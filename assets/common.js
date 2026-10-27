@@ -42,6 +42,45 @@
     return el;
   }
 
+  // ───── SVG, QR-код, аватарки ─────
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function svg(tag, attrs) {
+    const el = document.createElementNS(SVG_NS, tag);
+    if (attrs) for (const k of Object.keys(attrs)) el.setAttribute(k, attrs[k]);
+    for (let i = 2; i < arguments.length; i++) if (arguments[i]) el.appendChild(arguments[i]);
+    return el;
+  }
+  /** Чёткий векторный QR-код (библиотека qrcode-generator, MIT). null — если библиотека не загружена. */
+  function qrSvg(text, px) {
+    if (typeof global.qrcode !== 'function' || !text) return null;
+    try {
+      const qr = global.qrcode(0, 'M');
+      qr.addData(String(text));
+      qr.make();
+      const n = qr.getModuleCount(), quiet = 4, size = n + quiet * 2;
+      let d = '';
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += 'M' + (c + quiet) + ' ' + (r + quiet) + 'h1v1h-1z';
+      return svg('svg', { viewBox: '0 0 ' + size + ' ' + size, width: px, height: px, role: 'img', 'aria-label': 'QR-код для оплаты', 'shape-rendering': 'crispEdges' },
+        svg('rect', { width: size, height: size, fill: '#fff' }), svg('path', { d, fill: '#000' }));
+    } catch (e) { return null; }
+  }
+  /** Ссылка только http(s), иначе пустая строка (защита от javascript: в href). */
+  function safeUrl(u) {
+    const s = String(u == null ? '' : u).trim();
+    return /^https?:\/\/[^\s<>"']{3,400}$/i.test(s) ? s : '';
+  }
+  /** Аватарка: фото из ВК, а если его нет или оно не загрузилось — цветной кружок с буквой. */
+  function avatar(name, photo, size) {
+    const st = size ? { width: size + 'px', height: size + 'px', fontSize: Math.round(size * 0.42) + 'px' } : null;
+    const letter = h('div', { class: 'avatar', style: st, 'aria-hidden': 'true' }, String(name || '?').charAt(0).toUpperCase());
+    letter.style.background = avatarColor(String(name || '?'));
+    const url = safeUrl(photo);
+    if (!url) return letter;
+    const img = h('img', { class: 'avatar avatar-img', style: st, src: url, alt: '', loading: 'lazy', decoding: 'async', referrerpolicy: 'no-referrer', 'aria-hidden': 'true' });
+    img.addEventListener('error', () => { if (img.parentNode) img.parentNode.replaceChild(letter, img); });
+    return img;
+  }
+
   // ───── Время ─────
   let skew = 0; // серверное время минус локальное
   const nowMs = () => Date.now() + skew;
@@ -207,7 +246,7 @@
         ok: true, now: Date.now(), event: { number: cfg.number, title: cfg.title, date: cfg.date }, price: '250 ₽',
         ticketCount: cfg.count, confirmHours: cfg.hours, limits: { pending: cfg.maxPending, total: 0 },
         quiet: { on: true, from: '00:00', to: '09:00' }, tzOffsetMin: OFF, open: cfg.open, paused: cfg.paused, pauseMessage: cfg.pauseMessage,
-        info: { payment: 'Донат на карту 0000 0000 0000 0000 (Имя Ф.)\nили по СБП на +7 900 000-00-00.\nСумма — по числу номерков.', contact: 'Отправьте скриншот доната в личные сообщения ВК (vk.com/your_workshop) и укажите код брони.' },
+        info: { payUrl: 'https://spasibomir.ru/pay/33434', postUrl: 'https://vk.com/wall-1_1', payment: '' },
         tickets: t, players, counts: { free: t.filter((x) => x === 'f').length, total: cfg.count }
       };
     };
@@ -221,6 +260,8 @@
       { key: 'maxPending', label: 'Лимит неподтверждённых номерков на человека', hint: '', type: 'number', options: null, value: String(cfg.maxPending) },
       { key: 'quietFrom', label: 'Тихие часы: с', hint: 'ЧЧ:ММ', type: 'time', options: null, value: '00:00' },
       { key: 'quietTo', label: 'Тихие часы: до', hint: 'ЧЧ:ММ', type: 'time', options: null, value: '09:00' },
+      { key: 'payUrl', label: 'Ссылка на оплату', hint: 'Кнопка и QR-код для участников', type: 'text', options: null, value: 'https://spasibomir.ru/pay/33434' },
+      { key: 'postUrl', label: 'Ссылка на пост для комментария', hint: 'Под ним участники оставляют номерки и скриншот', type: 'text', options: null, value: 'https://vk.com/wall-1_1' },
       { key: 'bookingOpen', label: 'Приём броней открыт', hint: '', type: 'yesno', options: null, value: cfg.open ? 'ДА' : 'НЕТ' },
       { key: 'paused', label: 'Технический перерыв (заморозка бронирования)', hint: 'ДА — новые брони закрыты, таймеры стоят', type: 'yesno', options: null, value: cfg.paused ? 'ДА' : 'НЕТ' },
       { key: 'pauseMessage', label: 'Текст на время перерыва', hint: '', type: 'text', options: null, value: cfg.pauseMessage },
@@ -241,7 +282,7 @@
     function handle(action, p) {
       if (action === 'state') return pubState();
       if (action === 'mine') return { ok: true, now: Date.now(), paused: cfg.paused, bookings: bookings.filter((b) => b.client === p.client && b.status !== 'ОТМЕНЕНА').map(pub) };
-      if (action === 'resolveVk') return { ok: true, display: 'Демо Г.', key: 'demo' };
+      if (action === 'resolveVk') return { ok: true, display: 'Демо Г.', photo: '', key: 'demo' };
       if (action === 'book') {
         if (cfg.paused) return err('PAUSED', cfg.pauseMessage);
         if (!/vk\.(com|ru)\//i.test(p.vkUrl || '')) return err('BAD_VK', 'Это не похоже на ссылку ВКонтакте. Пример: vk.com/id12345');
@@ -292,5 +333,5 @@
     return { handle };
   })();
 
-  global.Nomerok = { CFG, DEMO, h, fill, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
+  global.Nomerok = { CFG, DEMO, h, fill, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
 })(window);

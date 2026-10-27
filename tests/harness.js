@@ -69,7 +69,7 @@ function createEnv(opts = {}) {
   const cache = new Map();
   const mails = [];
   const fetches = [];
-  const env = { clock, sheets, props, mails, fetches, vkHandler: () => ({ response: [] }) };
+  const env = { clock, sheets, props, mails, fetches, vkHandler: () => ({ response: [] }), htmlHandler: () => ({ status: 403 }) };
 
   class FakeDate extends Date {
     constructor(...a) { if (a.length === 0) super(clock.now); else super(...a); }
@@ -113,8 +113,14 @@ function createEnv(opts = {}) {
     UrlFetchApp: {
       fetch: (url) => {
         fetches.push(url);
-        const body = env.vkHandler(url);
-        return { getContentText: () => JSON.stringify(body) };
+        const resp = (status, headers, body, byCharset) => ({
+          getResponseCode: () => status,
+          getHeaders: () => headers || {},
+          getContentText: (cs) => (byCharset ? (byCharset[cs || 'UTF-8'] ?? '') : body)
+        });
+        if (url.includes('api.vk.com')) return resp(200, {}, JSON.stringify(env.vkHandler(url)));
+        const r = env.htmlHandler(url) || { status: 403 };
+        return resp(r.status === undefined ? 200 : r.status, r.headers, r.body === undefined ? '' : r.body, r.byCharset);
       }
     },
     MailApp: { sendEmail: (to, subject, body) => mails.push({ to, subject, body }) },

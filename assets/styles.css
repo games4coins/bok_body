@@ -258,3 +258,30 @@ button { cursor: pointer; }
 
 /* список участников внутри flex-карточки */
 .players .plist { flex: 1; min-height: 0; }
+
+/* ───── Аватарки, оплата, комментарий ───── */
+.avatar-img { object-fit: cover; background: #eee; display: block; }
+.hero-top .admin-link { margin-left: auto; text-decoration: none; color: #fff; background: rgba(0, 0, 0, .22); font-weight: 700; }
+.hero-top .admin-link:hover { background: rgba(0, 0, 0, .34); }
+.profile-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--free-bg); border: 1px solid var(--free-line); }
+.profile-card b { font-size: 16px; }
+.profile-card .meta { color: var(--ink-soft); font-size: 12.5px; margin-top: 2px; }
+
+.paybox, .cbox { border: 1.5px solid var(--line); background: var(--bg-2); border-radius: 18px; padding: 14px 16px; margin-top: 12px; }
+.paybox { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.paybox-main { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; flex: 1 1 200px; min-width: 0; }
+.paybox-main .meta, .cbox .meta { color: var(--ink-soft); font-size: 13px; }
+.qr { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 6px; line-height: 0; flex: none; margin: 0 auto; }
+.qr svg { width: 168px; height: 168px; display: block; }
+.copyline { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: #fff; border: 1.5px dashed #f0b896; border-radius: 14px; padding: 10px 12px; }
+.copynums { font-weight: 900; font-size: 20px; letter-spacing: .02em; color: var(--accent-2); word-break: break-word; min-width: 0; }
+.codebox .code { font-size: 24px; word-break: break-word; }
+@media (max-width: 520px) {
+  .paybox { flex-direction: column; align-items: stretch; }
+  .paybox-main .btn { width: 100%; }
+  .copyline { flex-direction: column; align-items: stretch; text-align: center; }
+}
+
+/* админка: аватарка рядом с именем */
+.bk .who { display: flex; align-items: center; gap: 10px; }
+.adm-top a.tab { text-decoration: none; display: inline-block; }

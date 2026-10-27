@@ -112,7 +112,7 @@ test('бронь без VK_TOKEN: просит имя; с именем — со�
   assert.equal(r.booking.status, 'ОЖИДАЕТ');
   assert.equal(r.booking.deadline, env.msk(2, 20));
   assert.equal(r.booking.name, 'Анна К.');
-  assert.ok(r.info.payment.length > 0);
+  assert.equal(r.info.payUrl, 'https://spasibomir.ru/pay/33434');
 
   const st = env.get();
   assert.equal(st.tickets[0], 'p');

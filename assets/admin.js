@@ -1,7 +1,7 @@
 /* Номерок — админка. Работает с телефона. */
 (function () {
   'use strict';
-  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, store, copyText, toast, beep, unlockAudio, DEMO } = Nomerok;
+  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, store, copyText, toast, beep, unlockAudio, DEMO } = Nomerok;
 
   const POLL_MS = 10000;
   const root = document.getElementById('app');
@@ -89,7 +89,8 @@
     } },
       h('h2', null, '🎙 Номерок · Админка'), h('p', { class: 'lead' }, 'Введите пароль, заданный в свойствах скрипта.'),
       h('div', { class: 'field' }, pw), h('label', { class: 'sw', style: { marginBottom: '14px' } }, remember, 'Запомнить на этом устройстве'), btn, err);
-    fill(root, h('div', { class: 'login' }, form));
+    fill(root, h('div', { class: 'login' }, form,
+      h('p', { style: { textAlign: 'center', marginTop: '16px' } }, h('a', { href: 'index.html', style: { color: 'var(--accent-2)', fontWeight: '700' } }, '← К бронированию'))));
     pw.focus();
   }
 
@@ -129,7 +130,8 @@
     const attention = st.bookings.filter((b) => NEEDS_CHECK.indexOf(b.status) >= 0).length;
     const tab = (id, label, badge) => h('button', { class: 'tab' + (A.tab === id ? ' on' : ''), onclick: () => { A.tab = id; renderTop(); renderTab(); } },
       label, badge ? h('span', { class: 'badge' }, badge) : null);
-    fill(topEl, 
+    fill(topEl,
+      h('a', { class: 'tab', href: 'index.html', title: 'Страница бронирования для участников' }, '← К бронированию'),
       h('span', { class: 'brand' }, 'Эфир №' + st.event.number),
       h('div', { class: 'tabs' }, tab('queue', 'Брони', attention || ''), tab('grid', 'Сетка'), tab('settings', 'Настройки')),
       h('span', { class: 'grow' }),
@@ -223,7 +225,8 @@
       buttons.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmThen('Отменить подтверждённую бронь ' + b.code + '?', () => act('adminCancel', { code: b.code }, 'Отменена')) }, 'Отменить бронь'));
     }
     buttons.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: async (e) => { const ok = await copyText(b.code); e.target.textContent = ok ? 'Скопировано ✓' : 'Ошибка'; } }, '📋 Код'));
-    const who = b.vkUrl ? h('a', { href: b.vkUrl, target: '_blank', rel: 'noopener noreferrer' }, b.name) : b.name;
+    const whoName = b.vkUrl ? h('a', { href: b.vkUrl, target: '_blank', rel: 'noopener noreferrer' }, b.name) : h('span', null, b.name);
+    const who = h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '10px' } }, avatar(b.name, b.photo, 36), whoName);
     return h('section', { class: 'card bk' + (b.status === 'ОПЛАТА ЗАЯВЛЕНА' ? ' attn' : '') },
       h('div', { class: 'mine-top' }, h('span', { class: 'code' }, b.code), h('span', { class: 'status ' + cls }, label),
         h('span', { class: 'meta' }, fmtDT(b.created, off()) + ' · ' + (b.source || ''))),
@@ -320,7 +323,8 @@
     ['Эфир', ['eventNumber', 'eventTitle', 'eventDate', 'ticketCount', 'priceText']],
     ['Бронирование', ['confirmHours', 'maxPending', 'maxConfirmed', 'quietEnabled', 'quietFrom', 'quietTo', 'utcOffset', 'bookingOpen']],
     ['Технический перерыв', ['paused', 'pauseMessage']],
-    ['Тексты для участников', ['paymentInfo', 'contactInfo', 'nameFormat', 'showPending']],
+    ['Оплата и комментарий', ['payUrl', 'postUrl', 'paymentInfo']],
+    ['Список участников', ['nameFormat', 'showPending']],
     ['Уведомления', ['notifyEmail', 'adminUrl']]
   ];
 

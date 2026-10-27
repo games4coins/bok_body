@@ -76,6 +76,7 @@ function boot(files) {
   const store = new Map();
   const storage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
   const timers = [];
+  const clip = [];
   const audio = { osc: 0 };
   class FakeAudio {
     constructor() { this.state = 'running'; this.currentTime = 0; this.destination = {}; }
@@ -90,26 +91,27 @@ function boot(files) {
     Node: FNode,
     document: {
       body, title: '', hidden: false,
-      createElement: (t) => new FEl(t), createTextNode: (t) => new FText(t),
+      createElement: (t) => new FEl(t), createElementNS: (ns, t) => new FEl(t), createTextNode: (t) => new FText(t),
       getElementById: (id) => byId[id] || null, addEventListener() {}, removeEventListener() {},
       querySelectorAll: (sel) => body.querySelectorAll(sel), execCommand: () => true
     },
-    navigator: { clipboard: { writeText: async () => {} } },
+    navigator: { clipboard: { writeText: async (t) => { clip.push(t); } } },
     localStorage: storage, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     location: { reload() {} },
     matchMedia: () => ({ matches: true }),
     confirm: () => true
   };
   sandbox.window = sandbox;
+  sandbox.NOMEROK_CONFIG = { API_URL: '' };   // тесты всегда работают на демо-бэкенде, независимо от боевого config.js
   sandbox.window.matchMedia = sandbox.matchMedia;
   sandbox.window.confirm = () => true;
   const ctx = vm.createContext(sandbox);
   files.forEach((f) => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f }));
-  return { app, body, demo, ctx, sandbox, timers, audio };
+  return { app, body, demo, ctx, sandbox, timers, audio, clip };
 }
 
-const PUBLIC = ['config.js', 'assets/common.js', 'assets/app.js'];
-const ADMIN = ['config.js', 'assets/common.js', 'assets/admin.js'];
+const PUBLIC = ['assets/qrcode.js', 'assets/common.js', 'assets/app.js'];
+const ADMIN = ['assets/common.js', 'assets/admin.js'];
 
 test('публичная страница: сборка, сетка, список участников по алфавиту', async () => {
   const { app, body } = boot(PUBLIC);
@@ -131,7 +133,7 @@ test('публичная страница: сборка, сетка, списо�
 });
 
 test('публичная страница: выбор номерков → бронь → экран подтверждения скриншотом', async () => {
-  const { app, body } = boot(PUBLIC);
+  const { app, body, clip } = boot(PUBLIC);
   await sleep(500);
   const free = () => findAll(app, (e) => e.className.includes('t-free'));
   const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
@@ -163,18 +165,37 @@ test('публичная страница: выбор номерков → бр�
   click(submit); await sleep(500);
   const ov2 = findAll(body, (e) => e.className === 'overlay')[0];
   assert.ok(hasText(ov2, 'Подтвердите бронирование номерков скриншотом доната'));
-  assert.ok(/Б-\d{4}/.test(textOf(ov2)), 'код брони показан');
-  assert.ok(hasText(ov2, 'Я отправил(а) скриншот'));
-  assert.ok(hasText(ov2, 'Куда отправить скриншот'));
+  assert.ok(!/Б-\d{4}/.test(textOf(ov2)), 'код брони участнику не показывается');
+  assert.ok(hasText(ov2, 'Ваши номерки'));
+  assert.ok(hasText(ov2, '2, 3'), 'номерки через запятую');
 
-  // после брони в списке «Ваши брони», номерки занялись
+  // оплата: ссылка и QR-код
+  const payLink = findAll(ov2, (e) => e.tag === 'a' && textOf(e).includes('Оплатить по ссылке'))[0];
+  assert.ok(payLink, 'кнопка-ссылка оплаты');
+  assert.equal(payLink.attrs.href, 'https://spasibomir.ru/pay/33434');
+  assert.equal(payLink.attrs.rel, 'noopener noreferrer');
+  const qrPath = findAll(ov2, (e) => e.tag === 'path' && (e.attrs.d || '').length > 100)[0];
+  assert.ok(qrPath, 'QR-код нарисован');
+  assert.ok(hasText(ov2, 'К оплате: 500 ₽ (2 × 250 ₽)'), 'сумма: ' + textOf(ov2).slice(0, 400));
+
+  // комментарий под постом: копирование номерков и ссылка на пост
+  assert.ok(hasText(ov2, 'Оставьте комментарий под постом'));
+  const post = findAll(ov2, (e) => e.tag === 'a' && textOf(e).includes('Открыть пост'))[0];
+  assert.ok(post && /^https:\/\//.test(post.attrs.href));
+  click(buttonByText(ov2, 'Копировать номерки')); await sleep(30);
+  assert.deepEqual(clip, ['2, 3'], 'в буфер ушли номерки через запятую');
+  click(buttonByText(ov2, 'Копировать')); await sleep(30);
+  assert.equal(clip[clip.length - 1], '2, 3');
+
+  // после брони в «Ваши брони» — без кода, номерки заняты
   const mine = findAll(app, (e) => e.className.includes('mine'));
   assert.ok(mine.length > 0 && hasText(mine[0], 'Ждёт подтверждения'));
+  assert.ok(!/Б-\d{4}/.test(textOf(mine[0])), 'кода нет и в «Ваших бронях»');
   assert.ok(tile(2).className.includes('t-pend'));
   assert.ok(tile(2).disabled);
 
-  // «Я отправил(а) скриншот» → статус «Оплата заявлена»
-  click(buttonByText(ov2, 'Я отправил(а) скриншот')); await sleep(500);
+  // «Я оставил(а) комментарий» → статус «Оплата заявлена»
+  click(buttonByText(ov2, 'Я оставил(а) комментарий со скриншотом')); await sleep(500);
   const mine2 = findAll(app, (e) => e.className.includes('mine'));
   assert.ok(hasText(mine2[0], 'Оплата заявлена'));
 
@@ -318,6 +339,53 @@ test('админка: кнопка «Перерыв» замораживает �
   click(buttonByText(app, 'Возобновить')); await sleep(400);
   assert.equal((await ctx.Nomerok.api.state()).paused, false);
   assert.ok(!hasText(app, 'Бронирование заморожено'));
+});
+
+test('публичная страница: кнопка входа в админку', async () => {
+  const { app } = boot(PUBLIC);
+  await sleep(400);
+  const link = findAll(app, (e) => e.tag === 'a' && e.className.includes('admin-link'))[0];
+  assert.ok(link, 'ссылка на админку в шапке');
+  assert.equal(link.attrs.href, 'admin.html');
+  assert.ok(hasText(link, 'Админ'));
+});
+
+test('админка: переход обратно к бронированию (на входе и после входа)', async () => {
+  const { app } = boot(ADMIN);
+  await sleep(100);
+  const loginBack = findAll(app, (e) => e.tag === 'a' && e.attrs.href === 'index.html')[0];
+  assert.ok(loginBack && hasText(loginBack, 'К бронированию'), 'на экране входа');
+  const form = findAll(app, (e) => e.tag === 'form')[0];
+  findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
+  form.listeners.submit.forEach((f) => f({ preventDefault() {} }));
+  await sleep(500);
+  const back = findAll(app, (e) => e.tag === 'a' && e.attrs.href === 'index.html' && e.className.includes('tab'))[0];
+  assert.ok(back && hasText(back, 'К бронированию'), 'в панели администратора');
+  click(buttonByText(app, 'Настройки'));
+  assert.ok(hasText(app, 'Ссылка на оплату'));
+  assert.ok(hasText(app, 'Ссылка на пост для комментария'));
+});
+
+test('аватарка: фото ВК или буква; чужие и опасные адреса игнорируются', async () => {
+  const { ctx } = boot(PUBLIC);
+  const { avatar, safeUrl } = ctx.Nomerok;
+  const withPhoto = avatar('Анна К.', 'https://sun9-1.userapi.com/a.jpg', 40);
+  assert.equal(withPhoto.tag, 'img');
+  assert.equal(withPhoto.attrs.src, 'https://sun9-1.userapi.com/a.jpg');
+  assert.equal(withPhoto.attrs.referrerpolicy, 'no-referrer');
+  const letter = avatar('Анна К.', '', 40);
+  assert.equal(letter.tag, 'div');
+  assert.equal(textOf(letter), 'А');
+  assert.equal(avatar('Анна', 'javascript:alert(1)').tag, 'div', 'javascript: отброшен');
+  assert.equal(safeUrl('ftp://x.y/z'), '');
+  assert.equal(safeUrl('https://spasibomir.ru/pay/33434'), 'https://spasibomir.ru/pay/33434');
+});
+
+test('QR-код: пустая ссылка оплаты скрывает блок оплаты', async () => {
+  const { app, body, ctx, timers } = boot(PUBLIC);
+  await sleep(400);
+  assert.equal(ctx.Nomerok.qrSvg('', 100), null);
+  assert.ok(ctx.Nomerok.qrSvg('https://spasibomir.ru/pay/33434', 100));
 });
 
 test('XSS: имена участников не интерпретируются как HTML', async () => {

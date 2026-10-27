@@ -4,6 +4,6 @@
   "private": true,
   "description": "Бронирование номерков: GitHub Pages + Google Таблица (Apps Script)",
   "scripts": {
-    "test": "node --test tests/backend.test.js tests/frontend.test.js"
+    "test": "node --test tests/backend.test.js tests/vk.test.js tests/frontend.test.js"
   }
 }

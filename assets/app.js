@@ -1,7 +1,7 @@
 /* Номерок — публичная страница бронирования. */
 (function () {
   'use strict';
-  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, avatarColor, DEMO } = Nomerok;
+  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO } = Nomerok;
 
   const CLIENT = clientId();
   const POLL_MS = 8000;
@@ -69,7 +69,8 @@
     document.title = 'Эфир №' + st.event.number + ' — бронирование номерков';
     const status = st.paused ? '⏸ Технический перерыв' : st.open ? '● Бронь открыта' : 'Бронь закрыта';
     fill(heroEl, 
-      h('div', { class: 'hero-top' }, h('span', { class: 'pill solid' }, 'Эфир №' + st.event.number), h('span', { class: 'pill' }, status)),
+      h('div', { class: 'hero-top' }, h('span', { class: 'pill solid' }, 'Эфир №' + st.event.number), h('span', { class: 'pill' }, status),
+        h('a', { class: 'pill admin-link', href: 'admin.html', title: 'Вход для организатора' }, store('nomerok_admin_pw') ? '⚙ Админка' : '🔐 Админ')),
       h('h1', null, st.event.title || 'Прямой эфир'),
       st.event.date ? h('p', { class: 'sub' }, '📅 ' + st.event.date) : null,
       h('div', { class: 'hero-stats' },
@@ -95,8 +96,8 @@
       h('summary', { style: { cursor: 'pointer', fontWeight: '800', fontSize: '17px' } }, 'Как это работает'),
       h('div', { class: 'steps' },
         step(1, 'Выберите номерки', 'Нажмите на свободные номерки в сетке.'),
-        step(2, 'Оставьте ссылку на ВК', 'Имя для списка участников подтянется из вашего профиля.'),
-        step(3, 'Подтвердите скриншотом доната', 'У вас ' + fmtHours(st.confirmHours) + ' на подтверждение.' + quiet)),
+        step(2, 'Оставьте ссылку на ВК', 'Имя и фото для списка участников подтянутся из вашего профиля.'),
+        step(3, 'Оплатите и подтвердите комментарием', 'Оставьте номерки и скриншот оплаты в комментарии к посту. У вас ' + fmtHours(st.confirmHours) + ' на подтверждение.' + quiet)),
       h('p', { class: 'lead', style: { margin: '14px 0 0' } },
         'Пока бронь не подтверждена, можно держать не более ' + st.limits.pending + ' номерков. После подтверждения лимит обновляется.' +
         (st.limits.total ? ' Всего на одного участника — не больше ' + st.limits.total + '.' : '')));
@@ -129,18 +130,19 @@
       : null;
     const actions = [];
     if (b.status === 'ОЖИДАЕТ') {
-      actions.push(h('button', { class: 'btn btn-primary btn-sm', onclick: () => markPaid(b) }, 'Я отправил(а) скриншот'));
-      actions.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openHowToPay(b) }, 'Как оплатить'));
+      actions.push(h('button', { class: 'btn btn-primary btn-sm', onclick: () => openHowToPay(b) }, 'Как оплатить и подтвердить'));
+      actions.push(h('button', { class: 'btn btn-soft btn-sm', onclick: () => markPaid(b) }, 'Я оставил(а) комментарий'));
       actions.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => cancelBooking(b) }, 'Отменить'));
     } else if (b.status === 'ОПЛАТА ЗАЯВЛЕНА') {
-      actions.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openHowToPay(b) }, 'Куда отправить скриншот'));
+      actions.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: () => openHowToPay(b) }, 'Показать инструкцию'));
     }
     const note = b.status === 'ИСТЕКЛА'
-      ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Если вы уже оплатили — напишите организатору и назовите код брони, её можно восстановить.')
-      : b.status === 'ПОДТВЕРЖДЕНА' ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Номерки закреплены за вами. До встречи в эфире!') : null;
+      ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Если вы уже оплатили — напишите организатору и назовите номерки, бронь можно восстановить.')
+      : b.status === 'ПОДТВЕРЖДЕНА' ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Номерки закреплены за вами. До встречи в эфире!')
+      : b.status === 'ОПЛАТА ЗАЯВЛЕНА' ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Спасибо! Организатор проверит комментарий и оплату.') : null;
     return h('div', { class: 'mine-item' },
-      h('div', { class: 'mine-top' }, h('span', { class: 'code' }, b.code), h('span', { class: 'status ' + cls }, label)),
-      h('div', { class: 'chips' }, b.numbers.map((n) => h('span', { class: 'chip' }, '№' + n))),
+      h('div', { class: 'mine-top' }, h('span', { class: 'status ' + cls }, label), h('span', { class: 'meta' }, b.count + ' ' + (b.count === 1 ? 'номерок' : 'номерков'))),
+      h('div', { class: 'chips', style: { marginTop: '8px' } }, b.numbers.map((n) => h('span', { class: 'chip' }, '№' + n))),
       timer, note, actions.length ? h('div', { class: 'row-actions' }, actions) : null);
   }
 
@@ -205,7 +207,7 @@
       const l = norm(p.name).charAt(0).toUpperCase();
       if (l !== letter) { letter = l; out.push(h('div', { class: 'letter' }, l)); }
       out.push(h('div', { class: 'prow' },
-        h('div', { class: 'avatar', style: { background: avatarColor(p.name) }, 'aria-hidden': 'true' }, p.name.charAt(0).toUpperCase()),
+        avatar(p.name, p.photo),
         h('div', { class: 'pname' }, h('b', null, p.name),
           h('div', { class: 'chips' }, p.items.map((it) => h('span', { class: 'chip' + (it[1] ? '' : ' pend') }, '№' + it[0]))))));
     });
@@ -264,21 +266,59 @@
     refresh();
   }
 
-  function payBlock(code) {
-    const info = S.st.info;
-    return [
-      info.payment ? h('div', null, h('b', null, 'Куда перевести'), h('div', { class: 'pre' }, info.payment)) : null,
-      info.contact ? h('div', null, h('b', null, 'Куда отправить скриншот'), h('div', { class: 'pre' }, info.contact)) : null,
-      h('p', { class: 'meta' }, 'В сообщении обязательно укажите код брони: ', h('b', null, code))
-    ];
+  function totalText(count) {
+    const m = String(S.st.price || '').match(/(\d[\d\s]*)/);
+    const unit = m ? parseInt(m[1].replace(/\s/g, ''), 10) : 0;
+    if (!unit) return '';
+    const cur = /₽|руб/i.test(S.st.price) ? ' ₽' : '';
+    return 'К оплате: ' + (unit * count).toLocaleString('ru-RU') + cur + ' (' + count + ' × ' + unit + cur + ')';
+  }
+
+  function copyBtn(text, label) {
+    return h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: async (e) => {
+      const ok = await copyText(text);
+      e.target.textContent = ok ? 'Скопировано ✓' : 'Не удалось';
+      setTimeout(() => { e.target.textContent = label || 'Копировать'; }, 2500);
+    } }, label || 'Копировать');
+  }
+
+  /** Блок оплаты: ссылка-кнопка и QR-код. */
+  function payBlock(nums) {
+    const info = S.st.info, url = safeUrl(info.payUrl);
+    const out = [];
+    if (url) {
+      const qr = qrSvg(url, 168);
+      const total = totalText(nums.length);
+      out.push(h('div', { class: 'paybox' },
+        h('div', { class: 'paybox-main' },
+          h('b', null, '1. Оплатите'),
+          total ? h('div', { class: 'meta' }, total) : null,
+          h('a', { class: 'btn btn-primary', href: url, target: '_blank', rel: 'noopener noreferrer' }, 'Оплатить по ссылке'),
+          qr ? h('div', { class: 'meta' }, 'или наведите камеру телефона на QR-код') : null),
+        qr ? h('div', { class: 'qr' }, qr) : null));
+    }
+    if (info.payment) out.push(h('div', { class: 'pre' }, info.payment));
+    return out;
+  }
+
+  /** Блок комментария: номерки через запятую с копированием и ссылка на пост. */
+  function commentBlock(nums) {
+    const text = nums.join(', '), post = safeUrl(S.st.info.postUrl);
+    return h('div', { class: 'cbox' },
+      h('b', null, '2. Оставьте комментарий под постом'),
+      h('p', { class: 'meta', style: { margin: '4px 0 10px' } }, 'Напишите номерки через запятую и прикрепите скриншот оплаты.'),
+      h('div', { class: 'copyline' }, h('span', { class: 'copynums num' }, text), copyBtn(text, 'Копировать номерки')),
+      post ? h('a', { class: 'btn btn-ghost btn-block', style: { marginTop: '10px' }, href: post, target: '_blank', rel: 'noopener noreferrer' }, 'Открыть пост для комментария')
+        : h('p', { class: 'meta', style: { margin: '10px 0 0' } }, 'Пост для комментария укажет организатор.'));
   }
 
   function openHowToPay(b) {
     openModal([
-      h('h3', null, 'Как подтвердить бронь ' + b.code),
-      h('p', { class: 'lead' }, 'Номерки ' + list(b.numbers)),
-      payBlock(b.code),
-      b.status === 'ОЖИДАЕТ' ? h('button', { class: 'btn btn-primary btn-block', style: { marginTop: '10px' }, onclick: () => markPaid(b) }, 'Я отправил(а) скриншот') : null
+      h('h3', null, 'Как подтвердить бронь'),
+      h('p', { class: 'lead' }, 'Ваши номерки: ' + b.numbers.join(', ')),
+      payBlock(b.numbers), commentBlock(b.numbers),
+      h('div', { class: 'cbox' }, h('b', null, '3. Нажмите кнопку'), h('p', { class: 'meta', style: { margin: '4px 0 0' } }, 'Организатор получит сигнал и проверит комментарий.')),
+      b.status === 'ОЖИДАЕТ' ? h('button', { class: 'btn btn-primary btn-block', style: { marginTop: '12px' }, onclick: () => markPaid(b) }, 'Я оставил(а) комментарий со скриншотом') : null
     ]);
   }
 
@@ -287,24 +327,35 @@
     if (!nums.length) return;
     const vkInput = h('input', {
       class: 'input', type: 'text', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false',
-      placeholder: 'vk.com/id12345', value: store('nomerok_vk') || ''
+      placeholder: 'vk.com/id12345 или vk.com/ваш_ник', value: store('nomerok_vk') || ''
     });
     const nameInput = h('input', { class: 'input', type: 'text', autocomplete: 'name', maxlength: '40', placeholder: 'Как вас называть', value: store('nomerok_name') || '' });
     const nameField = h('div', { class: 'field hidden' }, h('label', null, 'Ваше имя'), nameInput,
-      h('div', { class: 'hint' }, 'Автоматически определить имя по ссылке не получилось — введите его вручную.'));
+      h('div', { class: 'hint' }, 'Определить имя по ссылке автоматически не получилось — введите его вручную. В списке будет только имя, без фото.'));
     const preview = h('div', { class: 'msg' });
     const errBox = h('div', { class: 'msg err', role: 'alert' });
     const submit = h('button', { class: 'btn btn-primary btn-block', type: 'button' }, 'Забронировать ' + list(nums));
+    let seq = 0;
 
     async function resolve() {
-      const v = vkInput.value.trim();
-      preview.textContent = ''; errBox.textContent = '';
+      const v = vkInput.value.trim(), my = ++seq;
+      errBox.textContent = '';
+      fill(preview);
       if (!v) return;
       preview.className = 'msg'; preview.textContent = 'Проверяем профиль…';
       const r = await api.post('resolveVk', { clientId: CLIENT, vkUrl: v });
-      if (r.ok) { preview.className = 'msg ok'; preview.textContent = 'В списке вы будете как: ' + r.display; nameField.classList.add('hidden'); }
-      else if (r.error.needName) { preview.textContent = ''; nameField.classList.remove('hidden'); }
-      else { preview.className = 'msg err'; preview.textContent = r.error.message; }
+      if (my !== seq) return;           // ссылку уже изменили
+      fill(preview);
+      if (r.ok) {
+        preview.className = 'msg';
+        nameField.classList.add('hidden');
+        fill(preview, h('div', { class: 'profile-card' }, avatar(r.display, r.photo, 44),
+          h('div', null, h('b', null, r.display), h('div', { class: 'meta' }, 'Так вы будете в списке участников. Это не вы? Проверьте ссылку.'))));
+      } else if (r.error.needName) {
+        nameField.classList.remove('hidden');
+      } else {
+        preview.className = 'msg err'; preview.textContent = r.error.message;
+      }
     }
     vkInput.addEventListener('change', resolve);
 
@@ -333,32 +384,29 @@
       h('p', { class: 'lead' }, list(nums) + ' · ' + nums.length + ' шт. · ' + S.st.price + ' за номерок'),
       h('div', { class: 'field' },
         h('label', null, 'Ссылка на ваш профиль ВКонтакте'), vkInput,
-        h('div', { class: 'hint' }, 'Нужна, чтобы мы вас узнали и могли написать. Имя в списке подтянется из профиля.'), preview),
+        h('div', { class: 'hint' }, 'Нужна, чтобы мы вас узнали. В списке участников будут видны имя и фото из вашего профиля.'), preview),
       nameField, errBox, submit
     ]);
     if (vkInput.value) resolve(); else vkInput.focus();
   }
 
   function showSuccess(r) {
-    const b = r.booking, st = S.st;
+    const b = r.booking;
     const deadline = b.deadline
-      ? h('p', { style: { textAlign: 'center', margin: '0 0 10px' } }, 'Подтвердите бронь до ', h('b', null, fmtDT(b.deadline, off()) + ' ' + tz()),
+      ? h('p', { style: { textAlign: 'center', margin: '0 0 12px' } }, 'Подтвердите бронь до ', h('b', null, fmtDT(b.deadline, off()) + ' ' + tz()),
         ' (осталось ', h('span', { class: 'timer', 'data-deadline': b.deadline }, ''), ')')
       : null;
-    const copyBtn = h('button', { class: 'btn btn-soft btn-sm', onclick: async (e) => { const ok = await copyText(b.code); e.target.textContent = ok ? 'Скопировано ✓' : 'Не удалось'; } }, 'Копировать');
     openModal([
       h('div', { style: { textAlign: 'center' } }, h('div', { class: 'big-ok' }, '✓'),
         h('h3', null, 'Подтвердите бронирование номерков скриншотом доната'),
-        h('p', { class: 'lead' }, 'Номерки ' + list(b.numbers) + ' закреплены за вами на время подтверждения.')),
-      h('div', { class: 'codebox' }, h('div', null, h('div', { class: 'meta' }, 'Код брони'), h('div', { class: 'code' }, b.code)), copyBtn),
+        h('p', { class: 'lead' }, 'Номерки закреплены за вами на время подтверждения.')),
+      h('div', { class: 'codebox' }, h('div', null, h('div', { class: 'meta' }, 'Ваши номерки'), h('div', { class: 'code num' }, b.numbers.join(', '))),
+        copyBtn(b.numbers.join(', '), 'Копировать')),
       deadline,
-      h('ol', { class: 'ol' },
-        h('li', null, 'Переведите донат за ' + b.count + ' ' + (b.count === 1 ? 'номерок' : 'номерков') + ' по реквизитам ниже.'),
-        h('li', null, 'Отправьте скриншот и укажите код брони.'),
-        h('li', null, 'Нажмите «Я отправил(а) скриншот» — организатор получит сигнал и проверит оплату.')),
-      payBlock(b.code),
-      h('button', { class: 'btn btn-primary btn-block', style: { marginTop: '10px' }, onclick: () => markPaid(b) }, 'Я отправил(а) скриншот'),
-      h('button', { class: 'btn btn-ghost btn-block', style: { marginTop: '8px' }, onclick: closeModal }, 'Закрыть, отправлю позже')
+      payBlock(b.numbers), commentBlock(b.numbers),
+      h('div', { class: 'cbox' }, h('b', null, '3. Нажмите кнопку'), h('p', { class: 'meta', style: { margin: '4px 0 0' } }, 'Организатор получит сигнал и проверит комментарий.')),
+      h('button', { class: 'btn btn-primary btn-block', style: { marginTop: '12px' }, onclick: () => markPaid(b) }, 'Я оставил(а) комментарий со скриншотом'),
+      h('button', { class: 'btn btn-ghost btn-block', style: { marginTop: '8px' }, onclick: closeModal }, 'Закрыть, сделаю позже')
     ]);
     tickTimers();
   }
