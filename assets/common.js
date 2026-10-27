@@ -201,7 +201,7 @@
   // ───── Демо-режим: работает без сервера, чтобы можно было посмотреть вёрстку ─────
   const Demo = (function () {
     const OFF = 180, H = 3600000;
-    const cfg = { number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
+    const cfg = { bulkMin: 4, bulkText: 'Для брони от 4х и более билетов становится доступна оплата без комиссии', bulkButton: 'ЗАПРОСИТЬ РЕКВИЗИТЫ', bulkUrl: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
     const bookings = [];
     let seq = 4000;
     const add = (name, nums, status, extra) => bookings.push(Object.assign({
@@ -246,7 +246,7 @@
         ok: true, now: Date.now(), event: { number: cfg.number, title: cfg.title, date: cfg.date }, price: '250 ₽',
         ticketCount: cfg.count, confirmHours: cfg.hours, limits: { pending: cfg.maxPending, total: 0 },
         quiet: { on: true, from: '00:00', to: '09:00' }, tzOffsetMin: OFF, open: cfg.open, paused: cfg.paused, pauseMessage: cfg.pauseMessage,
-        info: { payUrl: 'https://spasibomir.ru/pay/33434', postUrl: 'https://vk.com/wall-1_1', payment: '' },
+        info: { payUrl: 'https://spasibomir.ru/pay/33434', postUrl: 'https://vk.com/wall-1_1', payment: '', bulk: cfg.bulkMin > 0 && cfg.bulkUrl ? { min: cfg.bulkMin, text: cfg.bulkText.replace(/\{n\}/g, String(cfg.bulkMin)), button: cfg.bulkButton, url: cfg.bulkUrl } : null },
         tickets: t, players, counts: { free: t.filter((x) => x === 'f').length, total: cfg.count }
       };
     };
@@ -262,6 +262,10 @@
       { key: 'quietTo', label: 'Тихие часы: до', hint: 'ЧЧ:ММ', type: 'time', options: null, value: '09:00' },
       { key: 'payUrl', label: 'Ссылка на оплату', hint: 'Кнопка и QR-код для участников', type: 'text', options: null, value: 'https://spasibomir.ru/pay/33434' },
       { key: 'postUrl', label: 'Ссылка на пост для комментария', hint: 'Под ним участники оставляют номерки и скриншот', type: 'text', options: null, value: 'https://vk.com/wall-1_1' },
+      { key: 'bulkMin', label: 'Оплата без комиссии: от скольки номерков', hint: '0 — отключить', type: 'number', options: null, value: String(cfg.bulkMin) },
+      { key: 'bulkText', label: 'Оплата без комиссии: надпись', hint: 'Можно написать {n}', type: 'textarea', options: null, value: cfg.bulkText },
+      { key: 'bulkButton', label: 'Оплата без комиссии: текст кнопки', hint: '', type: 'text', options: null, value: cfg.bulkButton },
+      { key: 'bulkUrl', label: 'Оплата без комиссии: ссылка кнопки', hint: 'Пусто — кнопка скрыта', type: 'text', options: null, value: cfg.bulkUrl },
       { key: 'bookingOpen', label: 'Приём броней открыт', hint: '', type: 'yesno', options: null, value: cfg.open ? 'ДА' : 'НЕТ' },
       { key: 'paused', label: 'Технический перерыв (заморозка бронирования)', hint: 'ДА — новые брони закрыты, таймеры стоят', type: 'yesno', options: null, value: cfg.paused ? 'ДА' : 'НЕТ' },
       { key: 'pauseMessage', label: 'Текст на время перерыва', hint: '', type: 'text', options: null, value: cfg.pauseMessage },
@@ -325,6 +329,10 @@
           if (u.bookingOpen !== undefined) cfg.open = String(u.bookingOpen).toUpperCase() === 'ДА';
           if (u.paused !== undefined) cfg.paused = String(u.paused).toUpperCase() === 'ДА';
           if (u.pauseMessage !== undefined) cfg.pauseMessage = String(u.pauseMessage);
+          if (u.bulkMin !== undefined) cfg.bulkMin = Math.max(0, Math.floor(Number(u.bulkMin) || 0));
+          if (u.bulkText !== undefined) cfg.bulkText = String(u.bulkText);
+          if (u.bulkButton !== undefined) cfg.bulkButton = String(u.bulkButton);
+          if (u.bulkUrl !== undefined) cfg.bulkUrl = String(u.bulkUrl);
           return admState();
         }
         default: return err('BAD_ACTION', 'Неизвестное действие');

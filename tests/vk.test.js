@@ -232,3 +232,49 @@ test('миграция: у существующей таблицы колонк�
   env.run('invalidate_()');
   assert.equal(env.get().tickets[2], 'p');
 });
+
+// ───── Оплата без комиссии (от N номерков) ─────
+
+test('оплата без комиссии: значения по умолчанию', () => {
+  const env = createEnv();
+  const b = env.get().info.bulk;
+  assert.equal(b.min, 4);
+  assert.equal(b.text, 'Для брони от 4х и более билетов становится доступна оплата без комиссии');
+  assert.equal(b.button, 'ЗАПРОСИТЬ РЕКВИЗИТЫ');
+  assert.equal(b.url, 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all');
+  // QR и ссылка на оплату остаются
+  assert.equal(env.get().info.payUrl, 'https://spasibomir.ru/pay/33434');
+});
+
+test('оплата без комиссии: порог, текст кнопки, ссылка настраиваются; {n} подставляется', () => {
+  const env = createEnv();
+  const r = env.admin('adminSettings', { updates: {
+    bulkMin: 6, bulkButton: 'Запросить реквизиты', bulkUrl: 'https://vk.com/im?sel=-1', bulkText: 'Бронь от {n} номерков — без комиссии'
+  } });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const b = env.get().info.bulk;
+  assert.deepEqual(JSON.parse(JSON.stringify(b)), { min: 6, text: 'Бронь от 6 номерков — без комиссии', button: 'Запросить реквизиты', url: 'https://vk.com/im?sel=-1' });
+  const booked = env.post({ action: 'book', clientId: CLIENT, vkUrl: 'vk.com/id1', name: 'Анна Кузнецова', numbers: [1, 2, 3, 4] });
+  assert.equal(booked.info.bulk.min, 6, 'в ответе на бронь тоже');
+});
+
+test('оплата без комиссии: 0 или пустая ссылка отключают блок, мусорная ссылка отвергается', () => {
+  const env = createEnv();
+  assert.equal(env.admin('adminSettings', { updates: { bulkMin: 0 } }).ok, true);
+  assert.equal(env.get().info.bulk, null);
+  env.admin('adminSettings', { updates: { bulkMin: 4, bulkUrl: '' } });
+  assert.equal(env.get().info.bulk, null);
+  assert.equal(env.admin('adminSettings', { updates: { bulkUrl: 'javascript:alert(1)' } }).error.code, 'BAD_SETTING');
+  assert.equal(env.admin('adminSettings', { updates: { bulkMin: -1 } }).error.code, 'BAD_SETTING');
+  assert.equal(env.admin('adminSettings', { updates: { bulkMin: 'много' } }).error.code, 'BAD_SETTING');
+});
+
+test('оплата без комиссии: настройки появляются в админке и сохраняются в листе', () => {
+  const env = createEnv();
+  const form = env.admin('adminState').form;
+  const keys = form.map((f) => f.key);
+  for (const k of ['bulkMin', 'bulkText', 'bulkButton', 'bulkUrl']) assert.ok(keys.includes(k), k);
+  env.admin('adminSettings', { updates: { bulkMin: 5 } });
+  const row = env.sheets['Настройки'].rows.find((r) => r && r[0] === 'Оплата без комиссии: от скольки номерков');
+  assert.equal(row[1], '5');
+});

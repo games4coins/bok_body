@@ -297,6 +297,13 @@
           qr ? h('div', { class: 'meta' }, 'или наведите камеру телефона на QR-код') : null),
         qr ? h('div', { class: 'qr' }, qr) : null));
     }
+    // Оплата без комиссии: от N номерков. QR и ссылка выше остаются.
+    const bulk = info.bulk, bulkUrl = bulk ? safeUrl(bulk.url) : '';
+    if (bulk && bulkUrl && nums.length >= bulk.min) {
+      out.push(h('div', { class: 'bulkbox' },
+        bulk.text ? h('p', { class: 'bulk-text' }, '💸 ' + bulk.text) : null,
+        h('a', { class: 'btn btn-soft bulk-btn', href: bulkUrl, target: '_blank', rel: 'noopener noreferrer' }, bulk.button || 'Запросить реквизиты')));
+    }
     if (info.payment) out.push(h('div', { class: 'pre' }, info.payment));
     return out;
   }

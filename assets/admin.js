@@ -324,6 +324,7 @@
     ['Бронирование', ['confirmHours', 'maxPending', 'maxConfirmed', 'quietEnabled', 'quietFrom', 'quietTo', 'utcOffset', 'bookingOpen']],
     ['Технический перерыв', ['paused', 'pauseMessage']],
     ['Оплата и комментарий', ['payUrl', 'postUrl', 'paymentInfo']],
+    ['Оплата без комиссии', ['bulkMin', 'bulkText', 'bulkButton', 'bulkUrl']],
     ['Список участников', ['nameFormat', 'showPending']],
     ['Уведомления', ['notifyEmail', 'adminUrl']]
   ];

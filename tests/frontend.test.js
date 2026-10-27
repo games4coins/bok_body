@@ -341,6 +341,68 @@ test('админка: кнопка «Перерыв» замораживает �
   assert.ok(!hasText(app, 'Бронирование заморожено'));
 });
 
+test('оплата без комиссии: при 3 номерках блока нет, при 4+ — надпись и кнопка, QR и ссылка на оплату остаются', async () => {
+  for (const [count, shown] of [[3, false], [4, true], [5, true]]) {
+    const { app, body } = boot(PUBLIC);
+    await sleep(450);
+    const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
+    for (let n = 2; n < 2 + count; n++) click(tile(n));
+    const bar = findAll(app, (e) => e.className.includes('actionbar'))[0];
+    click(buttonByText(bar, 'Забронировать'));
+    let overlay = findAll(body, (e) => e.className === 'overlay')[0];
+    findAll(overlay, (e) => e.tag === 'input')[0].value = 'https://vk.com/id12345';
+    click(buttonByText(overlay, 'Забронировать №2'));
+    await sleep(500);
+    overlay = findAll(body, (e) => e.className === 'overlay')[0];
+    assert.ok(hasText(overlay, 'Подтвердите бронирование'), 'бронь создана, ' + count);
+
+    const box = findAll(overlay, (e) => e.className === 'bulkbox')[0];
+    assert.equal(!!box, shown, 'блок без комиссии при ' + count + ' номерках');
+    if (shown) {
+      assert.ok(hasText(box, 'Для брони от 4х и более билетов становится доступна оплата без комиссии'));
+      const btn = findAll(box, (e) => e.tag === 'a')[0];
+      assert.equal(btn.attrs.href, 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all');
+      assert.equal(btn.attrs.target, '_blank');
+      assert.equal(btn.attrs.rel, 'noopener noreferrer');
+      assert.equal(textOf(btn), 'ЗАПРОСИТЬ РЕКВИЗИТЫ');
+    }
+    // оплата по ссылке и QR-код никуда не пропадают
+    const payLink = findAll(overlay, (e) => e.tag === 'a' && textOf(e).includes('Оплатить по ссылке'))[0];
+    assert.equal(payLink.attrs.href, 'https://spasibomir.ru/pay/33434');
+    assert.ok(findAll(overlay, (e) => e.tag === 'path' && (e.attrs.d || '').length > 100).length === 1, 'QR на месте');
+  }
+});
+
+test('оплата без комиссии: порог и тексты берутся из настроек, 0 скрывает блок', async () => {
+  const run = async (updates) => {
+    const env = boot(PUBLIC);
+    await sleep(400);
+    await env.ctx.Nomerok.api.post('adminSettings', { password: 'demo', updates });
+    await env.timers.find((t) => t.ms === 8000).f();
+    await sleep(300);
+    const { app, body } = env;
+    const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
+    [2, 3, 4, 5, 7].forEach((n) => click(tile(n)));                       // 5 номерков
+    click(buttonByText(findAll(app, (e) => e.className.includes('actionbar'))[0], 'Забронировать'));
+    let ov = findAll(body, (e) => e.className === 'overlay')[0];
+    findAll(ov, (e) => e.tag === 'input')[0].value = 'https://vk.com/id12345';
+    click(buttonByText(ov, 'Забронировать №2'));
+    await sleep(500);
+    ov = findAll(body, (e) => e.className === 'overlay')[0];
+    return findAll(ov, (e) => e.className === 'bulkbox')[0] || null;
+  };
+
+  assert.ok(await run({ bulkMin: 5 }), 'порог 5: при 5 номерках блок есть');
+  assert.equal(await run({ bulkMin: 6 }), null, 'порог 6: при 5 номерках блока нет');
+  assert.equal(await run({ bulkMin: 0 }), null, '0 — функция выключена');
+  assert.equal(await run({ bulkUrl: '' }), null, 'без ссылки кнопка скрыта');
+  const custom = await run({ bulkMin: 5, bulkText: 'Бронь от {n} — без комиссии', bulkButton: 'Узнать реквизиты', bulkUrl: 'https://vk.com/im?sel=-5' });
+  assert.ok(hasText(custom, 'Бронь от 5 — без комиссии'));
+  const link = findAll(custom, (e) => e.tag === 'a')[0];
+  assert.equal(textOf(link), 'Узнать реквизиты');
+  assert.equal(link.attrs.href, 'https://vk.com/im?sel=-5');
+});
+
 test('публичная страница: кнопка входа в админку', async () => {
   const { app } = boot(PUBLIC);
   await sleep(400);
