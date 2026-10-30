@@ -403,6 +403,92 @@ test('оплата без комиссии: порог и тексты беру�
   assert.equal(link.attrs.href, 'https://vk.com/im?sel=-5');
 });
 
+test('все места забронированы: крупная надпись поверх сетки, исчезает при освобождении номерка', async () => {
+  const { app, ctx, timers } = boot(PUBLIC);
+  await sleep(400);
+  const api = ctx.Nomerok.api;
+  const poll = async () => { await timers.find((t) => t.ms === 8000).f(); await sleep(250); };
+  const cover = () => findAll(app, (e) => e.className.split(' ').includes('soldout'))[0];
+  const wrap = () => findAll(app, (e) => e.className.split(' ').includes('gridwrap'))[0];
+
+  assert.ok(cover().className.includes('hidden'), 'пока есть свободные — надписи нет');
+  await api.post('adminSettings', { password: 'demo', updates: { ticketCount: 10, eventDate: 'в 15:00 28.10.2026' } });
+  await api.post('adminBook', { password: 'demo', name: 'Гость Тестовый', numbers: [2, 3, 4, 5, 7, 8, 9], mode: 'confirmed' });
+  await poll();
+  assert.ok(cover().className.includes('hidden'), 'остался номерок 10');
+  await api.post('adminBook', { password: 'demo', name: 'Гость Последний', numbers: [10], mode: 'confirmed' });
+  await poll();
+
+  assert.ok(!cover().className.includes('hidden'), 'надпись показана');
+  assert.ok(wrap().className.includes('is-covered'), 'сетка закрыта');
+  const big = findAll(cover(), (e) => e.className === 'soldout-big')[0];
+  const sub = findAll(cover(), (e) => e.className === 'soldout-sub')[0];
+  assert.equal(textOf(big), 'Все места забронированы.');
+  assert.equal(textOf(sub), 'Прямой эфир проведем в 15:00 28.10.2026');
+
+  // админ освободил номерок → надпись пропала
+  const st = await api.post('adminState', { password: 'demo' });
+  const code = st.bookings.find((b) => b.name === 'Гость Последний').code;
+  await api.post('adminCancel', { password: 'demo', code });
+  await poll();
+  assert.ok(cover().className.includes('hidden'));
+  assert.ok(!wrap().className.includes('is-covered'));
+});
+
+test('все места: «идёт подтверждение» — баннер над сеткой, только если задан текст', async () => {
+  const { app, ctx, timers } = boot(PUBLIC);
+  await sleep(400);
+  const api = ctx.Nomerok.api;
+  const poll = async () => { await timers.find((t) => t.ms === 8000).f(); await sleep(250); };
+  await api.post('adminSettings', { password: 'demo', updates: { ticketCount: 3 } });
+  await api.post('adminBook', { password: 'demo', name: 'Гость Раз', numbers: [2, 3], mode: 'confirmed' });
+  await api.post('adminBook', { password: 'demo', name: 'Ждёт Оплаты', numbers: [4], mode: 'timer' });   // 4 > 3: не влияет
+  await api.post('adminCancel', { password: 'demo', code: (await api.post('adminState', { password: 'demo' })).bookings.find((b) => b.name === 'Гость Раз').code });
+  await api.post('adminBook', { password: 'demo', name: 'Гость Два', numbers: [2, 3], mode: 'timer' });
+  await poll();
+  assert.ok(!textOf(app).includes('идёт подтверждение'), 'по умолчанию баннера нет');
+  await api.post('adminSettings', { password: 'demo', updates: { waitText: 'Места разобраны, идёт подтверждение оплаты' } });
+  await poll();
+  assert.ok(hasText(app, 'Места разобраны, идёт подтверждение оплаты'));
+  const cover = findAll(app, (e) => e.className.split(' ').includes('soldout'))[0];
+  assert.ok(cover.className.includes('hidden'), 'сетка при этом не закрыта');
+});
+
+test('админка: «Завершить эфир и начать новый» — предупреждение о неподтверждённых, архив, новый номер', async () => {
+  const { app, body } = boot(ADMIN);
+  await sleep(100);
+  const form = findAll(app, (e) => e.tag === 'form')[0];
+  findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
+  form.listeners.submit.forEach((f) => f({ preventDefault() {} }));
+  await sleep(500);
+  click(buttonByText(app, 'Настройки'));
+  assert.ok(hasText(app, 'Надписи на странице бронирования'));
+  assert.ok(hasText(app, 'Завершение эфира'));
+
+  click(buttonByText(app, 'Завершить эфир и начать новый'));
+  let ov = findAll(body, (e) => e.className === 'overlay')[0];
+  assert.ok(hasText(ov, 'Завершить эфир №187?'));
+  assert.ok(hasText(ov, 'Неподтверждённых броней'), 'в демо есть ожидающие брони');
+  const inputs = findAll(ov, (e) => e.tag === 'input' && e.attrs.type !== 'checkbox');
+  assert.equal(inputs[0].value, '188', 'номер следующего эфира подставлен');
+  const confirmBtn = buttonByText(ov, 'Завершить эфир №187');
+  assert.ok(confirmBtn.disabled, 'без галочки кнопка недоступна');
+  click(confirmBtn); await sleep(100);
+  assert.ok(findAll(body, (e) => e.className === 'overlay').length === 1, 'ничего не произошло');
+
+  const cb = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'checkbox')[0];
+  cb.checked = true; cb.listeners.change.forEach((f) => f({ target: cb }));
+  assert.ok(!confirmBtn.disabled);
+  inputs[1].value = 'в 20:00 1 декабря';
+  click(confirmBtn); await sleep(500);
+
+  assert.ok(!findAll(body, (e) => e.className === 'overlay').length, 'окно закрылось');
+  const toasts = findAll(body, (e) => e.className.includes('toast')).map(textOf).join('|');
+  assert.ok(toasts.includes('в архиве') && toasts.includes('Архив №187') && toasts.includes('№188'), toasts);
+  assert.ok(hasText(findAll(app, (e) => e.className === 'brand')[0], 'Эфир №188'), 'шапка показывает новый эфир');
+  assert.ok(findAll(app, (e) => e.tag === 'input').some((i) => i.value === '188'), 'форма настроек обновилась');
+});
+
 test('публичная страница: кнопка входа в админку', async () => {
   const { app } = boot(PUBLIC);
   await sleep(400);

@@ -14,12 +14,15 @@
   const stepsEl = h('details', { class: 'card', style: { marginTop: '20px' } });
   const mineEl = h('div');
   const gridEl = h('div', { class: 'grid', role: 'group', 'aria-label': 'Номерки' });
+  const coverEl = h('div', { class: 'soldout hidden' });          // «Все места забронированы…» поверх сетки
+  const waitEl = h('div');                                         // «Идёт подтверждение…» над сеткой
+  const gridWrap = h('div', { class: 'gridwrap' }, gridEl, coverEl);
   const legendEl = h('div', { class: 'legend' });
   const actionEl = h('div', { class: 'actionbar hidden' });
   const gridCard = h('section', { class: 'card' },
     h('h2', null, 'Выберите свои номерки'),
     h('p', { class: 'lead' }, 'Нажмите на свободные номерки — они подсветятся. Затем нажмите «Забронировать».'),
-    gridEl, legendEl, actionEl);
+    waitEl, gridWrap, legendEl, actionEl);
   const countChip = h('span', { class: 'count-chip' }, '0');
   const searchEl = h('input', {
     class: 'input', type: 'search', placeholder: 'Найти имя или номерок', autocomplete: 'off',
@@ -178,6 +181,28 @@
     return h('span', null, h('i', { style: { background: bg, borderColor: border } }), text);
   }
 
+  /** Первое предложение (или первая строка) выводится крупно, остальное — подписью. */
+  function soldOutParts(text) {
+    const lines = String(text).split(/\n+/).map((x) => x.trim()).filter(Boolean);
+    let first = lines[0] || '', rest = lines.slice(1);
+    if (lines.length === 1) {
+      const m = first.match(/^(.*?[.!?…])\s+(.+)$/);
+      if (m) { first = m[1]; rest = [m[2]]; }
+    }
+    return [h('div', { class: 'soldout-big' }, first)].concat(rest.map((r) => h('div', { class: 'soldout-sub' }, r)));
+  }
+
+  function renderOverlay() {
+    const o = S.st.overlay;
+    const sold = !!(o && o.kind === 'soldout');
+    gridWrap.classList.toggle('is-covered', sold);
+    coverEl.classList.toggle('hidden', !sold);
+    fill(coverEl, sold ? h('div', { class: 'soldout-card', role: 'status' },
+      h('div', { class: 'soldout-emoji', 'aria-hidden': 'true' }, '🎟️'), soldOutParts(o.text)) : null);
+    fill(waitEl, o && o.kind === 'waiting'
+      ? h('div', { class: 'banner info', style: { marginBottom: '14px' }, role: 'status' }, h('span', null, '⏳'), h('span', null, o.text)) : null);
+  }
+
   function renderAction() {
     const n = S.sel.size;
     actionEl.classList.toggle('hidden', n === 0);
@@ -215,7 +240,7 @@
   }
 
   function renderAll() {
-    renderHero(); renderBanner(); renderSteps(); renderMine(); renderGrid(); renderAction(); renderPlayers();
+    renderHero(); renderBanner(); renderSteps(); renderMine(); renderGrid(); renderOverlay(); renderAction(); renderPlayers();
   }
 
   function tickTimers() {

@@ -201,7 +201,7 @@
   // ───── Демо-режим: работает без сервера, чтобы можно было посмотреть вёрстку ─────
   const Demo = (function () {
     const OFF = 180, H = 3600000;
-    const cfg = { bulkMin: 4, bulkText: 'Для брони от 4х и более билетов становится доступна оплата без комиссии', bulkButton: 'ЗАПРОСИТЬ РЕКВИЗИТЫ', bulkUrl: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
+    const cfg = { soldOutEnabled: true, soldOutText: 'Все места забронированы. Прямой эфир проведем {date}', waitText: '', bulkMin: 4, bulkText: 'Для брони от 4х и более билетов становится доступна оплата без комиссии', bulkButton: 'ЗАПРОСИТЬ РЕКВИЗИТЫ', bulkUrl: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
     const bookings = [];
     let seq = 4000;
     const add = (name, nums, status, extra) => bookings.push(Object.assign({
@@ -233,6 +233,13 @@
       }
       return out;
     };
+    const tpl = (t) => String(t).replace(/\{date\}/g, cfg.date).replace(/\{number\}/g, cfg.number).replace(/[ \t]+(\r?\n|$)/g, '$1').trim();
+    const overlay = (t) => {
+      const free = t.filter((x) => x === 'f').length, pend = t.filter((x) => x === 'p').length, taken = t.filter((x) => x === 't').length;
+      if (!free && !pend && taken && cfg.soldOutEnabled && cfg.soldOutText) return { kind: 'soldout', text: tpl(cfg.soldOutText) };
+      if (!free && pend && cfg.waitText) return { kind: 'waiting', text: tpl(cfg.waitText) };
+      return null;
+    };
     const pubState = () => {
       const g = {};
       bookings.forEach((b) => {
@@ -247,7 +254,7 @@
         ticketCount: cfg.count, confirmHours: cfg.hours, limits: { pending: cfg.maxPending, total: 0 },
         quiet: { on: true, from: '00:00', to: '09:00' }, tzOffsetMin: OFF, open: cfg.open, paused: cfg.paused, pauseMessage: cfg.pauseMessage,
         info: { payUrl: 'https://spasibomir.ru/pay/33434', postUrl: 'https://vk.com/wall-1_1', payment: '', bulk: cfg.bulkMin > 0 && cfg.bulkUrl ? { min: cfg.bulkMin, text: cfg.bulkText.replace(/\{n\}/g, String(cfg.bulkMin)), button: cfg.bulkButton, url: cfg.bulkUrl } : null },
-        tickets: t, players, counts: { free: t.filter((x) => x === 'f').length, total: cfg.count }
+        tickets: t, overlay: overlay(t), players, counts: { free: t.filter((x) => x === 'f').length, total: cfg.count }
       };
     };
     const adm = (b) => ({ code: b.code, created: b.created, name: b.name, vkUrl: b.vk, numbers: b.numbers, count: b.numbers.length, status: b.status, deadline: b.deadline, leftMin: null, source: b.source, note: b.note });
@@ -266,6 +273,9 @@
       { key: 'bulkText', label: 'Оплата без комиссии: надпись', hint: 'Можно написать {n}', type: 'textarea', options: null, value: cfg.bulkText },
       { key: 'bulkButton', label: 'Оплата без комиссии: текст кнопки', hint: '', type: 'text', options: null, value: cfg.bulkButton },
       { key: 'bulkUrl', label: 'Оплата без комиссии: ссылка кнопки', hint: 'Пусто — кнопка скрыта', type: 'text', options: null, value: cfg.bulkUrl },
+      { key: 'soldOutEnabled', label: 'Надпись «все места забронированы»: показывать', hint: 'Поверх сетки, когда всё подтверждено', type: 'yesno', options: null, value: cfg.soldOutEnabled ? 'ДА' : 'НЕТ' },
+      { key: 'soldOutText', label: 'Надпись «все места забронированы»: текст', hint: '{date} — дата эфира, {number} — номер', type: 'textarea', options: null, value: cfg.soldOutText },
+      { key: 'waitText', label: 'Надпись «идёт подтверждение»: текст', hint: 'Пусто — не показывать', type: 'textarea', options: null, value: cfg.waitText },
       { key: 'bookingOpen', label: 'Приём броней открыт', hint: '', type: 'yesno', options: null, value: cfg.open ? 'ДА' : 'НЕТ' },
       { key: 'paused', label: 'Технический перерыв (заморозка бронирования)', hint: 'ДА — новые брони закрыты, таймеры стоят', type: 'yesno', options: null, value: cfg.paused ? 'ДА' : 'НЕТ' },
       { key: 'pauseMessage', label: 'Текст на время перерыва', hint: '', type: 'text', options: null, value: cfg.pauseMessage },
@@ -318,6 +328,17 @@
         }
         case 'adminBlock': (p.numbers || []).forEach((n) => { if (!busy()[n]) add('БЛОК', [n], 'БЛОК', { source: 'админ' }); }); return admState();
         case 'adminUnblock': bookings.forEach((x) => { if (x.status === 'БЛОК' && x.numbers.some((n) => (p.numbers || []).includes(n))) x.status = 'ОТМЕНЕНА'; }); return admState();
+        case 'adminArchive': {
+          const open = bookings.filter((x) => ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'].includes(x.status));
+          if (open.length && !p.force) return err('PENDING', 'Есть неподтверждённые брони: ' + open.length + '. Подтвердите или отмените их либо закройте вместе с эфиром.', { pending: open.length });
+          const real = bookings.filter((x) => x.status !== 'БЛОК').length, old = cfg.number;
+          bookings.length = 0;
+          const next = String(p.newNumber || '').trim() || (/^\d+$/.test(old) ? String(Number(old) + 1) : '');
+          cfg.number = next; cfg.date = String(p.newDate || '').trim();
+          const st = admState();
+          st.archive = { sheet: real ? 'Архив №' + old : '', rows: real, closed: open.length, oldNumber: old, newNumber: next };
+          return st;
+        }
         case 'adminSettings': {
           const u = p.updates || {};
           if (u.eventNumber !== undefined) cfg.number = String(u.eventNumber);
@@ -329,6 +350,9 @@
           if (u.bookingOpen !== undefined) cfg.open = String(u.bookingOpen).toUpperCase() === 'ДА';
           if (u.paused !== undefined) cfg.paused = String(u.paused).toUpperCase() === 'ДА';
           if (u.pauseMessage !== undefined) cfg.pauseMessage = String(u.pauseMessage);
+          if (u.soldOutEnabled !== undefined) cfg.soldOutEnabled = String(u.soldOutEnabled).toUpperCase() === 'ДА';
+          if (u.soldOutText !== undefined) cfg.soldOutText = String(u.soldOutText);
+          if (u.waitText !== undefined) cfg.waitText = String(u.waitText);
           if (u.bulkMin !== undefined) cfg.bulkMin = Math.max(0, Math.floor(Number(u.bulkMin) || 0));
           if (u.bulkText !== undefined) cfg.bulkText = String(u.bulkText);
           if (u.bulkButton !== undefined) cfg.bulkButton = String(u.bulkButton);

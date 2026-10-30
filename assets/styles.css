@@ -292,3 +292,16 @@ button { cursor: pointer; }
 .bulkbox .bulk-btn { width: 100%; text-transform: uppercase; letter-spacing: .02em; background: #fff; color: var(--accent-2); border: 1.5px solid var(--accent); text-decoration: none; }
 .bulkbox .bulk-btn:hover { background: var(--accent); color: #fff; }
 @media (min-width: 521px) { .bulkbox .bulk-btn { width: auto; } }
+
+/* ───── «Все места забронированы» поверх сетки ───── */
+.gridwrap { position: relative; }
+.gridwrap.is-covered .grid { filter: blur(3px) saturate(.75); opacity: .5; pointer-events: none; user-select: none; }
+.soldout { position: absolute; inset: -6px; z-index: 6; display: flex; justify-content: center; align-items: flex-start; padding: 10px; border-radius: 22px;
+  background: linear-gradient(180deg, rgba(251, 246, 240, .45), rgba(251, 246, 240, .78)); animation: fade .25s ease; }
+.soldout-card { position: sticky; top: max(14px, calc(50vh - 130px)); align-self: flex-start; margin-top: clamp(10px, 8vh, 70px); width: 100%; max-width: 560px; text-align: center; color: #fff;
+  padding: clamp(22px, 5vw, 36px) clamp(16px, 4vw, 30px); border-radius: 26px;
+  background: radial-gradient(500px 220px at 100% 0%, rgba(255, 255, 255, .22), transparent 60%), linear-gradient(135deg, #e0722f 0%, #c4501c 55%, #a63f13 100%);
+  box-shadow: 0 22px 54px rgba(166, 63, 19, .38); }
+.soldout-emoji { font-size: 40px; line-height: 1; margin-bottom: 10px; }
+.soldout-big { font-size: clamp(24px, 5.4vw, 38px); font-weight: 800; line-height: 1.15; letter-spacing: -.01em; }
+.soldout-sub { margin-top: 12px; font-size: clamp(16px, 3.4vw, 21px); font-weight: 600; opacity: .95; line-height: 1.3; }

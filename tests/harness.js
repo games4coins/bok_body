@@ -22,6 +22,7 @@ function withNoop(obj) {
 
 class Sheet {
   constructor(name) { this.name = name; this.rows = []; }
+  getMaxColumns() { return this.maxColumns || 26; }
   getLastRow() {
     for (let i = this.rows.length - 1; i >= 0; i--) {
       if (this.rows[i] && this.rows[i].some((v) => v !== '' && v !== undefined && v !== null)) return i + 1;
@@ -60,6 +61,13 @@ class Range {
   }
   setValue(v) { return this.setValues([[v]]); }
   getValue() { return this.getValues()[0][0]; }
+  clearContent() {
+    for (let i = 0; i < this.nr; i++) {
+      const row = this.sh.rows[this.r - 1 + i];
+      if (row) for (let j = 0; j < this.nc; j++) row[this.c - 1 + j] = '';
+    }
+    return this;
+  }
 }
 
 function createEnv(opts = {}) {
@@ -79,7 +87,8 @@ function createEnv(opts = {}) {
   const ss = {
     getId: () => 'SS1',
     getSheetByName: (n) => (sheets[n] ? withNoop(sheets[n]) : null),
-    insertSheet: (n) => { sheets[n] = new Sheet(n); return withNoop(sheets[n]); },
+    insertSheet: (n) => { if (sheets[n]) throw new Error('Sheet exists: ' + n); sheets[n] = new Sheet(n); return withNoop(sheets[n]); },
+    getSheets: () => Object.values(sheets).map((x) => withNoop(x)),
     getSpreadsheetTimeZone: () => 'Europe/Moscow'
   };
 
@@ -89,6 +98,7 @@ function createEnv(opts = {}) {
     Date: FakeDate,
     Logger: { log() {} },
     SpreadsheetApp: {
+      flush() {},
       getActiveSpreadsheet: () => ss,
       openById: () => ss,
       newDataValidation: () => chain(),

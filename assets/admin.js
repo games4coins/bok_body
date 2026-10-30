@@ -325,6 +325,7 @@
     ['Технический перерыв', ['paused', 'pauseMessage']],
     ['Оплата и комментарий', ['payUrl', 'postUrl', 'paymentInfo']],
     ['Оплата без комиссии', ['bulkMin', 'bulkText', 'bulkButton', 'bulkUrl']],
+    ['Надписи на странице бронирования', ['soldOutEnabled', 'soldOutText', 'waitText']],
     ['Список участников', ['nameFormat', 'showPending']],
     ['Уведомления', ['notifyEmail', 'adminUrl']]
   ];
@@ -343,7 +344,42 @@
     return h('div', null, h('section', { class: 'card' },
       GROUPS.map(([title, keys]) => h('div', { class: 'set-group' }, h('h3', null, title), keys.filter((k) => byKey[k]).map((k) => control(byKey[k])))),
       saveBtn,
-      h('p', { class: 'note-foot' }, 'Время тихих часов и дедлайны считаются в часовом поясе организатора. Изменения часов на подтверждение действуют на новые брони.')));
+      h('p', { class: 'note-foot' }, 'Время тихих часов и дедлайны считаются в часовом поясе организатора. Изменения часов на подтверждение действуют на новые брони.')),
+      h('section', { class: 'card', style: { marginTop: '20px' } },
+        h('h2', null, 'Завершение эфира'),
+        h('p', { class: 'lead' }, 'Когда эфир прошёл: все брони уйдут во вкладку-архив в таблице, сетка очистится и начнётся следующий эфир.'),
+        h('button', { class: 'btn btn-danger btn-block', onclick: openArchive }, '🏁 Завершить эфир и начать новый')));
+  }
+
+  function openArchive() {
+    const st = A.st, cur = st.event.number;
+    const nextNum = /^\d+$/.test(cur) ? String(Number(cur) + 1) : '';
+    const open = st.bookings.filter((b) => NEEDS_CHECK.indexOf(b.status) >= 0).length;
+    const numInput = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Номер следующего эфира' });
+    numInput.value = nextNum;
+    const dateInput = h('input', { class: 'input', type: 'text', maxlength: '100', placeholder: 'Например: в 20:00 1 декабря (можно задать позже)' });
+    const force = h('input', { type: 'checkbox' });
+    const err = h('div', { class: 'msg err' });
+    const btn = h('button', { class: 'btn btn-danger btn-block', style: { marginTop: '6px' } }, 'Завершить эфир №' + cur);
+    if (open > 0) btn.disabled = true;
+    force.addEventListener('change', () => { btn.disabled = !force.checked; });
+    btn.addEventListener('click', async () => {
+      err.textContent = ''; btn.disabled = true;
+      const r = await api.post('adminArchive', { password: A.pw, newNumber: numInput.value, newDate: dateInput.value, force: force.checked });
+      if (!r.ok) { err.textContent = r.error.message; btn.disabled = open > 0 && !force.checked; return; }
+      setState(r); closeModal(); renderTab();
+      const a = r.archive;
+      toast(a.rows ? 'Эфир №' + a.oldNumber + ' в архиве: «' + a.sheet + '», броней: ' + a.rows + '. Начат эфир ' + (a.newNumber ? '№' + a.newNumber : '(укажите номер в настройках)') + '.'
+        : 'Начат эфир ' + (a.newNumber ? '№' + a.newNumber : '(укажите номер в настройках)') + '.', null, 12000);
+    });
+    openModal([
+      h('h3', null, 'Завершить эфир №' + cur + '?'),
+      h('p', { class: 'lead' }, 'Брони уйдут во вкладку «Архив №' + cur + '» в таблице. Сетка очистится, номерки освободятся, блокировки снимутся, дата эфира сбросится.'),
+      open > 0 ? h('div', { class: 'banner warn', style: { margin: '0 0 12px' } }, h('span', null, '⚠️'), h('span', null,
+        'Неподтверждённых броней: ' + open + '. ', h('label', { class: 'sw', style: { marginTop: '8px' } }, force, 'Закрыть их вместе с эфиром (в архиве — со статусом «ИСТЕКЛА»)'))) : null,
+      h('div', { class: 'field' }, h('label', null, 'Номер следующего эфира'), numInput),
+      h('div', { class: 'field' }, h('label', null, 'Дата и время следующего эфира'), dateInput),
+      err, btn]);
   }
 
   function control(f) {
