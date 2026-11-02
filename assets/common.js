@@ -103,6 +103,30 @@
   }
   function fmtMin(min) { return fmtLeft(min * 60000); }
 
+  /**
+   * Таймер брони. Показывает сколько АКТИВНОГО времени осталось: ночью (тихие часы) оно стоит.
+   * q — блок quiet из ответа сервера (nowQuiet, nextStart). data-run — сколько мс часы ещё могут идти до остановки.
+   */
+  function timerSpan(b, q) {
+    const act = b.activeLeftMin != null ? b.activeLeftMin * 60000 : Math.max(0, (b.deadline || 0) - nowMs());
+    let run = 1e15;
+    if (q && q.nowQuiet) run = 0;
+    else if (q && q.on && q.nextStart) run = Math.max(0, q.nextStart - nowMs());
+    return h('span', { class: 'timer', 'data-act': Math.round(act), 'data-t0': nowMs(), 'data-run': Math.round(run) }, '');
+  }
+  function tickTimer(el) {
+    const act = Number(el.getAttribute('data-act')), t0 = Number(el.getAttribute('data-t0')), run = Number(el.getAttribute('data-run'));
+    const left = act - Math.min(Math.max(nowMs() - t0, 0), run);
+    el.textContent = left <= 0 ? 'проверяем…' : fmtLeft(left);
+  }
+  /** Строка про срок брони: «Подтвердить до … · осталось …» (+ пометка про тихие часы ночью). */
+  function timerNodes(b, q, off) {
+    if (b.deadline == null) return ['⏸ Таймер на паузе, осталось ' + fmtMin(b.leftMin || 0)];
+    const nodes = ['Подтвердить до ', h('b', null, fmtDT(b.deadline, off) + ' ' + tzName(off)), ' · осталось ', timerSpan(b, q)];
+    if (q && q.nowQuiet && q.resumeAt) nodes.push(' · 🌙 тихие часы: таймер стоит до ', h('b', null, fmtDT(q.resumeAt, off).slice(6)));
+    return nodes;
+  }
+
   // ───── Прочее ─────
   function clientId() {
     let id = '';
@@ -201,7 +225,7 @@
   // ───── Демо-режим: работает без сервера, чтобы можно было посмотреть вёрстку ─────
   const Demo = (function () {
     const OFF = 180, H = 3600000;
-    const cfg = { soldOutEnabled: true, soldOutText: 'Все места забронированы. Прямой эфир проведем {date}', waitText: '', bulkMin: 4, bulkText: 'Для брони от 4х и более билетов становится доступна оплата без комиссии', bulkButton: 'ЗАПРОСИТЬ РЕКВИЗИТЫ', bulkUrl: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
+    const cfg = { quietFrom: '00:00', soldOutEnabled: true, soldOutText: 'Все места забронированы. Прямой эфир проведем {date}', waitText: '', bulkMin: 4, bulkText: 'Для брони от 4х и более билетов становится доступна оплата без комиссии', bulkButton: 'ЗАПРОСИТЬ РЕКВИЗИТЫ', bulkUrl: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', number: '187', title: 'Прямой эфир мастерской', date: '2 сентября в 21:10 МСК', count: 63, hours: 6, maxPending: 5, paused: false, open: true, pauseMessage: 'Технический перерыв. Бронирование скоро возобновится.' };
     const bookings = [];
     let seq = 4000;
     const add = (name, nums, status, extra) => bookings.push(Object.assign({
@@ -265,7 +289,7 @@
       { key: 'ticketCount', label: 'Количество номерков', hint: '1–500', type: 'number', options: null, value: String(cfg.count) },
       { key: 'confirmHours', label: 'Часов на подтверждение брони', hint: 'Считаются без тихих часов', type: 'number', options: null, value: String(cfg.hours) },
       { key: 'maxPending', label: 'Лимит неподтверждённых номерков на человека', hint: '', type: 'number', options: null, value: String(cfg.maxPending) },
-      { key: 'quietFrom', label: 'Тихие часы: с', hint: 'ЧЧ:ММ', type: 'time', options: null, value: '00:00' },
+      { key: 'quietFrom', label: 'Тихие часы: с', hint: 'ЧЧ:ММ', type: 'time', options: null, value: cfg.quietFrom },
       { key: 'quietTo', label: 'Тихие часы: до', hint: 'ЧЧ:ММ', type: 'time', options: null, value: '09:00' },
       { key: 'payUrl', label: 'Ссылка на оплату', hint: 'Кнопка и QR-код для участников', type: 'text', options: null, value: 'https://spasibomir.ru/pay/33434' },
       { key: 'postUrl', label: 'Ссылка на пост для комментария', hint: 'Под ним участники оставляют номерки и скриншот', type: 'text', options: null, value: 'https://vk.com/wall-1_1' },
@@ -288,6 +312,7 @@
       return {
         ok: true, now: Date.now(), tzOffsetMin: OFF, event: { number: cfg.number, title: cfg.title }, ticketCount: cfg.count,
         paused: cfg.paused, open: cfg.open, confirmHours: cfg.hours, tickets: t, counts: c, form: form(),
+        warnings: /^\d{1,2}([:.\-]\d{2}(:\d{2})?)?$/.test(cfg.quietFrom.trim()) ? [] : ['«Тихие часы: с»: значение «' + cfg.quietFrom + '» не распознано — тихие часы сейчас выключены, таймер идёт круглосуточно. Нужен формат ЧЧ:ММ, например 09:00.'],
         bookings: bookings.filter((b) => b.status !== 'БЛОК').sort((a, b) => b.created - a.created).map(adm)
       };
     };
@@ -322,8 +347,10 @@
         case 'adminBook': {
           const m = busy(), taken = (p.numbers || []).filter((n) => m[n]);
           if (taken.length) return err('TAKEN', 'Номерки уже заняты: ' + taken.join(', '));
-          if (!p.name || p.name.trim().length < 2) return err('NEED_NAME', 'Укажите имя участника');
-          add(p.name, p.numbers.slice().sort((a, c) => a - c), p.mode === 'confirmed' ? 'ПОДТВЕРЖДЕНА' : 'ОЖИДАЕТ', { source: 'админ', note: p.note || '', deadline: p.mode === 'confirmed' ? null : Date.now() + cfg.hours * H });
+          if (String(p.vkUrl || '').trim() && !/vk\.(com|ru)\//i.test(p.vkUrl)) return err('BAD_VK', 'Это не похоже на ссылку ВКонтакте. Пример: vk.com/id12345');
+          const nm = (p.name || '').trim().length >= 2 ? p.name.trim() : (String(p.vkUrl || '').trim() ? 'Демо Участник' : '');
+          if (nm.length < 2) return err('NEED_NAME', 'Укажите имя участника или ссылку на его профиль ВК', { needName: true });
+          add(nm, p.numbers.slice().sort((a, c) => a - c), p.mode === 'confirmed' ? 'ПОДТВЕРЖДЕНА' : 'ОЖИДАЕТ', { source: 'админ', note: p.note || '', deadline: p.mode === 'confirmed' ? null : Date.now() + cfg.hours * H });
           return admState();
         }
         case 'adminBlock': (p.numbers || []).forEach((n) => { if (!busy()[n]) add('БЛОК', [n], 'БЛОК', { source: 'админ' }); }); return admState();
@@ -350,6 +377,7 @@
           if (u.bookingOpen !== undefined) cfg.open = String(u.bookingOpen).toUpperCase() === 'ДА';
           if (u.paused !== undefined) cfg.paused = String(u.paused).toUpperCase() === 'ДА';
           if (u.pauseMessage !== undefined) cfg.pauseMessage = String(u.pauseMessage);
+          if (u.quietFrom !== undefined) cfg.quietFrom = String(u.quietFrom);
           if (u.soldOutEnabled !== undefined) cfg.soldOutEnabled = String(u.soldOutEnabled).toUpperCase() === 'ДА';
           if (u.soldOutText !== undefined) cfg.soldOutText = String(u.soldOutText);
           if (u.waitText !== undefined) cfg.waitText = String(u.waitText);
@@ -365,5 +393,5 @@
     return { handle };
   })();
 
-  global.Nomerok = { CFG, DEMO, h, fill, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
+  global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
 })(window);

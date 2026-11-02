@@ -61,6 +61,7 @@ class Range {
   }
   setValue(v) { return this.setValues([[v]]); }
   getValue() { return this.getValues()[0][0]; }
+  getDisplayValues() { return this.getValues().map((row) => row.map((v) => (v === '' || v === undefined || v === null ? '' : String(v)))); }
   clearContent() {
     for (let i = 0; i < this.nr; i++) {
       const row = this.sh.rows[this.r - 1 + i];

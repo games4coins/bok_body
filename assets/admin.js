@@ -1,7 +1,7 @@
 /* Номерок — админка. Работает с телефона. */
 (function () {
   'use strict';
-  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, store, copyText, toast, beep, unlockAudio, DEMO } = Nomerok;
+  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, beep, unlockAudio, DEMO } = Nomerok;
 
   const POLL_MS = 10000;
   const root = document.getElementById('app');
@@ -116,12 +116,13 @@
   }
 
   // ───── Каркас ─────
-  let topEl, pauseEl, contentEl;
+  let topEl, pauseEl, warnEl, contentEl;
   function buildShell() {
     topEl = h('div', { class: 'adm-top' });
     pauseEl = h('div');
+    warnEl = h('div', { class: 'adm-warn' });
     contentEl = h('main', { class: 'adm-wrap' });
-    fill(root, topEl, pauseEl, contentEl);
+    fill(root, topEl, pauseEl, warnEl, contentEl);
     if (DEMO) document.getElementById('demo').replaceChildren(h('div', { class: 'demo-flag' }, 'Демо-режим: данные не сохраняются. Пароль: demo.'));
   }
 
@@ -138,6 +139,10 @@
       h('button', { class: 'tab', title: 'Заморозить / возобновить бронирование', onclick: () => setPause(!st.paused) }, st.paused ? '▶ Возобновить' : '⏸ Перерыв'),
       h('button', { class: 'tab', title: 'Звуковой сигнал', onclick: toggleSound }, A.sound ? '🔔 Звук' : '🔕 Звук'),
       h('button', { class: 'tab', onclick: logout }, 'Выйти'));
+    fill(warnEl, (st.warnings || []).length
+      ? h('div', { class: 'banner warn', style: { margin: '12px 14px 0', flexDirection: 'column', gap: '6px' }, role: 'alert' },
+        h('b', null, '⚠ Проверьте настройки'), st.warnings.map((w) => h('div', null, w)))
+      : null);
     fill(pauseEl, st.paused
       ? h('div', { class: 'pause-on' }, '⏸ Бронирование заморожено, таймеры стоят. ',
         h('button', { class: 'btn btn-sm btn-primary', style: { marginLeft: '8px' }, onclick: () => setPause(false) }, 'Возобновить'))
@@ -166,9 +171,7 @@
   }
 
   function tickTimers() {
-    document.querySelectorAll('[data-deadline]').forEach((el) => {
-      el.textContent = fmtLeft(Number(el.getAttribute('data-deadline')) - nowMs());
-    });
+    document.querySelectorAll('[data-act]').forEach(tickTimer);
   }
 
   // ───── Очередь броней ─────
@@ -206,9 +209,8 @@
 
   function timerLine(b) {
     if (b.status !== 'ОЖИДАЕТ' && b.status !== 'ОПЛАТА ЗАЯВЛЕНА') return null;
-    if (b.deadline) return h('div', { class: 'meta' }, 'до ' + fmtDT(b.deadline, off()) + ' ' + tz() + ' · осталось ', h('span', { class: 'timer', 'data-deadline': b.deadline }, ''));
-    if (b.leftMin != null) return h('div', { class: 'meta' }, '⏸ на паузе, осталось ' + fmtMin(b.leftMin));
-    return null;
+    if (b.deadline == null && b.leftMin == null) return null;
+    return h('div', { class: 'meta' }, timerNodes(b, A.st.quiet, off()));
   }
 
   function bookingCard(b) {
@@ -296,13 +298,38 @@
 
   function openManual() {
     const nums = Array.from(A.sel).sort((a, b) => a - b);
-    const name = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Имя участника', value: '' });
-    const vk = h('input', { class: 'input', type: 'text', placeholder: 'vk.com/… (необязательно)', autocapitalize: 'off' });
+    const name = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Имя (если пусто — возьмём из профиля ВК)', value: '' });
+    const vk = h('input', { class: 'input', type: 'text', placeholder: 'vk.com/id… или vk.com/ник', autocapitalize: 'off', autocomplete: 'off', spellcheck: 'false' });
+    const preview = h('div', { class: 'msg' });
     const note = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Заметка (необязательно)' });
     const mode = h('select', { class: 'select' },
       h('option', { value: 'confirmed' }, 'Сразу подтверждена (оплатил вам напрямую)'),
       h('option', { value: 'timer' }, 'С таймером — как обычная бронь'));
     const err = h('div', { class: 'msg err' });
+    let seq = 0;
+
+    // Как у участников: по ссылке определяем имя и фото профиля
+    async function resolve() {
+      const v = vk.value.trim(), my = ++seq;
+      err.textContent = '';
+      fill(preview);
+      if (!v) return;
+      preview.className = 'msg'; preview.textContent = 'Проверяем профиль…';
+      const r = await api.post('resolveVk', { clientId: clientId(), vkUrl: v });
+      if (my !== seq) return;
+      fill(preview);
+      if (r.ok) {
+        preview.className = 'msg';
+        fill(preview, h('div', { class: 'profile-card' }, avatar(r.display, r.photo, 40),
+          h('div', null, h('b', null, r.display), h('div', { class: 'meta' }, 'Имя и фото возьмём из профиля'))));
+      } else if (r.error.needName) {
+        preview.className = 'msg'; preview.textContent = 'Имя по ссылке определить не удалось — введите его вручную.';
+      } else {
+        preview.className = 'msg err'; preview.textContent = r.error.message;
+      }
+    }
+    vk.addEventListener('change', resolve);
+
     const btn = h('button', { class: 'btn btn-primary btn-block', onclick: async () => {
       err.textContent = ''; btn.disabled = true;
       const r = await api.post('adminBook', { password: A.pw, name: name.value, vkUrl: vk.value, numbers: nums, mode: mode.value, note: note.value });
@@ -311,11 +338,12 @@
       setState(r); A.sel.clear(); closeModal(); renderTab(); toast('Забронировано: ' + list(nums));
     } }, 'Забронировать ' + list(nums));
     openModal([h('h3', null, 'Ручная бронь'),
+      h('div', { class: 'field' }, h('label', null, 'Ссылка на профиль ВК'), vk, preview,
+        h('div', { class: 'hint' }, 'С ссылкой имя вводить не обязательно: имя и фото подтянутся из ВК.')),
       h('div', { class: 'field' }, h('label', null, 'Имя'), name),
-      h('div', { class: 'field' }, h('label', null, 'Ссылка ВК'), vk),
       h('div', { class: 'field' }, h('label', null, 'Режим'), mode),
       h('div', { class: 'field' }, h('label', null, 'Заметка'), note), err, btn]);
-    name.focus();
+    vk.focus();
   }
 
   // ───── Настройки ─────

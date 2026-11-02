@@ -1,11 +1,11 @@
 /* Номерок — публичная страница бронирования. */
 (function () {
   'use strict';
-  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO } = Nomerok;
+  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO } = Nomerok;
 
   const CLIENT = clientId();
   const POLL_MS = 8000;
-  const S = { st: null, mine: [], sel: new Set(), search: '', loaded: false };
+  const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false };
   const UNCONF = ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'];
 
   // ───── Скелет страницы (строится один раз) ─────
@@ -126,10 +126,7 @@
   function mineItem(b) {
     const [cls, label] = STATUS[b.status] || ['s-off', b.status];
     const timer = (b.status === 'ОЖИДАЕТ' || b.status === 'ОПЛАТА ЗАЯВЛЕНА')
-      ? (b.deadline
-        ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, 'Подтвердить до ', h('b', null, fmtDT(b.deadline, off()) + ' ' + tz()),
-          ' · осталось ', h('span', { class: 'timer', 'data-deadline': b.deadline }, ''))
-        : h('p', { class: 'meta', style: { margin: '8px 0 0' } }, '⏸ Таймер на паузе, осталось ' + fmtMin(b.leftMin || 0)))
+      ? h('p', { class: 'meta', style: { margin: '8px 0 0' } }, timerNodes(b, S.quiet || S.st.quiet, off()))
       : null;
     const actions = [];
     if (b.status === 'ОЖИДАЕТ') {
@@ -244,9 +241,7 @@
   }
 
   function tickTimers() {
-    document.querySelectorAll('[data-deadline]').forEach((el) => {
-      el.textContent = fmtLeft(Number(el.getAttribute('data-deadline')) - nowMs());
-    });
+    document.querySelectorAll('[data-act]').forEach(tickTimer);
   }
 
   // ───── Действия ─────
@@ -266,7 +261,7 @@
     const [st, mine] = await Promise.all([api.state(), api.mine(CLIENT)]);
     if (st && st.ok) {
       S.st = st;
-      if (mine && mine.ok) S.mine = mine.bookings;
+      if (mine && mine.ok) { S.mine = mine.bookings; S.quiet = mine.quiet || null; }
       S.loaded = true;
       renderAll();
     } else if (!S.loaded) {
@@ -424,10 +419,7 @@
 
   function showSuccess(r) {
     const b = r.booking;
-    const deadline = b.deadline
-      ? h('p', { style: { textAlign: 'center', margin: '0 0 12px' } }, 'Подтвердите бронь до ', h('b', null, fmtDT(b.deadline, off()) + ' ' + tz()),
-        ' (осталось ', h('span', { class: 'timer', 'data-deadline': b.deadline }, ''), ')')
-      : null;
+    const deadline = h('p', { style: { textAlign: 'center', margin: '0 0 12px' } }, timerNodes(b, r.quiet || S.quiet || S.st.quiet, off()));
     openModal([
       h('div', { style: { textAlign: 'center' } }, h('div', { class: 'big-ok' }, '✓'),
         h('h3', null, 'Подтвердите бронирование номерков скриншотом доната'),

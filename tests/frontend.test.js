@@ -44,7 +44,7 @@ class FEl extends FNode {
   set textContent(v) { this.children = [new FText(v)]; }
   focus() {} select() {} setSelectionRange() {}
   matches(sel) {
-    if (sel === '[data-deadline]') return 'data-deadline' in this.attrs;
+    if (sel === '[data-act]') return 'data-act' in this.attrs;
     if (sel === 'input[type=search]') return this.tag === 'input' && this.attrs.type === 'search';
     return false;
   }
@@ -268,7 +268,7 @@ test('админка: вход, очередь, подтверждение, се
   assert.ok(buttonByText(app, 'Назначить вручную'));
   click(buttonByText(app, 'Назначить вручную'));
   const overlay = findAll(body, (e) => e.className === 'overlay')[0];
-  const name = findAll(overlay, (e) => e.tag === 'input')[0];
+  const name = findAll(overlay, (e) => e.tag === 'input' && (e.attrs.placeholder || '').startsWith('Имя'))[0];
   name.value = 'Мария Сидорова';
   click(buttonByText(overlay, 'Забронировать №10'));
   await sleep(500);
@@ -487,6 +487,98 @@ test('админка: «Завершить эфир и начать новый»
   assert.ok(toasts.includes('в архиве') && toasts.includes('Архив №187') && toasts.includes('№188'), toasts);
   assert.ok(hasText(findAll(app, (e) => e.className === 'brand')[0], 'Эфир №188'), 'шапка показывает новый эфир');
   assert.ok(findAll(app, (e) => e.tag === 'input').some((i) => i.value === '188'), 'форма настроек обновилась');
+});
+
+test('таймер на экране: ночью стоит, днём убывает, перед тихими часами замирает, потом «проверяем…»', async () => {
+  const { ctx } = boot(PUBLIC);
+  const N = ctx.Nomerok, now = Date.now(), MIN = 60000;
+  const mk = (b, q) => findAll(N.h('div', null, N.timerNodes(b, q, 180)), (e) => e.className === 'timer')[0];
+  const b = { deadline: now + 15 * 60 * MIN, activeLeftMin: 240 };
+
+  const night = mk(b, { on: true, nowQuiet: true, resumeAt: now + 120 * MIN });
+  night.attrs['data-t0'] = String(now - 100 * MIN);              // «прошло» 100 минут реального времени
+  N.tickTimer(night);
+  assert.equal(textOf(night), '4 ч 00 мин', 'ночью остаток не уменьшается');
+  assert.ok(textOf(night.parent).includes('тихие часы: таймер стоит до'), 'пометка про тихие часы: ' + textOf(night.parent));
+
+  const day = mk(b, { on: true, nowQuiet: false, nextStart: now + 600 * MIN });
+  day.attrs['data-t0'] = String(N.nowMs() - 30 * MIN + 500);          // запас 0,5 с: остаток округляется вниз до минуты
+  N.tickTimer(day);
+  assert.equal(textOf(day), '3 ч 30 мин', 'днём убывает вместе с часами');
+  assert.ok(!textOf(day.parent).includes('тихие часы'));
+
+  const edge = mk(b, { on: true, nowQuiet: false, nextStart: now + 60 * MIN });
+  edge.attrs['data-t0'] = String(now - 90 * MIN);                // до начала тихих часов оставался час, прошло полтора
+  N.tickTimer(edge);
+  assert.equal(textOf(edge), '3 ч 00 мин', 'замирает в момент начала тихих часов');
+
+  const gone = mk({ deadline: now - 1000, activeLeftMin: 0 }, null);
+  N.tickTimer(gone);
+  assert.equal(textOf(gone), 'проверяем…');
+
+  const paused = N.h('div', null, N.timerNodes({ deadline: null, leftMin: 125 }, null, 180));
+  assert.ok(textOf(paused).includes('Таймер на паузе, осталось 2 ч 05 мин'));
+});
+
+test('админка: предупреждение о нераспознанных настройках видно на любой вкладке и исчезает после исправления', async () => {
+  const { app } = boot(ADMIN);
+  await sleep(100);
+  const form = findAll(app, (e) => e.tag === 'form')[0];
+  findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
+  form.listeners.submit.forEach((f) => f({ preventDefault() {} }));
+  await sleep(500);
+  assert.ok(!hasText(app, 'Проверьте настройки'), 'по умолчанию предупреждений нет');
+
+  click(buttonByText(app, 'Настройки'));
+  const from = findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'time')[0];
+  from.value = 'abc';
+  from.listeners.input.forEach((f) => f({ target: from }));
+  click(buttonByText(app, 'Сохранить настройки')); await sleep(500);
+  assert.ok(hasText(app, 'Проверьте настройки'));
+  assert.ok(hasText(app, 'тихие часы сейчас выключены'));
+
+  click(buttonByText(app, 'Брони'));
+  assert.ok(hasText(app, 'Проверьте настройки'), 'видно и на другой вкладке');
+
+  click(buttonByText(app, 'Настройки'));
+  const from2 = findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'time')[0];
+  from2.value = '09:30';
+  from2.listeners.input.forEach((f) => f({ target: from2 }));
+  click(buttonByText(app, 'Сохранить настройки')); await sleep(500);
+  assert.ok(!hasText(app, 'Проверьте настройки'), 'исправили — предупреждение пропало');
+});
+
+test('админка: ручная бронь только по ссылке ВК — имя не нужно; неверная ссылка даёт понятную ошибку', async () => {
+  const { app, body } = boot(ADMIN);
+  await sleep(100);
+  const form = findAll(app, (e) => e.tag === 'form')[0];
+  findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
+  form.listeners.submit.forEach((f) => f({ preventDefault() {} }));
+  await sleep(500);
+  click(buttonByText(app, 'Сетка'));
+  const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
+  click(tile(10)); click(tile(11));
+  click(buttonByText(app, 'Назначить вручную'));
+  let ov = findAll(body, (e) => e.className === 'overlay')[0];
+  assert.ok(hasText(ov, 'Ссылка на профиль ВК'));
+  const vk = findAll(ov, (e) => e.tag === 'input' && (e.attrs.placeholder || '').startsWith('vk.com'))[0];
+  const book = () => buttonByText(findAll(body, (e) => e.className === 'overlay')[0], 'Забронировать №10');
+
+  vk.value = 'https://example.com/me';
+  click(book()); await sleep(400);
+  ov = findAll(body, (e) => e.className === 'overlay')[0];
+  assert.ok(ov && hasText(ov, 'не похоже на ссылку'), 'ошибка в окне, окно открыто');
+
+  vk.value = 'https://vk.com/id555';
+  vk.listeners.change.forEach((f) => f({ target: vk })); await sleep(400);
+  assert.ok(hasText(findAll(body, (e) => e.className === 'overlay')[0], 'Имя и фото возьмём из профиля'), 'карточка профиля');
+  click(book()); await sleep(500);
+  assert.ok(!findAll(body, (e) => e.className === 'overlay').length, 'бронь создана без ввода имени');
+  const t10 = findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === '10')[0];
+  assert.ok(!t10.className.includes('t-free'), 'номерок занят');
+  click(buttonByText(app, 'Брони'));
+  click(buttonByText(app, 'Все'));
+  assert.ok(hasText(app, 'Демо Участник'), 'имя подставлено из профиля');
 });
 
 test('публичная страница: кнопка входа в админку', async () => {
