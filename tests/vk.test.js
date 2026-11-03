@@ -283,6 +283,7 @@ test('оплата без комиссии: настройки появляют�
 
 // ───── Надпись «все места забронированы» ─────
 
+const archive = (env, extra = {}) => env.admin('adminArchive', { winners: [], ...extra });
 const confirmAll = (env, nums) => env.admin('adminBook', { name: 'Гость Тестовый', numbers: nums, mode: 'confirmed' });
 
 test('надпись «все места»: показывается, когда свободных нет и всё подтверждено', () => {
@@ -366,7 +367,7 @@ test('«Завершить эфир»: брони уходят во вкладк
   env.admin('adminBook', { name: 'Ручной Гость', numbers: [10], mode: 'confirmed' });
   env.admin('adminBlock', { numbers: [30] });
 
-  const r = env.admin('adminArchive', {});
+  const r = archive(env, {});
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.archive.sheet, 'Архив №187');
   assert.equal(r.archive.rows, 2, 'блокировка в архив не попадает');
@@ -397,11 +398,11 @@ test('«Завершить эфир»: свой номер и дата ново�
   const env = createEnv();
   env.admin('adminSettings', { updates: { eventNumber: '187' } });
   env.admin('adminBook', { name: 'Гость Ручной', numbers: [1], mode: 'confirmed' });
-  const r = env.admin('adminArchive', { newNumber: '200 (юбилейный)', newDate: 'в 20:00 1 декабря' });
+  const r = archive(env, { newNumber: '200 (юбилейный)', newDate: 'в 20:00 1 декабря' });
   assert.equal(r.event.number, '200 (юбилейный)');
   assert.equal(env.get().event.date, 'в 20:00 1 декабря');
   env.admin('adminBook', { name: 'Гость Ручной', numbers: [1], mode: 'confirmed' });
-  const r2 = env.admin('adminArchive', {});
+  const r2 = archive(env, {});
   assert.equal(r2.archive.sheet, 'Архив №200 (юбилейный)');
   assert.equal(r2.event.number, '', 'номер, который нельзя увеличить, остаётся пустым для ввода вручную');
 });
@@ -410,14 +411,14 @@ test('«Завершить эфир»: неподтверждённые брон
   const env = createEnv();
   env.admin('adminSettings', { updates: { eventNumber: '187' } });
   const a = book(env, { numbers: [1] });
-  const refused = env.admin('adminArchive', {});
+  const refused = archive(env, {});
   assert.equal(refused.ok, false);
   assert.equal(refused.error.code, 'PENDING');
   assert.equal(refused.error.pending, 1);
   assert.equal(env.get().tickets[0], 'p', 'ничего не изменилось');
   assert.equal(env.sheets['Архив №187'], undefined);
 
-  const forced = env.admin('adminArchive', { force: true });
+  const forced = archive(env, { force: true });
   assert.equal(forced.ok, true);
   assert.equal(forced.archive.closed, 1);
   const row = env.sheets['Архив №187'].rows[1];
@@ -430,12 +431,12 @@ test('«Завершить эфир»: повторное имя архива п
   const env = createEnv();
   env.admin('adminSettings', { updates: { eventNumber: '187' } });
   env.admin('adminBook', { name: 'Гость Один', numbers: [1], mode: 'confirmed' });
-  env.admin('adminArchive', { newNumber: '187' });          // номер вернули вручную
+  archive(env, { newNumber: '187' });          // номер вернули вручную
   env.admin('adminBook', { name: 'Гость Два', numbers: [1], mode: 'confirmed' });
-  const r = env.admin('adminArchive', {});
+  const r = archive(env, {});
   assert.equal(r.archive.sheet, 'Архив №187 (2)');
   assert.ok(env.sheets['Архив №187'] && env.sheets['Архив №187 (2)']);
-  const empty = env.admin('adminArchive', {});
+  const empty = archive(env, {});
   assert.equal(empty.ok, true);
   assert.equal(empty.archive.sheet, '');
   assert.equal(empty.archive.rows, 0);

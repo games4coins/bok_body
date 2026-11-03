@@ -90,6 +90,7 @@ function createEnv(opts = {}) {
     getSheetByName: (n) => (sheets[n] ? withNoop(sheets[n]) : null),
     insertSheet: (n) => { if (sheets[n]) throw new Error('Sheet exists: ' + n); sheets[n] = new Sheet(n); return withNoop(sheets[n]); },
     getSheets: () => Object.values(sheets).map((x) => withNoop(x)),
+    deleteSheet: (sh) => { delete sheets[sh.name]; },
     getSpreadsheetTimeZone: () => 'Europe/Moscow'
   };
 
@@ -144,7 +145,7 @@ function createEnv(opts = {}) {
   };
 
   const ctx = vm.createContext(sandbox);
-  for (const f of ['TimeLogic.gs', 'Code.gs']) {
+  for (const f of ['TimeLogic.gs', 'Code.gs', 'Players.gs']) {
     vm.runInContext(fs.readFileSync(path.join(SRC, f), 'utf8'), ctx, { filename: f });
   }
   env.ctx = ctx;

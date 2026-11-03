@@ -239,11 +239,11 @@ test('формат имени и скрытие неподтверждённых
   assert.equal(env.get().tickets[0], 'p', 'но номерок всё равно занят');
 });
 
-test('«Я оплатил»: только владелец брони; письмо админу', () => {
+test('«Я оплатил»: по коду брони (id браузера не важен), чужой код не подходит; письмо админу', () => {
   const env = createEnv();
   env.admin('adminSettings', { updates: { notifyEmail: 'owner@example.com' } });
   const r = book(env);
-  const stranger = env.post({ action: 'markPaid', clientId: CLIENT_B, code: r.booking.code });
+  const stranger = env.post({ action: 'markPaid', clientId: CLIENT_B, code: 'Б-0001' });
   assert.equal(stranger.error.code, 'NOT_FOUND');
   const ok = env.post({ action: 'markPaid', clientId: CLIENT_A, code: r.booking.code });
   assert.equal(ok.ok, true);

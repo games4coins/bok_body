@@ -1,0 +1,78 @@
+/** Регрессии: «бронь не найдена» при подтверждении и имя при ручной брони админом. */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { createEnv } = require('./harness');
+
+const MIN = 60000;
+const A = 'clientAAAA1111', B = 'clientBBBB2222';
+const PHOTO = 'https://sun9-12.userapi.com/s/v1/ig2/abc.jpg?size=200x200';
+const page = (t) => `<title>${t} | ВКонтакте</title><meta property="og:title" content="${t}"><meta property="og:image" content="${PHOTO}">`;
+const book = (env, c = A) => env.post({ action: 'book', clientId: c, vkUrl: 'vk.com/id1001', name: 'Анна Кузнецова', numbers: [5] });
+
+test('бронь → «оплата заявлена» работает в любой час суток, в том числе ночью', () => {
+  for (const h of [0.25, 3, 8.9, 9, 12, 23.9]) {
+    const env = createEnv();
+    env.setClock(env.msk(2, 0) + h * 60 * MIN);
+    const b = book(env);
+    assert.equal(b.ok, true);
+    const p = env.post({ action: 'markPaid', clientId: A, code: b.booking.code });
+    assert.equal(p.ok, true, 'час ' + h + ': ' + JSON.stringify(p.error));
+    assert.equal(env.admin('adminState').bookings[0].status, 'ОПЛАТА ЗАЯВЛЕНА');
+  }
+});
+
+test('«оплата заявлена» из другого браузера (id сменился) проходит по коду брони, бронь не теряется', () => {
+  const env = createEnv();
+  const b = book(env);
+  const p = env.post({ action: 'markPaid', clientId: B, code: b.booking.code });
+  assert.equal(p.ok, true, JSON.stringify(p.error));
+  assert.equal(env.admin('adminState').bookings[0].status, 'ОПЛАТА ЗАЯВЛЕНА');
+});
+
+test('отмена брони по-прежнему только из того же браузера', () => {
+  const env = createEnv();
+  const b = book(env);
+  assert.equal(env.post({ action: 'cancelMine', clientId: B, code: b.booking.code }).error.code, 'NOT_FOUND');
+  assert.equal(env.post({ action: 'cancelMine', clientId: A, code: b.booking.code }).ok, true);
+});
+
+test('несуществующий код: понятное сообщение и запись в журнале', () => {
+  const env = createEnv();
+  const p = env.post({ action: 'markPaid', clientId: A, code: 'Б-0000' });
+  assert.equal(p.error.code, 'NOT_FOUND');
+  assert.match(p.error.message, /не найдена/);
+  assert.ok(env.sheets['Журнал'].rows.some((r) => String(r[2]).includes('бронь не найдена')));
+});
+
+test('если строка брони не записалась в таблицу — участнику не показывают «успех»', () => {
+  const env = createEnv();
+  const sh = env.sheets['Брони'];
+  const orig = sh.appendRow.bind(sh);
+  sh.appendRow = () => { /* запись потерялась */ };
+  const b = book(env);
+  assert.equal(b.ok, false);
+  assert.equal(b.error.code, 'SERVER');
+  sh.appendRow = orig;
+  assert.equal(book(env).ok, true, 'после сбоя номерок не «застрял»');
+});
+
+test('ручная бронь: после неудачной попытки админ может повторить — отрицательный кэш ВК не мешает', () => {
+  const env = createEnv();
+  env.htmlHandler = () => ({ status: 403 });
+  const first = env.admin('adminResolveVk', { vkUrl: 'vk.com/maria_s' });
+  assert.equal(first.ok, false);
+  env.htmlHandler = () => ({ status: 200, body: page('Мария Сидорова') });
+  const again = env.admin('adminResolveVk', { vkUrl: 'vk.com/maria_s' });
+  assert.equal(again.ok, true, JSON.stringify(again));
+  assert.equal(again.name, 'Мария Сидорова');
+  assert.equal(again.photo, PHOTO);
+  env.htmlHandler = () => ({ status: 403 });
+  env.admin('adminBook', { vkUrl: 'vk.com/maria_s', numbers: [3], mode: 'confirmed' });   // из кэша успеха
+  assert.equal(env.admin('adminState').bookings[0].name, 'Мария Сидорова');
+});
+
+test('adminResolveVk не ограничивается по частоте и не требует clientId', () => {
+  const env = createEnv();
+  env.htmlHandler = () => ({ status: 200, body: page('Мария Сидорова') });
+  for (let i = 0; i < 40; i++) assert.equal(env.admin('adminResolveVk', { vkUrl: 'vk.com/id' + (100 + i) }).ok, true);
+});

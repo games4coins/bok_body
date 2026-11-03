@@ -454,39 +454,144 @@ test('все места: «идёт подтверждение» — банне�
   assert.ok(cover.className.includes('hidden'), 'сетка при этом не закрыта');
 });
 
-test('админка: «Завершить эфир и начать новый» — предупреждение о неподтверждённых, архив, новый номер', async () => {
-  const { app, body } = boot(ADMIN);
+const loginAdmin = async () => {
+  const r = boot(ADMIN);
   await sleep(100);
-  const form = findAll(app, (e) => e.tag === 'form')[0];
-  findAll(app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
+  const form = findAll(r.app, (e) => e.tag === 'form')[0];
+  findAll(r.app, (e) => e.tag === 'input' && e.attrs.type === 'password')[0].value = 'demo';
   form.listeners.submit.forEach((f) => f({ preventDefault() {} }));
   await sleep(500);
+  return r;
+};
+const overlayOf = (body) => findAll(body, (e) => e.className === 'overlay')[0];
+const checkbox = (el, i) => findAll(el, (e) => e.tag === 'input' && e.attrs.type === 'checkbox')[i];
+const toggle = (cb, v) => { cb.checked = v; cb.listeners.change.forEach((f) => f({ target: cb })); };
+
+test('админка: «Завершить эфир» — нужен победитель, предпросмотр итогов, потом закрытие; новый номер', async () => {
+  const { app, body } = await loginAdmin();
   click(buttonByText(app, 'Настройки'));
   assert.ok(hasText(app, 'Надписи на странице бронирования'));
+  assert.ok(hasText(app, 'Накопления и обмен'), 'группа настроек курса и пропусков');
   assert.ok(hasText(app, 'Завершение эфира'));
 
   click(buttonByText(app, 'Завершить эфир и начать новый'));
-  let ov = findAll(body, (e) => e.className === 'overlay')[0];
+  let ov = overlayOf(body);
   assert.ok(hasText(ov, 'Завершить эфир №187?'));
   assert.ok(hasText(ov, 'Неподтверждённых броней'), 'в демо есть ожидающие брони');
-  const inputs = findAll(ov, (e) => e.tag === 'input' && e.attrs.type !== 'checkbox');
-  assert.equal(inputs[0].value, '188', 'номер следующего эфира подставлен');
-  const confirmBtn = buttonByText(ov, 'Завершить эфир №187');
-  assert.ok(confirmBtn.disabled, 'без галочки кнопка недоступна');
-  click(confirmBtn); await sleep(100);
-  assert.ok(findAll(body, (e) => e.className === 'overlay').length === 1, 'ничего не произошло');
+  assert.ok(hasText(ov, 'Кто победил'), 'выбор победителя');
+  const texts = findAll(ov, (e) => e.tag === 'input' && e.attrs.type !== 'checkbox');
+  assert.equal(texts[0].value, '188', 'номер следующего эфира подставлен');
+  const go = () => buttonByText(overlayOf(body), 'Проверить итоги') || buttonByText(overlayOf(body), 'Подтвердить: завершить эфир');
+  assert.ok(go().disabled, 'без победителя и без галочки кнопка недоступна');
 
-  const cb = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'checkbox')[0];
-  cb.checked = true; cb.listeners.change.forEach((f) => f({ target: cb }));
-  assert.ok(!confirmBtn.disabled);
-  inputs[1].value = 'в 20:00 1 декабря';
+  toggle(checkbox(ov, 0), true);                              // «закрыть неподтверждённые вместе с эфиром»
+  assert.ok(go().disabled, 'победитель ещё не выбран');
+  const noWinner = findAll(ov, (e) => e.tag === 'label' && hasText(e, 'Без победителя'))[0];
+  const people = findAll(ov, (e) => e.tag === 'label' && e.className === 'prow');
+  assert.ok(people.length >= 3, 'в списке подтверждённые участники эфира');
+  toggle(checkbox(people[0], 0), true);
+  assert.ok(!go().disabled);
+  texts[1].value = 'в 20:00 1 декабря';
+
+  click(go()); await sleep(300);                              // предпросмотр, ничего не записано
+  ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Участников:') && hasText(ov, 'победителей: 1'), textOf(ov).slice(0, 400));
+  assert.ok(hasText(ov, 'ПОБЕДА'), 'победитель в таблице итогов');
+  assert.ok(hasText(app, 'Эфир №187'), 'эфир ещё не закрыт');
+  const confirmBtn = buttonByText(ov, 'Подтвердить: завершить эфир №187');
+  assert.ok(confirmBtn, 'появилась кнопка подтверждения');
+
   click(confirmBtn); await sleep(500);
-
   assert.ok(!findAll(body, (e) => e.className === 'overlay').length, 'окно закрылось');
   const toasts = findAll(body, (e) => e.className.includes('toast')).map(textOf).join('|');
   assert.ok(toasts.includes('в архиве') && toasts.includes('Архив №187') && toasts.includes('№188'), toasts);
   assert.ok(hasText(findAll(app, (e) => e.className === 'brand')[0], 'Эфир №188'), 'шапка показывает новый эфир');
-  assert.ok(findAll(app, (e) => e.tag === 'input').some((i) => i.value === '188'), 'форма настроек обновилась');
+  assert.ok(hasText(app, 'Откатить закрытие эфира'), 'доступен откат');
+  void noWinner;
+});
+
+test('админка: «Без победителя» тоже разрешает закрытие', async () => {
+  const { app, body } = await loginAdmin();
+  click(buttonByText(app, 'Настройки'));
+  click(buttonByText(app, 'Завершить эфир и начать новый'));
+  const ov = overlayOf(body);
+  toggle(checkbox(ov, 0), true);
+  const noWinner = checkbox(ov, checkbox(ov, 0) ? findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'checkbox').length - 1 : 0);
+  toggle(noWinner, true);
+  const b = buttonByText(overlayOf(body), 'Проверить итоги');
+  assert.ok(!b.disabled);
+  click(b); await sleep(300);
+  assert.ok(hasText(overlayOf(body), 'победителей: 0'));
+});
+
+test('публичная страница: у участников рядом с именем баланс и красные крестики пропусков', async () => {
+  const { app } = await sleepBoot();
+  const row = (name) => findAll(app, (e) => e.className === 'prow').find((r) => hasText(r, name));
+  const anna = row('Анна К.');
+  assert.ok(hasText(anna, '🎟 34'), 'баланс Анны');
+  assert.ok(!findAll(anna, (e) => e.className === 'xs').length, 'пропусков нет — крестиков нет');
+  const boris = row('Борис И.');
+  assert.ok(hasText(boris, '🎟 12'));
+  assert.equal(textOf(findAll(boris, (e) => e.className === 'xs')[0]), '✖✖', 'два пропуска — два креста');
+  const vera = row('Вера П.');
+  assert.equal(textOf(findAll(vera, (e) => e.className === 'xs')[0]), '✖');
+  assert.ok(findAll(vera, (e) => e.className === 'frz').length === 1, 'заморожен');
+  assert.ok(!hasText(row('Егор С.'), '🎟'), 'у кого нет накоплений — ничего не рисуем');
+});
+
+async function sleepBoot() { const r = boot(PUBLIC); await sleep(500); return r; }
+
+test('публичная страница: кнопка «Балансы» — список, поиск, правила, кнопка обмена только у тех, кому можно', async () => {
+  const { app, body } = await sleepBoot();
+  click(buttonByText(app, 'Балансы')); await sleep(200);
+  const ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Накопленные номерки'));
+  assert.ok(hasText(ov, 'Анна К.') && hasText(ov, 'Борис И.') && hasText(ov, 'Вера П.'));
+  assert.ok(!hasText(ov, 'Егор С.'), 'без накоплений и пропусков в списке нет');
+  assert.ok(hasText(ov, '⭐ можно обменять'), 'Анна накопила 34 ≥ 30');
+  assert.ok(hasText(ov, 'на 6800 ₽'), '34 × 200');
+  assert.equal(findAll(ov, (e) => hasText(e, 'можно обменять') && e.className === 'chip ex').length, 1, 'только у одной');
+  const exch = findAll(ov, (e) => e.tag === 'a' && hasText(e, 'ОБМЕНЯТЬ НА СКИДКУ'))[0];
+  assert.ok(exch && exch.attrs.href.startsWith('https://vk.ru/im/convo/'), 'ведёт в переписку ВК');
+  assert.ok(hasText(ov, '1 номерок = 200 ₽'));
+  const q = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'search')[0];
+  q.value = 'бор'; q.listeners.input.forEach((f) => f({ target: q }));
+  assert.ok(hasText(ov, 'Борис И.') && !hasText(ov, 'Анна К.'), 'поиск работает');
+});
+
+test('админка: вкладка «Игроки» — список, добавление со стартовым балансом и пропусками, ручное начисление, обмен', async () => {
+  const { app, body } = await loginAdmin();
+  click(buttonByText(app, 'Игроки')); await sleep(300);
+  assert.ok(hasText(app, 'Анна Кузнецова') && hasText(app, 'Игнат Орлов'));
+  assert.ok(hasText(app, '1 номерок = 200 ₽'));
+
+  click(buttonByText(app, 'Добавить игрока'));
+  let ov = overlayOf(body);
+  const inp = findAll(ov, (e) => e.tag === 'input');
+  inp[0].value = 'https://vk.com/id999'; inp[1].value = 'Новая Игрок'; inp[2].value = '15'; inp[3].value = '2';
+  click(buttonByText(ov, 'Добавить')); await sleep(300);
+  assert.ok(!overlayOf(body), 'окно закрылось');
+  const row = findAll(app, (e) => e.className === 'prow').find((r) => hasText(r, 'Новая Игрок'));
+  assert.ok(row && hasText(row, '🎟 15'), 'стартовый баланс');
+  assert.equal(textOf(findAll(row, (e) => e.className === 'xs')[0]), '✖✖', 'два пропуска');
+
+  click(row); await sleep(50);
+  ov = overlayOf(body);
+  const delta = findAll(ov, (e) => e.tag === 'input' && e.attrs.placeholder === '+5 или -3')[0];
+  delta.value = '-20';
+  click(buttonByText(ov, 'Применить')); await sleep(300);
+  assert.ok(hasText(overlayOf(body), 'Баланс не может стать отрицательным'), 'нельзя уйти в минус');
+  delta.value = '+10';
+  click(buttonByText(overlayOf(body), 'Применить')); await sleep(300);
+  assert.ok(hasText(overlayOf(body), 'баланс: 25') || hasText(overlayOf(body), '25'), textOf(overlayOf(body)).slice(0, 200));
+
+  const ex = findAll(overlayOf(body), (e) => e.tag === 'input').find((e) => e.value === '25');
+  ex.value = '10';
+  click(buttonByText(overlayOf(body), 'Обменять')); await sleep(300);
+  const toasts = findAll(body, (e) => e.className.includes('toast')).map(textOf).join('|');
+  assert.ok(toasts.includes('2000 ₽'), toasts);
+  click(buttonByText(overlayOf(body), 'Показать историю')); await sleep(300);
+  assert.ok(hasText(overlayOf(body), 'ОБМЕН'), 'обмен записан в историю');
 });
 
 test('таймер на экране: ночью стоит, днём убывает, перед тихими часами замирает, потом «проверяем…»', async () => {
