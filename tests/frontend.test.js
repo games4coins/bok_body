@@ -741,3 +741,29 @@ test('XSS: имена участников не интерпретируются
   assert.equal(el.textContent, '<b>не жирный</b>');
   assert.equal(findAll(el, (e) => e.tag === 'b').length, 0);
 });
+
+test('админка: ручная бронь — «Выбрать из базы игроков» с поиском по имени подставляет ссылку и имя', async () => {
+  const { app, body } = await loginAdmin();
+  click(buttonByText(app, 'Сетка'));
+  const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
+  click(tile(20)); click(tile(21));
+  click(buttonByText(app, 'Назначить вручную'));
+  click(buttonByText(overlayOf(body), 'Выбрать из базы игроков')); await sleep(300);
+  let ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Анна Кузнецова') && hasText(ov, 'Борис Иванов'), 'виден список игроков');
+  assert.ok(hasText(ov, '🎟 34'), 'баланс виден');
+  const q = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'search')[0];
+  q.value = 'бор'; q.listeners.input.forEach((f) => f({ target: q }));
+  assert.ok(hasText(ov, 'Борис Иванов') && !hasText(ov, 'Анна Кузнецова'), 'поиск по имени');
+  const row = findAll(ov, (e) => e.className === 'prow').find((r) => hasText(r, 'Борис Иванов'));
+  click(row);
+  ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Игрок из базы'), 'карточка выбранного игрока');
+  const inputs = findAll(ov, (e) => e.tag === 'input' && e.attrs.type !== 'checkbox');
+  assert.ok(inputs.some((i) => i.value === 'Борис Иванов'), 'имя подставлено');
+  assert.ok(inputs.some((i) => (i.value || '').includes('vk.com/id2')), 'ссылка подставлена');
+  click(buttonByText(ov, 'Забронировать №20')); await sleep(400);
+  assert.ok(!overlayOf(body), 'бронь создана');
+  click(buttonByText(app, 'Брони')); click(buttonByText(app, 'Все'));
+  assert.ok(hasText(app, 'Борис Иванов'));
+});

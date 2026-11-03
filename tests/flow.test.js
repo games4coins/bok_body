@@ -76,3 +76,18 @@ test('adminResolveVk не ограничивается по частоте и н
   env.htmlHandler = () => ({ status: 200, body: page('Мария Сидорова') });
   for (let i = 0; i < 40; i++) assert.equal(env.admin('adminResolveVk', { vkUrl: 'vk.com/id' + (100 + i) }).ok, true);
 });
+
+test('ручная бронь: игрок выбран из базы — ВК не опрашивается, ключ игрока сохраняется (баланс потом зачтётся)', () => {
+  const env = createEnv();
+  env.admin('adminPlayerAdd', { vkUrl: 'vk.com/id601', name: 'Старый Игрок', balance: 5, misses: 1 });
+  const key = env.admin('adminPlayers').players[0].key;
+  const before = env.fetches.length;
+  env.htmlHandler = () => ({ status: 403 });
+  const r = env.admin('adminBook', { playerKey: key, name: 'Старый Игрок', vkUrl: 'https://vk.com/id601', numbers: [7, 8], mode: 'confirmed' });
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(env.fetches.length, before, 'запросов к ВК нет');
+  const b = r.bookings[0];
+  assert.equal(b.key, key);
+  assert.equal(b.name, 'Старый Игрок');
+  assert.equal(b.status, 'ПОДТВЕРЖДЕНА');
+});
