@@ -310,7 +310,46 @@
       h('option', { value: 'confirmed' }, 'Сразу подтверждена (оплатил вам напрямую)'),
       h('option', { value: 'timer' }, 'С таймером — как обычная бронь'));
     const err = h('div', { class: 'msg err' });
-    let seq = 0;
+    let seq = 0, chosen = null;
+
+    // Выбор из базы игроков (как список участников справа от сетки): поиск по имени
+    const pickEl = h('div', null);
+    const pickBtn = h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: togglePicker }, '👥 Выбрать из базы игроков');
+    async function togglePicker() {
+      if (pickEl.children.length) { fill(pickEl); return; }
+      if (!A.players) {
+        fill(pickEl, h('div', { class: 'hint' }, 'Загружаем игроков…'));
+        const r = await act('adminPlayers');
+        if (!r) { fill(pickEl); return; }
+        A.players = r.players; A.rules = r.rules;
+      }
+      const q = h('input', { class: 'input', type: 'search', placeholder: 'Поиск по имени', autocomplete: 'off' });
+      const box = h('div', { class: 'blist', style: { maxHeight: '32vh' } });
+      const draw = () => {
+        const t = norm(q.value.trim());
+        const rows = A.players.filter((x) => !t || norm(x.name).indexOf(t) >= 0).slice(0, 80);
+        fill(box, rows.length ? rows.map((x) => h('div', { class: 'prow', style: { cursor: 'pointer' }, onclick: () => choose(x) },
+          avatar(x.name, x.photo, 32),
+          h('div', { class: 'pname' }, h('b', null, x.name),
+            h('div', { class: 'chips' }, x.balance ? h('span', { class: 'bal' }, '🎟 ' + x.balance) : null, crosses(x.misses), x.frozen ? h('span', { class: 'frz' }, '❄') : null))))
+          : h('div', { class: 'empty' }, A.players.length ? 'Никого не нашли' : 'В базе пока нет игроков'));
+      };
+      q.addEventListener('input', draw);
+      draw();
+      fill(pickEl, q, box);
+      q.focus();
+    }
+    function choose(x) {
+      chosen = x;
+      seq++; resolved = { ok: true };
+      vk.value = x.url || '';
+      name.value = x.name;
+      fill(pickEl);
+      err.textContent = '';
+      preview.className = 'msg';
+      fill(preview, h('div', { class: 'profile-card' }, avatar(x.name, x.photo, 40),
+        h('div', null, h('b', null, x.name), h('div', { class: 'meta' }, 'Игрок из базы' + (x.balance ? ' · 🎟 ' + x.balance : '') + (x.misses ? ' · пропусков: ' + x.misses : '')))));
+    }
 
     // Как у участников: по ссылке определяем имя и фото профиля
     let resolved = null, pending = null, timer = null;
@@ -340,8 +379,8 @@
         preview.className = 'msg err'; preview.textContent = (r.error && r.error.message) || 'Ошибка проверки';
       }
     }
-    const schedule = () => { clearTimeout(timer); timer = setTimeout(resolve, 600); };
-    vk.addEventListener('change', resolve);
+    const schedule = () => { chosen = null; clearTimeout(timer); timer = setTimeout(resolve, 600); };
+    vk.addEventListener('change', () => { if (!chosen) resolve(); });
     vk.addEventListener('input', schedule);
     vk.addEventListener('paste', schedule);
 
@@ -349,13 +388,13 @@
       err.textContent = ''; btn.disabled = true;
       clearTimeout(timer);
       if (pending) await pending;   // дожидаемся определения имени по ссылке
-      const r = await api.post('adminBook', { password: A.pw, name: name.value, vkUrl: vk.value, numbers: nums, mode: mode.value, note: note.value });
+      const r = await api.post('adminBook', { password: A.pw, name: name.value, vkUrl: vk.value, playerKey: chosen ? chosen.key : '', numbers: nums, mode: mode.value, note: note.value });
       btn.disabled = false;
       if (!r.ok) { err.textContent = r.error.message; return; }
       setState(r); A.sel.clear(); closeModal(); renderTab(); toast('Забронировано: ' + list(nums));
     } }, 'Забронировать ' + list(nums));
     openModal([h('h3', null, 'Ручная бронь'),
-      h('div', { class: 'field' }, h('label', null, 'Ссылка на профиль ВК'), vk, preview,
+      h('div', { class: 'field' }, h('label', null, 'Ссылка на профиль ВК'), vk, h('div', { style: { margin: '8px 0' } }, pickBtn), pickEl, preview,
         h('div', { class: 'hint' }, 'С ссылкой имя вводить не обязательно: имя и фото подтянутся из ВК.')),
       h('div', { class: 'field' }, h('label', null, 'Имя'), name),
       h('div', { class: 'field' }, h('label', null, 'Режим'), mode),

@@ -36,7 +36,7 @@
   const layout = h('div', { class: 'layout' }, h('div', null, mineEl, gridCard), playersCard);
   const app = document.getElementById('app');
   fill(app, heroEl, bannerEl, stepsEl, layout,
-    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.1'));
+    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.2'));
   if (DEMO) document.getElementById('demo').appendChild(h('div', { class: 'demo-flag' },
     'Демо-режим: данные не сохраняются. Админка: admin.html, пароль demo. Укажите API_URL в config.js, чтобы подключить таблицу.'));
   if (window.matchMedia('(min-width: 700px)').matches) stepsEl.open = true;
