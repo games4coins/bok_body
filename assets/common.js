@@ -129,14 +129,26 @@
 
   // ───── Прочее ─────
   function clientId() {
+    const OK = /^[A-Za-z0-9_-]{8,64}$/;
+    const ok = (x) => OK.test(x || '');
+    // id хранится сразу в нескольких местах: во встроенных браузерах (например, внутри ВК) что-то из этого может быть недоступно
+    const read = {
+      ls: () => localStorage.getItem('nomerok_client'),
+      ss: () => sessionStorage.getItem('nomerok_client'),
+      wn: () => { const m = /nomerok_client=([A-Za-z0-9_-]+)/.exec(global.name || ''); return m ? m[1] : ''; },
+      ck: () => { const m = /(?:^|; )nomerok_client=([A-Za-z0-9_-]+)/.exec(document.cookie || ''); return m ? m[1] : ''; }
+    };
     let id = '';
-    try { id = localStorage.getItem('nomerok_client') || ''; } catch (e) { /* приватный режим */ }
-    if (!/^[A-Za-z0-9_-]{8,64}$/.test(id)) {
+    for (const k of Object.keys(read)) { try { const v = read[k](); if (ok(v)) { id = v; break; } } catch (e) { /* недоступно */ } }
+    if (!ok(id)) {
       const a = new Uint8Array(16);
       (global.crypto || {}).getRandomValues ? global.crypto.getRandomValues(a) : a.forEach((_, i) => { a[i] = Math.floor(Math.random() * 256); });
       id = Array.from(a, (b) => b.toString(16).padStart(2, '0')).join('');
-      try { localStorage.setItem('nomerok_client', id); } catch (e) { /* ignore */ }
     }
+    try { localStorage.setItem('nomerok_client', id); } catch (e) { /* ignore */ }
+    try { sessionStorage.setItem('nomerok_client', id); } catch (e) { /* ignore */ }
+    try { if (!/nomerok_client=/.test(global.name || '')) global.name = (global.name || '') + ' nomerok_client=' + id; } catch (e) { /* ignore */ }
+    try { document.cookie = 'nomerok_client=' + id + '; max-age=31536000; path=/; SameSite=Lax'; } catch (e) { /* ignore */ }
     return id;
   }
 
@@ -219,6 +231,7 @@
   const api = {
     state: () => call('GET', 'state', { action: 'state' }),
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
+    balances: () => call('GET', 'balances', { action: 'balances' }),
     post: (action, body) => call('POST', action, body)
   };
 
@@ -243,6 +256,19 @@
     add('Ярослав Мудров', [52], 'ПОДТВЕРЖДЕНА');
     add('БЛОК', [30], 'БЛОК', { source: 'админ' });
 
+    const rules = { missLimit: 3, exchangeMin: 30, rate: 200, mode: 'точный', url: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', button: 'ОБМЕНЯТЬ НА СКИДКУ' };
+    const roster = [
+      { key: '1', name: 'Анна Кузнецова', balance: 34, misses: 0, frozen: false, wins: 0, bought: 34, note: '' },
+      { key: '2', name: 'Борис Иванов', balance: 12, misses: 2, frozen: false, wins: 0, bought: 12, note: '' },
+      { key: '3', name: 'Вера Петрова', balance: 5, misses: 1, frozen: true, wins: 1, bought: 9, note: '' },
+      { key: '4', name: 'Игнат Орлов', balance: 0, misses: 0, frozen: false, wins: 2, bought: 6, note: '' }
+    ];
+    const ledger = [];
+    const pkey = (b) => { const f = roster.find((x) => x.name === b.name); return f ? f.key : null; };
+    const worth = (p) => Math.round(p.balance * rules.rate);
+    const balShow = (n) => rules.mode === 'скрыт' ? null : rules.mode === 'ступени' ? (n >= 50 ? '50+' : n >= 30 ? '30+' : n >= 20 ? '20+' : n >= 10 ? '10+' : n >= 5 ? '5+' : n >= 1 ? '1+' : 0) : n;
+    const mark = (p) => (p ? { bal: balShow(p.balance), miss: p.misses, frozen: p.frozen, ex: p.balance >= rules.exchangeMin } : { bal: null, miss: 0, frozen: false, ex: false });
+    const logOp = (p, type, delta, comment) => ledger.unshift({ key: p.key, time: Date.now(), type, delta, balance: p.balance, misses: p.misses, event: cfg.number, who: 'админ', comment: comment || '' });
     const HOLD = ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА', 'ПОДТВЕРЖДЕНА', 'БЛОК'];
     const fmtName = (n) => { const p = n.trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[1][0].toUpperCase() + '.' : p[0]; };
     const err = (code, message, extra) => ({ ok: false, error: Object.assign({ code, message }, extra) });
@@ -268,7 +294,7 @@
       const g = {};
       bookings.forEach((b) => {
         if (!['ПОДТВЕРЖДЕНА', 'ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'].includes(b.status)) return;
-        const k = b.name; g[k] = g[k] || { name: fmtName(b.name), items: [] };
+        const k = b.name; g[k] = g[k] || Object.assign({ name: fmtName(b.name), photo: '', items: [] }, mark(roster.find((x) => x.name === b.name)));
         b.numbers.forEach((n) => g[k].items.push([n, b.status === 'ПОДТВЕРЖДЕНА' ? 1 : 0]));
       });
       const players = Object.values(g).map((x) => { x.items.sort((a, b) => a[0] - b[0]); return x; });
@@ -281,7 +307,7 @@
         tickets: t, overlay: overlay(t), players, counts: { free: t.filter((x) => x === 'f').length, total: cfg.count }
       };
     };
-    const adm = (b) => ({ code: b.code, created: b.created, name: b.name, vkUrl: b.vk, numbers: b.numbers, count: b.numbers.length, status: b.status, deadline: b.deadline, leftMin: null, source: b.source, note: b.note });
+    const adm = (b) => ({ code: b.code, created: b.created, name: b.name, vkUrl: b.vk, numbers: b.numbers, count: b.numbers.length, status: b.status, deadline: b.deadline, leftMin: null, source: b.source, note: b.note, photo: '', key: pkey(b) || ('demo' + b.code) });
     const form = () => [
       { key: 'eventNumber', label: 'Номер эфира', hint: 'Показывается участникам: «Эфир №…»', type: 'text', options: null, value: cfg.number },
       { key: 'eventTitle', label: 'Название эфира', hint: '', type: 'text', options: null, value: cfg.title },
@@ -303,15 +329,22 @@
       { key: 'bookingOpen', label: 'Приём броней открыт', hint: '', type: 'yesno', options: null, value: cfg.open ? 'ДА' : 'НЕТ' },
       { key: 'paused', label: 'Технический перерыв (заморозка бронирования)', hint: 'ДА — новые брони закрыты, таймеры стоят', type: 'yesno', options: null, value: cfg.paused ? 'ДА' : 'НЕТ' },
       { key: 'pauseMessage', label: 'Текст на время перерыва', hint: '', type: 'text', options: null, value: cfg.pauseMessage },
+      { key: 'missLimit', label: 'Пропусков подряд до обнуления баланса', hint: 'На этом пропуске накопленные номерки сгорают', type: 'number', options: null, value: String(rules.missLimit) },
+      { key: 'exchangeRate', label: 'Курс обмена: рублей скидки за 1 номерок', hint: '1 номерок = 200 ₽ по умолчанию', type: 'number', options: null, value: String(rules.rate) },
+      { key: 'exchangeMin', label: 'Обмен на скидку: от скольки номерков', hint: '', type: 'number', options: null, value: String(rules.exchangeMin) },
+      { key: 'exchangeButton', label: 'Обмен на скидку: текст кнопки', hint: '', type: 'text', options: null, value: rules.button },
+      { key: 'exchangeUrl', label: 'Обмен на скидку: ссылка кнопки', hint: 'Пусто — кнопка скрыта', type: 'text', options: null, value: rules.url },
+      { key: 'balanceMode', label: 'Как показывать балансы публично', hint: 'точный — число; ступени — «10+»; скрыт — не показывать', type: 'select', options: ['точный', 'ступени', 'скрыт'], value: rules.mode },
       { key: 'nameFormat', label: 'Формат имени в списке', hint: '', type: 'select', options: ['полное имя', 'имя и инициал', 'только имя'], value: 'имя и инициал' },
       { key: 'notifyEmail', label: 'E-mail для уведомлений', hint: '', type: 'text', options: null, value: '' }
     ];
+    let lastUndo = null;
     const admState = () => {
       const t = tickets(true), c = { free: 0, pending: 0, paid: 0, taken: 0, blocked: 0 };
       t.forEach((x) => { c[{ f: 'free', p: 'pending', a: 'paid', t: 'taken', b: 'blocked' }[x.s]]++; });
       return {
-        ok: true, now: Date.now(), tzOffsetMin: OFF, event: { number: cfg.number, title: cfg.title }, ticketCount: cfg.count,
-        paused: cfg.paused, open: cfg.open, confirmHours: cfg.hours, tickets: t, counts: c, form: form(),
+        ok: true, version: 5, now: Date.now(), tzOffsetMin: OFF, event: { number: cfg.number, title: cfg.title }, ticketCount: cfg.count,
+        paused: cfg.paused, open: cfg.open, confirmHours: cfg.hours, tickets: t, counts: c, form: form(), rules, undo: lastUndo ? { event: lastUndo.event, possible: true, reason: '' } : null,
         warnings: /^\d{1,2}([:.\-]\d{2}(:\d{2})?)?$/.test(cfg.quietFrom.trim()) ? [] : ['«Тихие часы: с»: значение «' + cfg.quietFrom + '» не распознано — тихие часы сейчас выключены, таймер идёт круглосуточно. Нужен формат ЧЧ:ММ, например 09:00.'],
         bookings: bookings.filter((b) => b.status !== 'БЛОК').sort((a, b) => b.created - a.created).map(adm)
       };
@@ -321,7 +354,13 @@
     function handle(action, p) {
       if (action === 'state') return pubState();
       if (action === 'mine') return { ok: true, now: Date.now(), paused: cfg.paused, bookings: bookings.filter((b) => b.client === p.client && b.status !== 'ОТМЕНЕНА').map(pub) };
-      if (action === 'resolveVk') return { ok: true, display: 'Демо Г.', photo: '', key: 'demo' };
+      if (action === 'resolveVk' || action === 'adminResolveVk') return { ok: true, display: 'Демо Г.', name: 'Демо Гость', photo: '', key: 'demo' };
+      if (action === 'balances') {
+        return {
+          ok: true, now: Date.now(), rules,
+          players: roster.filter((x) => x.balance > 0 || x.misses > 0).map((x) => Object.assign({ name: fmtName(x.name), photo: '', worth: x.balance >= rules.exchangeMin && rules.mode === 'точный' ? worth(x) : null }, mark(x)))
+        };
+      }
       if (action === 'book') {
         if (cfg.paused) return err('PAUSED', cfg.pauseMessage);
         if (!/vk\.(com|ru)\//i.test(p.vkUrl || '')) return err('BAD_VK', 'Это не похоже на ссылку ВКонтакте. Пример: vk.com/id12345');
@@ -356,16 +395,53 @@
         case 'adminBlock': (p.numbers || []).forEach((n) => { if (!busy()[n]) add('БЛОК', [n], 'БЛОК', { source: 'админ' }); }); return admState();
         case 'adminUnblock': bookings.forEach((x) => { if (x.status === 'БЛОК' && x.numbers.some((n) => (p.numbers || []).includes(n))) x.status = 'ОТМЕНЕНА'; }); return admState();
         case 'adminArchive': {
+          if (!Array.isArray(p.winners)) return err('NO_WINNERS', 'Укажите победителя или отметьте «без победителя»');
           const open = bookings.filter((x) => ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'].includes(x.status));
           if (open.length && !p.force) return err('PENDING', 'Есть неподтверждённые брони: ' + open.length + '. Подтвердите или отмените их либо закройте вместе с эфиром.', { pending: open.length });
-          const real = bookings.filter((x) => x.status !== 'БЛОК').length, old = cfg.number;
+          const part = {};
+          bookings.filter((x) => x.status === 'ПОДТВЕРЖДЕНА').forEach((x) => { const k = pkey(x) || ('demo' + x.code); part[k] = part[k] || { name: x.name, tickets: 0 }; part[k].tickets += x.numbers.length; });
+          for (const w of p.winners) if (!part[w]) return err('BAD_WINNER', 'Победитель должен быть среди участников этого эфира с подтверждёнными номерками');
+          const changes = [];
+          Object.keys(part).forEach((k) => {
+            const pl = roster.find((x) => x.key === k), win = p.winners.includes(k), before = pl ? pl.balance : 0;
+            changes.push({ name: part[k].name, type: win ? 'ПОБЕДА' : 'ЭФИР', tickets: part[k].tickets, isNew: !pl, before: { balance: before, misses: pl ? pl.misses : 0 }, after: { balance: win ? 0 : before + part[k].tickets, misses: 0 }, comment: win ? 'победа: баланс обнулён' : '+' + part[k].tickets + ' номерков' });
+          });
+          roster.forEach((pl) => { if (!part[pl.key] && pl.balance > 0 && !pl.frozen) changes.push({ name: pl.name, type: pl.misses + 1 >= rules.missLimit ? 'СГОРАНИЕ' : 'ПРОПУСК', tickets: 0, isNew: false, before: { balance: pl.balance, misses: pl.misses }, after: { balance: pl.misses + 1 >= rules.missLimit ? 0 : pl.balance, misses: pl.misses + 1 >= rules.missLimit ? 0 : pl.misses + 1 }, comment: 'пропустил эфир' }); });
+          const old = cfg.number, next = String(p.newNumber || '').trim() || (/^\d+$/.test(old) ? String(Number(old) + 1) : '');
+          const summary = { participants: Object.keys(part).length, credited: changes.filter((x) => x.type === 'ЭФИР').reduce((s, x) => s + x.tickets, 0), winners: p.winners.length, missed: changes.filter((x) => x.type === 'ПРОПУСК').length, burned: changes.filter((x) => x.type === 'СГОРАНИЕ').length, skipped: 0, unconfirmedClosed: open.length };
+          if (p.dryRun) return { ok: true, dryRun: true, event: old, newNumber: next, summary, changes, skipped: [] };
+          changes.forEach((ch) => {
+            let pl = roster.find((x) => x.name === ch.name);
+            if (!pl) { pl = { key: 'n' + Math.random().toString(36).slice(2, 6), name: ch.name, balance: 0, misses: 0, frozen: false, wins: 0, bought: 0, note: '' }; roster.push(pl); }
+            pl.balance = ch.after.balance; pl.misses = ch.after.misses; if (ch.type === 'ПОБЕДА') pl.wins++;
+          });
+          const real = bookings.filter((x) => x.status !== 'БЛОК').length;
           bookings.length = 0;
-          const next = String(p.newNumber || '').trim() || (/^\d+$/.test(old) ? String(Number(old) + 1) : '');
+          lastUndo = { event: old };
           cfg.number = next; cfg.date = String(p.newDate || '').trim();
           const st = admState();
-          st.archive = { sheet: real ? 'Архив №' + old : '', rows: real, closed: open.length, oldNumber: old, newNumber: next };
+          st.archive = { sheet: real ? 'Архив №' + old : '', rows: real, closed: open.length, oldNumber: old, newNumber: next, summary };
           return st;
         }
+        case 'adminUndoClose': lastUndo = null; return admState();
+        case 'adminPlayers': return { ok: true, rules, players: roster.map((x) => Object.assign({ url: 'https://vk.com/id' + x.key, photo: '', last: '', updated: Date.now() }, x)) };
+        case 'adminPlayerAdd': {
+          const nm = (p.name || '').trim() || 'Демо Игрок';
+          const pl = { key: 'n' + Math.random().toString(36).slice(2, 6), name: nm, balance: Number(p.balance) || 0, misses: Number(p.misses) || 0, frozen: false, wins: 0, bought: 0, note: p.note || '' };
+          roster.push(pl); logOp(pl, 'СТАРТ', pl.balance, 'игрок добавлен вручную');
+          return { ok: true, rules, players: roster.map((x) => Object.assign({ url: '', photo: '', last: '', updated: Date.now() }, x)), player: pl };
+        }
+        case 'adminPlayerAdjust': case 'adminPlayerSetMisses': case 'adminPlayerFreeze': case 'adminExchange': {
+          const pl = roster.find((x) => x.key === p.key);
+          if (!pl) return err('NOT_FOUND', 'Игрок не найден');
+          if (action === 'adminPlayerAdjust') { if (pl.balance + Number(p.delta) < 0) return err('NEGATIVE', 'Баланс не может стать отрицательным (сейчас ' + pl.balance + ')'); pl.balance += Number(p.delta); logOp(pl, 'РУЧНАЯ', Number(p.delta), p.reason); }
+          if (action === 'adminPlayerSetMisses') { pl.misses = Number(p.misses) || 0; logOp(pl, 'ПРОПУСКИ', 0, 'пропусков стало ' + pl.misses); }
+          if (action === 'adminPlayerFreeze') { pl.frozen = !!p.frozen; logOp(pl, 'ЗАМОРОЗКА', 0, pl.frozen ? 'заморожен' : 'разморожен'); }
+          if (action === 'adminExchange') { const n = Number(p.tickets) || 0; if (n > pl.balance) return err('NEGATIVE', 'На балансе всего ' + pl.balance + ' номерков'); pl.balance -= n; logOp(pl, 'ОБМЕН', -n, 'скидка ' + n * rules.rate + ' ₽'); }
+          return { ok: true, rules, players: roster.map((x) => Object.assign({ url: '', photo: '', last: '', updated: Date.now() }, x)), player: pl, discountRub: action === 'adminExchange' ? Number(p.tickets) * rules.rate : undefined };
+        }
+        case 'adminPlayerHistory': return { ok: true, history: ledger.filter((x) => x.key === p.key).slice(0, 60) };
+        case 'adminImport': return err('EMPTY', 'В демо-режиме импорт из таблицы недоступен');
         case 'adminSettings': {
           const u = p.updates || {};
           if (u.eventNumber !== undefined) cfg.number = String(u.eventNumber);
@@ -385,6 +461,12 @@
           if (u.bulkText !== undefined) cfg.bulkText = String(u.bulkText);
           if (u.bulkButton !== undefined) cfg.bulkButton = String(u.bulkButton);
           if (u.bulkUrl !== undefined) cfg.bulkUrl = String(u.bulkUrl);
+          if (u.missLimit !== undefined) rules.missLimit = Math.max(1, Math.floor(Number(u.missLimit) || 3));
+          if (u.exchangeRate !== undefined) rules.rate = Math.max(0, Number(u.exchangeRate) || 0);
+          if (u.exchangeMin !== undefined) rules.exchangeMin = Math.max(1, Math.floor(Number(u.exchangeMin) || 30));
+          if (u.exchangeButton !== undefined) rules.button = String(u.exchangeButton);
+          if (u.exchangeUrl !== undefined) rules.url = String(u.exchangeUrl);
+          if (u.balanceMode !== undefined) rules.mode = ['точный', 'ступени', 'скрыт'].includes(u.balanceMode) ? u.balanceMode : rules.mode;
           return admState();
         }
         default: return err('BAD_ACTION', 'Неизвестное действие');

@@ -305,3 +305,13 @@ button { cursor: pointer; }
 .soldout-emoji { font-size: 40px; line-height: 1; margin-bottom: 10px; }
 .soldout-big { font-size: clamp(24px, 5.4vw, 38px); font-weight: 800; line-height: 1.15; letter-spacing: -.01em; }
 .soldout-sub { margin-top: 12px; font-size: clamp(16px, 3.4vw, 21px); font-weight: 600; opacity: .95; line-height: 1.3; }
+
+/* ───── Балансы и пропуски ───── */
+.marks { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bal { font-size: 12.5px; font-weight: 800; color: var(--accent-2); font-variant-numeric: tabular-nums; }
+.xs { color: #d1242f; font-weight: 900; font-size: 13px; letter-spacing: 1px; }
+.frz { font-size: 13px; }
+.chip.ex { background: #fff3c4; color: #7a5a00; }
+.blist { margin-top: 10px; max-height: 52vh; overflow: auto; }
+button.pill { border: 0; font: inherit; cursor: pointer; }
+.hero-top .admin-link + .admin-link { margin-left: 0; }

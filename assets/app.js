@@ -36,7 +36,7 @@
   const layout = h('div', { class: 'layout' }, h('div', null, mineEl, gridCard), playersCard);
   const app = document.getElementById('app');
   fill(app, heroEl, bannerEl, stepsEl, layout,
-    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора.'));
+    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.1'));
   if (DEMO) document.getElementById('demo').appendChild(h('div', { class: 'demo-flag' },
     'Демо-режим: данные не сохраняются. Админка: admin.html, пароль demo. Укажите API_URL в config.js, чтобы подключить таблицу.'));
   if (window.matchMedia('(min-width: 700px)').matches) stepsEl.open = true;
@@ -73,6 +73,7 @@
     const status = st.paused ? '⏸ Технический перерыв' : st.open ? '● Бронь открыта' : 'Бронь закрыта';
     fill(heroEl, 
       h('div', { class: 'hero-top' }, h('span', { class: 'pill solid' }, 'Эфир №' + st.event.number), h('span', { class: 'pill' }, status),
+        h('button', { class: 'pill admin-link', type: 'button', onclick: openBalances, title: 'Накопленные номерки и пропуски участников' }, '🎟 Балансы'),
         h('a', { class: 'pill admin-link', href: 'admin.html', title: 'Вход для организатора' }, store('nomerok_admin_pw') ? '⚙ Админка' : '🔐 Админ')),
       h('h1', null, st.event.title || 'Прямой эфир'),
       st.event.date ? h('p', { class: 'sub' }, '📅 ' + st.event.date) : null,
@@ -213,6 +214,42 @@
   }
 
   const norm = (s) => s.toLowerCase().replace(/ё/g, 'е');
+  /** Баланс номерков и пропуски: «🎟 12 ✖✖». bal может быть числом, «10+» или null (скрыт). */
+  function marks(p) {
+    const nodes = [];
+    if (p.bal !== null && p.bal !== undefined && p.bal !== 0 && p.bal !== '0') nodes.push(h('span', { class: 'bal', title: 'Накопленные номерки' }, '🎟 ' + p.bal));
+    if (p.frozen) nodes.push(h('span', { class: 'frz', title: 'Баланс заморожен: пропуски не считаются' }, '❄'));
+    if (p.miss > 0) nodes.push(h('span', { class: 'xs', title: 'Пропусков подряд: ' + p.miss, 'aria-label': 'Пропусков подряд: ' + p.miss }, '✖'.repeat(p.miss)));
+    return nodes.length ? h('span', { class: 'marks' }, nodes) : null;
+  }
+
+  async function openBalances() {
+    const box = h('div', null, h('p', { class: 'lead' }, 'Загружаем…'));
+    openModal([h('h3', null, '🎟 Накопленные номерки'), box]);
+    const r = await api.balances();
+    if (!r.ok) { fill(box, h('div', { class: 'msg err' }, (r.error && r.error.message) || 'Не удалось загрузить')); return; }
+    const rules = r.rules || {};
+    const info = h('p', { class: 'lead' },
+      'Если вы участвовали в эфире и не выиграли, номерки копятся. Победитель теряет накопленное. ',
+      rules.missLimit ? 'Пропуск эфира (✖) при ненулевом балансе — ' + rules.missLimit + ' подряд обнуляют накопленное. ' : '',
+      rules.exchangeMin ? 'От ' + rules.exchangeMin + ' номерков можно обменять на скидку' + (rules.rate ? ' (1 номерок = ' + rules.rate + ' ₽)' : '') + '.' : '');
+    const q = h('input', { class: 'input', type: 'search', placeholder: 'Поиск по имени', autocomplete: 'off' });
+    const list = h('div', { class: 'blist' });
+    const draw = () => {
+      const t = norm(q.value.trim());
+      const rows = (r.players || []).filter((p) => !t || norm(p.name).indexOf(t) >= 0);
+      if (!rows.length) { fill(list, h('div', { class: 'empty' }, (r.players || []).length ? 'Никого не нашли' : 'Пока ни у кого нет накопленных номерков')); return; }
+      fill(list, ...rows.map((p) => h('div', { class: 'prow' }, avatar(p.name, p.photo),
+        h('div', { class: 'pname' }, h('b', null, p.name),
+          h('div', { class: 'chips' }, marks(p) || h('span', { class: 'meta' }, '—'),
+            p.ex ? h('span', { class: 'chip ex' }, '⭐ можно обменять' + (p.worth ? ' на ' + p.worth + ' ₽' : '')) : null)))));
+    };
+    q.addEventListener('input', draw);
+    draw();
+    fill(box, info, q, list,
+      rules.url ? h('a', { class: 'btn btn-primary btn-block', href: safeUrl(rules.url), target: '_blank', rel: 'noopener', style: { marginTop: '12px' } }, rules.button || 'ОБМЕНЯТЬ НА СКИДКУ') : null);
+  }
+
   function renderPlayers() {
     const st = S.st;
     countChip.textContent = String(st.players.length);
@@ -231,7 +268,7 @@
       out.push(h('div', { class: 'prow' },
         avatar(p.name, p.photo),
         h('div', { class: 'pname' }, h('b', null, p.name),
-          h('div', { class: 'chips' }, p.items.map((it) => h('span', { class: 'chip' + (it[1] ? '' : ' pend') }, '№' + it[0]))))));
+          h('div', { class: 'chips' }, p.items.map((it) => h('span', { class: 'chip' + (it[1] ? '' : ' pend') }, '№' + it[0])), marks(p)))));
     });
     fill(plistEl, ...out);
   }
