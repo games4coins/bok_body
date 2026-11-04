@@ -257,12 +257,12 @@
     add('Ярослав Мудров', [52], 'ПОДТВЕРЖДЕНА');
     add('БЛОК', [30], 'БЛОК', { source: 'админ' });
 
-    const rules = { missLimit: 3, exchangeMin: 30, rate: 200, mode: 'точный', url: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', button: 'ОБМЕНЯТЬ НА СКИДКУ' };
+    const rules = { missLimit: 3, exchangeMin: 30, rate: 200, mode: 'точный', url: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', button: 'ОБМЕНЯТЬ НА СКИДКУ', notice: 'У участников прямых эфиров с ❌❌❌ (3 пропуска подряд), при пропуске текущего эфира обнулится накопительный баланс. Своевременно бронируйте места, чтобы не потерять свои накопления!' };
     const roster = [
       { key: '1', name: 'Анна Кузнецова', balance: 34, misses: 0, frozen: false, wins: 0, bought: 34, note: '' },
       { key: '2', name: 'Борис Иванов', balance: 12, misses: 2, frozen: false, wins: 0, bought: 12, note: '' },
       { key: '3', name: 'Вера Петрова', balance: 5, misses: 1, frozen: true, wins: 1, bought: 9, note: '' },
-      { key: '4', name: 'Игнат Орлов', balance: 0, misses: 0, frozen: false, wins: 2, bought: 6, note: '' }
+      { key: '4', name: 'Игнат Орлов', balance: 0, misses: 0, frozen: false, wins: 2, bought: 6, note: '', exch: 10 }
     ];
     const ledger = [];
     const pkey = (b) => { const f = roster.find((x) => x.name === b.name); return f ? f.key : null; };
@@ -335,6 +335,7 @@
       { key: 'exchangeMin', label: 'Обмен на скидку: от скольки номерков', hint: '', type: 'number', options: null, value: String(rules.exchangeMin) },
       { key: 'exchangeButton', label: 'Обмен на скидку: текст кнопки', hint: '', type: 'text', options: null, value: rules.button },
       { key: 'exchangeUrl', label: 'Обмен на скидку: ссылка кнопки', hint: 'Пусто — кнопка скрыта', type: 'text', options: null, value: rules.url },
+      { key: 'missNotice', label: 'Список балансов: предупреждение', hint: 'Пусто — не показывать', type: 'textarea', options: null, value: rules.notice },
       { key: 'balanceMode', label: 'Как показывать балансы публично', hint: 'точный — число; ступени — «10+»; скрыт — не показывать', type: 'select', options: ['точный', 'ступени', 'скрыт'], value: rules.mode },
       { key: 'nameFormat', label: 'Формат имени в списке', hint: '', type: 'select', options: ['полное имя', 'имя и инициал', 'только имя'], value: 'имя и инициал' },
       { key: 'notifyEmail', label: 'E-mail для уведомлений', hint: '', type: 'text', options: null, value: '' }
@@ -360,7 +361,7 @@
       if (action === 'balances') {
         return {
           ok: true, now: Date.now(), rules,
-          players: roster.filter((x) => x.balance > 0 || x.misses > 0).map((x) => Object.assign({ name: fmtName(x.name), photo: '', worth: x.balance >= rules.exchangeMin && rules.mode === 'точный' ? worth(x) : null }, mark(x)))
+          players: roster.map((x) => Object.assign({ name: fmtName(x.name), photo: '', zero: x.balance <= 0, wins: x.wins, exch: x.exch || 0, worth: x.balance >= rules.exchangeMin && rules.mode === 'точный' ? worth(x) : null }, mark(x)))
         };
       }
       if (action === 'book') {
@@ -440,7 +441,7 @@
           if (action === 'adminPlayerAdjust') { if (pl.balance + Number(p.delta) < 0) return err('NEGATIVE', 'Баланс не может стать отрицательным (сейчас ' + pl.balance + ')'); pl.balance += Number(p.delta); logOp(pl, 'РУЧНАЯ', Number(p.delta), p.reason); }
           if (action === 'adminPlayerSetMisses') { pl.misses = Number(p.misses) || 0; logOp(pl, 'ПРОПУСКИ', 0, 'пропусков стало ' + pl.misses); }
           if (action === 'adminPlayerFreeze') { pl.frozen = !!p.frozen; logOp(pl, 'ЗАМОРОЗКА', 0, pl.frozen ? 'заморожен' : 'разморожен'); }
-          if (action === 'adminExchange') { const n = Number(p.tickets) || 0; if (n > pl.balance) return err('NEGATIVE', 'На балансе всего ' + pl.balance + ' номерков'); pl.balance -= n; logOp(pl, 'ОБМЕН', -n, 'скидка ' + n * rules.rate + ' ₽'); }
+          if (action === 'adminExchange') { const n = Number(p.tickets) || 0; if (n > pl.balance) return err('NEGATIVE', 'На балансе всего ' + pl.balance + ' номерков'); pl.balance -= n; pl.exch = (pl.exch || 0) + n; logOp(pl, 'ОБМЕН', -n, 'скидка ' + n * rules.rate + ' ₽'); }
           return { ok: true, rules, players: roster.map((x) => Object.assign({ url: '', photo: '', last: '', updated: Date.now() }, x)), player: pl, discountRub: action === 'adminExchange' ? Number(p.tickets) * rules.rate : undefined };
         }
         case 'adminPlayerHistory': return { ok: true, history: ledger.filter((x) => x.key === p.key).slice(0, 60) };
@@ -469,6 +470,7 @@
           if (u.exchangeMin !== undefined) rules.exchangeMin = Math.max(1, Math.floor(Number(u.exchangeMin) || 30));
           if (u.exchangeButton !== undefined) rules.button = String(u.exchangeButton);
           if (u.exchangeUrl !== undefined) rules.url = String(u.exchangeUrl);
+          if (u.missNotice !== undefined) rules.notice = String(u.missNotice);
           if (u.balanceMode !== undefined) rules.mode = ['точный', 'ступени', 'скрыт'].includes(u.balanceMode) ? u.balanceMode : rules.mode;
           return admState();
         }

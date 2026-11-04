@@ -410,7 +410,7 @@
     ['Оплата и комментарий', ['payUrl', 'postUrl', 'paymentInfo']],
     ['Оплата без комиссии', ['bulkMin', 'bulkText', 'bulkButton', 'bulkUrl']],
     ['Надписи на странице бронирования', ['soldOutEnabled', 'soldOutText', 'waitText']],
-    ['Накопления и обмен', ['missLimit', 'exchangeRate', 'exchangeMin', 'exchangeButton', 'exchangeUrl', 'balanceMode']],
+    ['Накопления и обмен', ['missLimit', 'exchangeRate', 'exchangeMin', 'exchangeButton', 'exchangeUrl', 'balanceMode', 'missNotice']],
     ['Список участников', ['nameFormat', 'showPending']],
     ['Уведомления', ['notifyEmail', 'adminUrl']]
   ];

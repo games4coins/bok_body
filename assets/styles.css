@@ -315,3 +315,15 @@ button { cursor: pointer; }
 .blist { margin-top: 10px; max-height: 52vh; overflow: auto; }
 button.pill { border: 0; font: inherit; cursor: pointer; }
 .hero-top .admin-link + .admin-link { margin-left: 0; }
+
+/* Компактный список балансов */
+.filters { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; }
+.sw.fl { font-size: 13.5px; }
+.btable { margin-top: 6px; max-height: 46vh; overflow: auto; border-top: 1px solid #f3ebe2; }
+.brow { display: grid; grid-template-columns: minmax(0, 1fr) 46px 34px 40px 48px; gap: 4px; align-items: center; padding: 6px 2px; border-bottom: 1px solid #f3ebe2; font-size: 14px; }
+.brow.bhead { position: sticky; top: 0; background: #fff; font-size: 12px; color: var(--muted, #8a7868); font-weight: 700; z-index: 1; }
+.brow .bn { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brow .bn b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.brow .n { text-align: center; font-variant-numeric: tabular-nums; }
+.brow .n.bal { font-weight: 800; color: var(--accent-2); }
+.brow.ready { background: #fffaf0; }
