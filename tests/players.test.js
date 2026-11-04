@@ -19,7 +19,10 @@ test('значения по умолчанию: правила обмена и �
   const env = createEnv();
   const st = env.get();
   assert.equal(st.version, 5);
-  assert.deepEqual(JSON.parse(JSON.stringify(st.rules)), {
+  const rl = JSON.parse(JSON.stringify(st.rules));
+  assert.match(rl.notice, /обнулится накопительный баланс/);
+  delete rl.notice;
+  assert.deepEqual(rl, {
     missLimit: 3, exchangeMin: 30, rate: 200, mode: 'точный',
     url: 'https://vk.ru/im/convo/-227093583?entrypoint=community_page&tab=all', button: 'ОБМЕНЯТЬ НА СКИДКУ'
   });
@@ -44,7 +47,7 @@ test('добавить игрока: стартовый баланс и проп
 
   const pub = env.get({ action: 'balances' });
   assert.equal(pub.players.length, 1);
-  assert.deepEqual(JSON.parse(JSON.stringify(pub.players[0])), { name: 'Анна К.', photo: '', bal: 18, miss: 2, frozen: false, ex: false, worth: null });
+  assert.deepEqual(JSON.parse(JSON.stringify(pub.players[0])), { name: 'Анна К.', photo: '', bal: 18, miss: 2, frozen: false, ex: false, zero: false, wins: 0, exch: 0, worth: null });
   assert.ok(!JSON.stringify(pub).includes('101'), 'технический ключ не раскрывается');
 });
 
@@ -152,13 +155,14 @@ test('режимы показа баланса: ступени и скрыт (п
   assert.equal(x[0].worth, 6200, '31 × 200 ₽');
 });
 
-test('в публичный список балансов не попадают игроки без баланса и пропусков; порядок по алфавиту', () => {
+test('публичный список балансов: все игроки по алфавиту, у нулевого баланса флаг zero (на сайте скрывается фильтром)', () => {
   const env = createEnv();
   addPlayer(env, 101, 'Вера Петрова', 3);
   addPlayer(env, 102, 'Анна Кузнецова', 0, 0);
   addPlayer(env, 103, 'Борис Иванов', 0, 1);
   const names = env.get({ action: 'balances' }).players.map((p) => p.name);
-  assert.deepEqual(names, ['Борис И.', 'Вера П.']);
+  assert.deepEqual(names, ['Анна К.', 'Борис И.', 'Вера П.']);
+  assert.deepEqual(env.get({ action: 'balances' }).players.map((p) => p.zero), [true, true, false]);
 });
 
 // ───── Закрытие эфира ─────
@@ -209,7 +213,7 @@ test('закрытие эфира: предпросмотр совпадает �
   const burn = rows.find((x) => x[3] === 'ОБНУЛЕНИЕ ЗА ПРОПУСКИ');
   assert.equal(burn[4], -5);
   assert.match(burn[9], /пропуск № 3 подряд/);
-  assert.equal(env.get({ action: 'balances' }).players.some((p) => p.name === 'Борис В.'), false);
+  assert.equal(env.get({ action: 'balances' }).players.find((p) => p.name === 'Борис В.').zero, true, 'сгоревший баланс — нулевой');
 });
 
 test('закрытие эфира: победителя нужно указать явно; победитель — только участник с подтверждёнными номерками', () => {
@@ -465,7 +469,8 @@ test('настройки обмена: курс, порог, кнопка, сс�
   const env = createEnv();
   const r = env.admin('adminSettings', { updates: { exchangeRate: 150, exchangeMin: 20, exchangeButton: 'Обменять', exchangeUrl: 'https://vk.com/im?sel=-1', missLimit: 4, balanceMode: 'ступени' } });
   assert.equal(r.ok, true, JSON.stringify(r));
-  assert.deepEqual(JSON.parse(JSON.stringify(env.get().rules)), { missLimit: 4, exchangeMin: 20, rate: 150, mode: 'ступени', url: 'https://vk.com/im?sel=-1', button: 'Обменять' });
+  const r2 = JSON.parse(JSON.stringify(env.get().rules)); delete r2.notice;
+  assert.deepEqual(r2, { missLimit: 4, exchangeMin: 20, rate: 150, mode: 'ступени', url: 'https://vk.com/im?sel=-1', button: 'Обменять' });
   assert.equal(env.admin('adminSettings', { updates: { exchangeUrl: 'javascript:1' } }).error.code, 'BAD_SETTING');
   assert.equal(env.admin('adminSettings', { updates: { missLimit: 0 } }).error.code, 'BAD_SETTING');
   assert.equal(env.admin('adminSettings', { updates: { balanceMode: 'как-то' } }).error.code, 'BAD_SETTING');
@@ -479,4 +484,20 @@ test('ручная бронь админа: определение профил�
   const env2 = createEnv();
   assert.equal(env2.admin('adminResolveVk', { vkUrl: 'vk.com/maria_s' }).error.needName, true);
   assert.equal(env2.admin('adminResolveVk', { vkUrl: 'bad link' }).error.code, 'BAD_VK');
+});
+
+test('список балансов: победы и обмены за всё время; текст предупреждения настраивается и может быть пустым', () => {
+  const env = createEnv();
+  addPlayer(env, 101, 'Анна Кузнецова', 40, 1);
+  const key = env.admin('adminPlayers').players[0].key;
+  env.admin('adminExchange', { key, tickets: 30, note: 'промокод' });
+  env.admin('adminExchange', { key, tickets: 5 });
+  const p = env.get({ action: 'balances' }).players[0];
+  assert.equal(p.exch, 35);
+  assert.equal(p.wins, 0);
+  assert.equal(p.bal, 5);
+  env.admin('adminSettings', { updates: { missNotice: 'Внимание, пропуски!' } });
+  assert.equal(env.get({ action: 'balances' }).rules.notice, 'Внимание, пропуски!');
+  env.admin('adminSettings', { updates: { missNotice: '' } });
+  assert.equal(env.get({ action: 'balances' }).rules.notice, '');
 });

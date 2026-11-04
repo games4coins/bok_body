@@ -36,7 +36,7 @@
   const layout = h('div', { class: 'layout' }, h('div', null, mineEl, gridCard), playersCard);
   const app = document.getElementById('app');
   fill(app, heroEl, bannerEl, stepsEl, layout,
-    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.3'));
+    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.4'));
   if (DEMO) document.getElementById('demo').appendChild(h('div', { class: 'demo-flag' },
     'Демо-режим: данные не сохраняются. Админка: admin.html, пароль demo. Укажите API_URL в config.js, чтобы подключить таблицу.'));
   if (window.matchMedia('(min-width: 700px)').matches) stepsEl.open = true;
@@ -229,24 +229,45 @@
     const r = await api.balances();
     if (!r.ok) { fill(box, h('div', { class: 'msg err' }, (r.error && r.error.message) || 'Не удалось загрузить')); return; }
     const rules = r.rules || {};
-    const info = h('p', { class: 'lead' },
-      'Если вы участвовали в эфире и не выиграли, номерки копятся. Победитель теряет накопленное. ',
-      rules.missLimit ? 'Пропуск эфира (✖) при ненулевом балансе — ' + rules.missLimit + ' подряд обнуляют накопленное. ' : '',
-      rules.exchangeMin ? 'От ' + rules.exchangeMin + ' номерков можно обменять на скидку' + (rules.rate ? ' (1 номерок = ' + rules.rate + ' ₽)' : '') + '.' : '');
+    const all = r.players || [];
+    const F = { zero: false, miss: false, ex: false, win: false };
     const q = h('input', { class: 'input', type: 'search', placeholder: 'Поиск по имени', autocomplete: 'off' });
-    const list = h('div', { class: 'blist' });
-    const draw = () => {
+    const list = h('div', { class: 'btable' });
+    const count = h('div', { class: 'hint' });
+    const check = (key, label) => h('label', { class: 'sw fl' }, h('input', { type: 'checkbox', onchange: (e) => { F[key] = e.target.checked; draw(); } }), label);
+    const num = (v, cls) => h('span', { class: 'n' + (cls ? ' ' + cls : '') }, v === null || v === undefined ? '—' : String(v));
+
+    function draw() {
       const t = norm(q.value.trim());
-      const rows = (r.players || []).filter((p) => !t || norm(p.name).indexOf(t) >= 0);
-      if (!rows.length) { fill(list, h('div', { class: 'empty' }, (r.players || []).length ? 'Никого не нашли' : 'Пока ни у кого нет накопленных номерков')); return; }
-      fill(list, ...rows.map((p) => h('div', { class: 'prow' }, avatar(p.name, p.photo),
-        h('div', { class: 'pname' }, h('b', null, p.name),
-          h('div', { class: 'chips' }, marks(p) || h('span', { class: 'meta' }, '—'),
-            p.ex ? h('span', { class: 'chip ex' }, '⭐ можно обменять' + (p.worth ? ' на ' + p.worth + ' ₽' : '')) : null)))));
-    };
+      const rows = all.filter((p) => {
+        if (!F.zero && p.zero) return false;                     // нулевой баланс скрыт, пока не включён фильтр
+        if (F.miss && !(p.miss > 0)) return false;
+        if (F.ex && !p.ex) return false;
+        if (F.win && !(p.wins > 0)) return false;
+        return !t || norm(p.name).indexOf(t) >= 0;
+      });
+      count.textContent = 'Показано ' + rows.length + ' из ' + all.length;
+      fill(list,
+        h('div', { class: 'brow bhead' }, h('span', null, 'Участник'), h('span', { class: 'n', title: 'Накопленные номерки' }, '🎟'),
+          h('span', { class: 'n', title: 'Победы' }, '🏆'), h('span', { class: 'n', title: 'Обменено номерков за всё время' }, '🔄'),
+          h('span', { class: 'n', title: 'Пропуски эфиров подряд' }, '✖')),
+        rows.length ? rows.map((p) => h('div', { class: 'brow' + (p.ex ? ' ready' : '') },
+          h('span', { class: 'bn' }, avatar(p.name, p.photo, 22), h('b', null, p.name), p.frozen ? h('span', { class: 'frz', title: 'Баланс заморожен' }, '❄') : null,
+            p.ex ? h('span', { class: 'star', title: 'Можно обменять' + (p.worth ? ' на ' + p.worth + ' ₽' : '') }, '⭐') : null),
+          num(p.bal, p.ex ? 'bal' : ''), num(p.wins || 0), num(p.exch || 0),
+          h('span', { class: 'n' }, p.miss > 0 ? h('span', { class: 'xs' }, '✖'.repeat(p.miss)) : '·')))
+          : h('div', { class: 'empty' }, all.length ? 'Никого не нашли — попробуйте изменить фильтры' : 'Пока нет данных'));
+    }
     q.addEventListener('input', draw);
     draw();
-    fill(box, info, q, list,
+    fill(box,
+      rules.notice ? h('div', { class: 'banner warn', style: { margin: '0 0 12px' } }, h('span', null, '⚠️'), h('span', null, rules.notice)) : null,
+      h('p', { class: 'lead' }, 'Номерки копятся, если вы участвовали в эфире и не выиграли. Победитель теряет накопленное. ',
+        rules.exchangeMin ? 'От ' + rules.exchangeMin + ' номерков можно обменять на скидку' + (rules.rate ? ' (1 номерок = ' + rules.rate + ' ₽)' : '') + '. ' : '',
+        h('span', { class: 'meta' }, '🎟 накоплено · 🏆 побед · 🔄 обменено · ✖ пропусков подряд')),
+      q,
+      h('div', { class: 'filters' }, check('zero', 'С нулевым балансом'), check('miss', 'Только с пропусками'), check('ex', 'Можно обменять ⭐'), check('win', 'Только победители')),
+      count, list,
       rules.url ? h('a', { class: 'btn btn-primary btn-block', href: safeUrl(rules.url), target: '_blank', rel: 'noopener', style: { marginTop: '12px' } }, rules.button || 'ОБМЕНЯТЬ НА СКИДКУ') : null);
   }
 

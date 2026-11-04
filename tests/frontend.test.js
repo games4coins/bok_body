@@ -541,22 +541,45 @@ test('публичная страница: у участников рядом с
 
 async function sleepBoot() { const r = boot(PUBLIC); await sleep(500); return r; }
 
-test('публичная страница: кнопка «Балансы» — список, поиск, правила, кнопка обмена только у тех, кому можно', async () => {
+test('публичная страница: «Балансы» — компактная таблица: баланс, победы, обмены, пропуски; нули скрыты по умолчанию', async () => {
   const { app, body } = await sleepBoot();
   click(buttonByText(app, 'Балансы')); await sleep(200);
   const ov = overlayOf(body);
+  const rowOf = (n) => findAll(ov, (e) => e.className.startsWith('brow') && !e.className.includes('bhead')).find((r) => hasText(r, n));
   assert.ok(hasText(ov, 'Накопленные номерки'));
-  assert.ok(hasText(ov, 'Анна К.') && hasText(ov, 'Борис И.') && hasText(ov, 'Вера П.'));
-  assert.ok(!hasText(ov, 'Егор С.'), 'без накоплений и пропусков в списке нет');
-  assert.ok(hasText(ov, '⭐ можно обменять'), 'Анна накопила 34 ≥ 30');
-  assert.ok(hasText(ov, 'на 6800 ₽'), '34 × 200');
-  assert.equal(findAll(ov, (e) => hasText(e, 'можно обменять') && e.className === 'chip ex').length, 1, 'только у одной');
+  assert.ok(hasText(ov, 'обнулится накопительный баланс'), 'предупреждение из настроек');
+  assert.ok(rowOf('Анна К.') && rowOf('Борис И.') && rowOf('Вера П.'));
+  assert.ok(!rowOf('Игнат О.'), 'нулевой баланс скрыт по умолчанию');
+  assert.ok(hasText(ov, 'Показано 3 из 4'));
+  const cells = (r) => findAll(r, (e) => e.className.startsWith('n')).map(textOf);
+  assert.deepEqual(cells(rowOf('Борис И.')), ['12', '0', '0', '✖✖'], 'баланс, победы, обмены, пропуски');
+  assert.deepEqual(cells(rowOf('Вера П.')), ['5', '1', '0', '✖']);
+  assert.ok(findAll(rowOf('Анна К.'), (e) => e.className === 'star').length === 1, 'Анна накопила 34 ≥ 30 — звезда');
+  assert.ok(!findAll(rowOf('Борис И.'), (e) => e.className === 'star').length);
   const exch = findAll(ov, (e) => e.tag === 'a' && hasText(e, 'ОБМЕНЯТЬ НА СКИДКУ'))[0];
-  assert.ok(exch && exch.attrs.href.startsWith('https://vk.ru/im/convo/'), 'ведёт в переписку ВК');
-  assert.ok(hasText(ov, '1 номерок = 200 ₽'));
+  assert.ok(exch && exch.attrs.href.startsWith('https://vk.ru/im/convo/'));
+});
+
+test('публичная страница: фильтры списка балансов (нулевые, с пропусками, можно обменять, победители) и поиск', async () => {
+  const { app, body } = await sleepBoot();
+  click(buttonByText(app, 'Балансы')); await sleep(200);
+  const ov = overlayOf(body);
+  const visible = () => findAll(ov, (e) => e.className.startsWith('brow') && !e.className.includes('bhead')).map((r) => textOf(findAll(r, (e) => e.tag === 'b')[0]));
+  const flag = (label, v = true) => { const cb = findAll(findAll(ov, (e) => e.tag === 'label' && hasText(e, label))[0], (e) => e.tag === 'input')[0]; cb.checked = v; cb.listeners.change.forEach((f) => f({ target: cb })); };
+  flag('С нулевым балансом');
+  assert.deepEqual(visible(), ['Анна К.', 'Борис И.', 'Вера П.', 'Игнат О.']);
+  flag('Только победители');
+  assert.deepEqual(visible(), ['Вера П.', 'Игнат О.']);
+  flag('Только победители', false); flag('С нулевым балансом', false);
+  flag('Только с пропусками');
+  assert.deepEqual(visible(), ['Борис И.', 'Вера П.']);
+  flag('Только с пропусками', false);
+  flag('Можно обменять');
+  assert.deepEqual(visible(), ['Анна К.']);
+  flag('Можно обменять', false);
   const q = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'search')[0];
   q.value = 'бор'; q.listeners.input.forEach((f) => f({ target: q }));
-  assert.ok(hasText(ov, 'Борис И.') && !hasText(ov, 'Анна К.'), 'поиск работает');
+  assert.deepEqual(visible(), ['Борис И.']);
 });
 
 test('админка: вкладка «Игроки» — список, добавление со стартовым балансом и пропусками, ручное начисление, обмен', async () => {
