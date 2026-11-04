@@ -36,7 +36,7 @@
   const layout = h('div', { class: 'layout' }, h('div', null, mineEl, gridCard), playersCard);
   const app = document.getElementById('app');
   fill(app, heroEl, bannerEl, stepsEl, layout,
-    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.2'));
+    h('div', { class: 'footer' }, 'Время указано по часовому поясу организатора. · версия сайта 5.3'));
   if (DEMO) document.getElementById('demo').appendChild(h('div', { class: 'demo-flag' },
     'Демо-режим: данные не сохраняются. Админка: admin.html, пароль demo. Укажите API_URL в config.js, чтобы подключить таблицу.'));
   if (window.matchMedia('(min-width: 700px)').matches) stepsEl.open = true;
@@ -399,9 +399,43 @@
     const preview = h('div', { class: 'msg' });
     const errBox = h('div', { class: 'msg err', role: 'alert' });
     const submit = h('button', { class: 'btn btn-primary btn-block', type: 'button' }, 'Забронировать ' + list(nums));
-    let seq = 0;
+    let seq = 0, chosen = null;
+
+    // Выбор из списка игроков (кто уже участвовал): поиск по имени
+    const pickEl = h('div', null);
+    const pickBtn = h('button', { class: 'btn btn-soft btn-sm', type: 'button', onclick: togglePicker }, '👥 Я уже участвовал(а) — выбрать из списка');
+    async function togglePicker() {
+      if (pickEl.children.length) { fill(pickEl); return; }
+      fill(pickEl, h('div', { class: 'hint' }, 'Загружаем список…'));
+      const r = await api.players();
+      if (!r.ok) { fill(pickEl, h('div', { class: 'msg err' }, (r.error && r.error.message) || 'Не удалось загрузить список')); return; }
+      const q = h('input', { class: 'input', type: 'search', placeholder: 'Начните вводить имя', autocomplete: 'off' });
+      const box = h('div', { class: 'blist', style: { maxHeight: '30vh' } });
+      const draw = () => {
+        const t = norm(q.value.trim());
+        const rows = r.players.filter((x) => !t || norm(x.name).indexOf(t) >= 0).slice(0, 60);
+        fill(box, rows.length ? rows.map((x) => h('div', { class: 'prow', style: { cursor: 'pointer' }, onclick: () => choose(x) },
+          avatar(x.name, x.photo, 32), h('div', { class: 'pname' }, h('b', null, x.name))))
+          : h('div', { class: 'empty' }, r.players.length ? 'Никого не нашли — вставьте ссылку на профиль' : 'Список пока пуст — вставьте ссылку на профиль'));
+      };
+      q.addEventListener('input', draw);
+      draw();
+      fill(pickEl, q, box, h('div', { class: 'hint' }, 'Не нашли себя? Закройте список и вставьте ссылку на профиль ВК.'));
+      q.focus();
+    }
+    function choose(x) {
+      chosen = x; seq++;
+      vkInput.value = '';
+      errBox.textContent = '';
+      nameField.classList.add('hidden');
+      fill(pickEl);
+      preview.className = 'msg';
+      fill(preview, h('div', { class: 'profile-card' }, avatar(x.name, x.photo, 44),
+        h('div', null, h('b', null, x.name), h('div', { class: 'meta' }, 'Выбрано из списка. Это не вы? Выберите другого или вставьте ссылку.'))));
+    }
 
     async function resolve() {
+      chosen = null;
       const v = vkInput.value.trim(), my = ++seq;
       errBox.textContent = '';
       fill(preview);
@@ -422,15 +456,16 @@
       }
     }
     vkInput.addEventListener('change', resolve);
+    vkInput.addEventListener('input', () => { chosen = null; });
 
     submit.addEventListener('click', async () => {
       errBox.textContent = '';
-      if (!vkInput.value.trim()) { errBox.textContent = 'Вставьте ссылку на ваш профиль ВКонтакте'; vkInput.focus(); return; }
+      if (!chosen && !vkInput.value.trim()) { errBox.textContent = 'Вставьте ссылку на ваш профиль ВКонтакте или выберите себя из списка'; vkInput.focus(); return; }
       submit.disabled = true; submit.textContent = 'Бронируем…';
-      const r = await api.post('book', { clientId: CLIENT, vkUrl: vkInput.value.trim(), name: nameInput.value.trim(), numbers: nums });
+      const r = await api.post('book', { clientId: CLIENT, vkUrl: chosen ? '' : vkInput.value.trim(), playerKey: chosen ? chosen.id : '', name: nameInput.value.trim(), numbers: nums });
       submit.disabled = false; submit.textContent = 'Забронировать ' + list(nums);
       if (r.ok) {
-        store('nomerok_vk', vkInput.value.trim());
+        if (!chosen) store('nomerok_vk', vkInput.value.trim());
         if (nameInput.value.trim()) store('nomerok_name', nameInput.value.trim());
         S.sel.clear();
         showSuccess(r);
@@ -447,7 +482,7 @@
       h('h3', null, 'Бронь номерков'),
       h('p', { class: 'lead' }, list(nums) + ' · ' + nums.length + ' шт. · ' + S.st.price + ' за номерок'),
       h('div', { class: 'field' },
-        h('label', null, 'Ссылка на ваш профиль ВКонтакте'), vkInput,
+        h('label', null, 'Ссылка на ваш профиль ВКонтакте'), vkInput, h('div', { style: { margin: '8px 0' } }, pickBtn), pickEl,
         h('div', { class: 'hint' }, 'Нужна, чтобы мы вас узнали. В списке участников будут видны имя и фото из вашего профиля.'), preview),
       nameField, errBox, submit
     ]);

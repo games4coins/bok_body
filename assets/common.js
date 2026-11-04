@@ -232,6 +232,7 @@
     state: () => call('GET', 'state', { action: 'state' }),
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
     balances: () => call('GET', 'balances', { action: 'balances' }),
+    players: () => call('GET', 'players', { action: 'players' }),
     post: (action, body) => call('POST', action, body)
   };
 
@@ -355,6 +356,7 @@
       if (action === 'state') return pubState();
       if (action === 'mine') return { ok: true, now: Date.now(), paused: cfg.paused, bookings: bookings.filter((b) => b.client === p.client && b.status !== 'ОТМЕНЕНА').map(pub) };
       if (action === 'resolveVk' || action === 'adminResolveVk') return { ok: true, display: 'Демо Г.', name: 'Демо Гость', photo: '', key: 'demo' };
+      if (action === 'players') return { ok: true, players: roster.map((x) => ({ id: x.key, name: fmtName(x.name), photo: '' })) };
       if (action === 'balances') {
         return {
           ok: true, now: Date.now(), rules,
@@ -363,6 +365,7 @@
       }
       if (action === 'book') {
         if (cfg.paused) return err('PAUSED', cfg.pauseMessage);
+        if (p.playerKey) { const f = roster.find((x) => x.key === p.playerKey); if (!f) return err('PLAYER_NOT_FOUND', 'Игрок не найден в списке'); p.name = f.name; p.vkUrl = 'https://vk.com/id' + f.key; }
         if (!/vk\.(com|ru)\//i.test(p.vkUrl || '')) return err('BAD_VK', 'Это не похоже на ссылку ВКонтакте. Пример: vk.com/id12345');
         const m = busy(), taken = (p.numbers || []).filter((n) => m[n]);
         if (taken.length) return err('TAKEN', 'Номерки уже заняты: ' + taken.join(', '), { taken });

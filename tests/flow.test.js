@@ -91,3 +91,30 @@ test('ручная бронь: игрок выбран из базы — ВК н
   assert.equal(b.name, 'Старый Игрок');
   assert.equal(b.status, 'ПОДТВЕРЖДЕНА');
 });
+
+test('публичный список игроков: только имя в принятом формате, фото и id; ссылки ВК не отдаются', () => {
+  const env = createEnv();
+  env.admin('adminPlayerAdd', { vkUrl: 'vk.com/id601', name: 'Анна Кузнецова', balance: 5 });
+  env.admin('adminPlayerAdd', { vkUrl: 'vk.com/id602', name: 'Борис Иванов', balance: 0 });
+  const r = env.get({ action: 'players' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.players.map((p) => p.name), ['Анна К.', 'Борис И.']);
+  assert.ok(!JSON.stringify(r).includes('vk.com'), 'ссылки не раскрываются');
+});
+
+test('бронь участником «из списка»: без ссылки и без запросов к ВК, привязка к игроку, лимиты действуют', () => {
+  const env = createEnv();
+  env.admin('adminPlayerAdd', { vkUrl: 'vk.com/id601', name: 'Анна Кузнецова', balance: 5 });
+  const id = env.get({ action: 'players' }).players[0].id;
+  const before = env.fetches.length;
+  const r = env.post({ action: 'book', clientId: A, playerKey: id, numbers: [4, 5] });
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+  assert.equal(env.fetches.length, before);
+  const b = env.admin('adminState').bookings[0];
+  assert.equal(b.key, id);
+  assert.equal(b.name, 'Анна Кузнецова');
+  assert.equal(env.post({ action: 'book', clientId: A, playerKey: 'нет-такого', numbers: [9] }).error.code, 'PLAYER_NOT_FOUND');
+  assert.equal(env.post({ action: 'book', clientId: A, playerKey: id, numbers: [4] }).error.code, 'TAKEN');
+  const pub = env.get().players.find((p) => p.name === 'Анна К.');
+  assert.equal(pub.bal, 5, 'в списке участников у неё виден баланс');
+});

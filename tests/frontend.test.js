@@ -767,3 +767,25 @@ test('админка: ручная бронь — «Выбрать из базы
   click(buttonByText(app, 'Брони')); click(buttonByText(app, 'Все'));
   assert.ok(hasText(app, 'Борис Иванов'));
 });
+
+test('публичная страница: в форме брони можно выбрать себя из списка игроков с поиском по имени', async () => {
+  const { app, body } = await sleepBoot();
+  const tile = (n) => findAll(app, (e) => e.className.split(' ').includes('tile') && textOf(e) === String(n))[0];
+  click(tile(20));
+  click(buttonByText(app, 'Забронировать'));
+  let ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Бронь номерков'));
+  click(buttonByText(ov, 'выбрать из списка')); await sleep(300);
+  ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Анна К.') && hasText(ov, 'Борис И.'), 'виден список');
+  assert.ok(!hasText(ov, 'vk.com/id1'), 'ссылки игроков не показываются');
+  const q = findAll(ov, (e) => e.tag === 'input' && e.attrs.type === 'search')[0];
+  q.value = 'вер'; q.listeners.input.forEach((f) => f({ target: q }));
+  assert.ok(hasText(ov, 'Вера П.') && !hasText(ov, 'Анна К.'));
+  click(findAll(ov, (e) => e.className === 'prow').find((r) => hasText(r, 'Вера П.')));
+  ov = overlayOf(body);
+  assert.ok(hasText(ov, 'Выбрано из списка'));
+  click(buttonByText(ov, 'Забронировать №20')); await sleep(400);
+  assert.ok(hasText(overlayOf(body) || app, 'Номерки закреплены за вами'), 'бронь создана без ссылки');
+  assert.ok(!hasText(overlayOf(body) || app, 'Вставьте ссылку'), 'без ошибки про ссылку');
+});
