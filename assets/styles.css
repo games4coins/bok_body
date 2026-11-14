@@ -327,3 +327,57 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .brow .n { text-align: center; font-variant-numeric: tabular-nums; }
 .brow .n.bal { font-weight: 800; color: var(--accent-2); }
 .brow.ready { background: #fffaf0; }
+
+/* BOK v6.1: кабинет и открытка победителя */
+.cab-profile{display:flex;align-items:center;gap:15px;margin:18px 0}.cab-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:16px 0}.cab-stats>div{padding:13px;background:var(--surface,#f5f1ed);border-radius:12px}.winner-preview{margin:16px 0}.winner-stage{position:relative;overflow:hidden;min-height:540px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px 18px;text-align:center;border-radius:20px;background:linear-gradient(135deg,#4e1748,#a33568);color:#fff}.winner-stage .avatar{border:6px solid #ffe5ac;box-sizing:content-box;max-width:40vw;max-height:40vw}.winner-stage h2{color:white;font-size:clamp(25px,5vw,42px);margin:0}.winner-kicker{font-weight:800;letter-spacing:2px;color:#ffe5ac}.winner-name{font-size:clamp(24px,4vw,38px);font-weight:800}.winner-number{font-size:clamp(60px,10vw,100px);font-weight:900;color:#ffe5ac}.winner-stage p{font-size:19px;white-space:pre-wrap}.winner-stage a{color:#fff}.winner-fireworks{font-size:26px;animation:confetti 1.8s ease-in-out infinite alternate}@keyframes confetti{from{transform:translateY(-8px) rotate(-7deg);opacity:.65}to{transform:translateY(12px) rotate(8deg);opacity:1}}@media(prefers-reduced-motion:reduce){.winner-fireworks{animation:none}}
+
+/* v6.2 — контрастная индикация заморозки и премиальная открытка */
+.snow-big,.frz{color:#1677da!important;font-size:22px!important;font-weight:900;filter:drop-shadow(0 1px 1px #b6dcff)}
+.frozen-name{color:#1677da!important;font-weight:800}.freeze-days{font-size:11px!important;color:#1677da;font-weight:800}
+.brow{grid-template-columns:minmax(0,1fr) 46px 34px 40px 48px 58px}
+.winner-stage{background:radial-gradient(ellipse at 50% 42%,#8b3657,#4a1b36 62%,#220f20);border:3px solid #d5a35f;outline:1px solid #9b684c;outline-offset:-12px;min-height:700px;padding:32px 24px;box-shadow:inset 0 0 100px #1c081988;gap:12px}
+.winner-stage .winner-brand{font-family:Georgia,serif;font-size:46px;letter-spacing:14px;color:#f7d7a1;line-height:1.1}
+.winner-brand small{display:block;font:11px system-ui,sans-serif;letter-spacing:4px;margin-top:9px}
+.winner-stage .winner-heading{font-family:Georgia,serif;font-size:clamp(30px,6vw,60px);line-height:1.1;color:#f6d9a5}
+.winner-heading em{display:block;font-size:.78em;font-weight:400;text-transform:none}
+.winner-portrait{width:min(74vw,290px);height:min(74vw,290px);display:flex;align-items:center;justify-content:center;border:6px solid #e8bd79;border-radius:50%;box-shadow:0 0 35px #d4a36d80;overflow:hidden}
+.winner-portrait .avatar{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover;border:0!important;border-radius:50%}
+.winner-stage .winner-name{font:italic clamp(32px,6vw,55px) Georgia,serif;color:#fff0dc}
+.winner-stage .winner-number{font:700 clamp(74px,12vw,130px) Georgia,serif;color:#f7d59b}
+.winner-event,.winner-prize{color:#f8d7a4;font-weight:800;letter-spacing:2px}
+.winner-stage p{font-size:15px;max-width:580px;line-height:1.5}
+.winner-sparks{position:absolute;top:20%;left:0;right:0;pointer-events:none;color:#f7d7a1;letter-spacing:40px;animation:confetti 2s infinite alternate}
+.gift-item{padding:9px 12px;border-bottom:1px solid #e6dfd6}.live-suggestions{max-height:220px;overflow:auto}.winner-copy-preview{overflow-wrap:anywhere}
+
+/* v6.3 · премиальная поздравительная открытка */
+.winner-preview{max-width:900px;margin:24px auto}
+.winner-stage{isolation:isolate;position:relative;min-height:920px;padding:42px 28px 56px;gap:16px;border:2px solid #edc58b;border-radius:25px;outline:1px solid rgba(255,224,162,.35);outline-offset:-13px;background:radial-gradient(ellipse at 42% 44%,#9a4761 0%,#63263e 42%,#321421 80%,#1c0b14 100%);box-shadow:0 24px 60px #28101b55,inset 0 0 110px #12050d9c;color:#fff4df}
+.winner-stage:before{content:'';position:absolute;inset:19px;border:1px solid #f5d6a54a;border-radius:14px;pointer-events:none;z-index:-1}
+.winner-stage:after{content:'✦';position:absolute;top:31%;right:9%;font-size:38px;color:#f4d69e;filter:drop-shadow(0 0 13px #ffcd74);animation:winner-glow 2.6s ease-in-out infinite alternate}
+.winner-stage .winner-brand{font:400 clamp(48px,7vw,74px)/1 Georgia,'Times New Roman',serif;letter-spacing:.25em;color:#ffe3b2;text-shadow:0 2px 25px #e5a04d70}
+.winner-brand small{font:500 12px/1.5 system-ui,sans-serif;letter-spacing:.3em;margin-top:10px}
+.winner-stage .winner-heading{font:400 clamp(38px,6.5vw,83px)/1.02 Georgia,'Times New Roman',serif;letter-spacing:.025em;color:#ffe5b8;text-shadow:0 3px 20px #c98b5559;margin:15px 0 5px}
+.winner-stage .winner-heading em{font:italic 400 clamp(33px,5vw,66px)/1.15 Georgia,serif;color:#f5c886;margin-top:9px;letter-spacing:0}
+.winner-stage .winner-portrait{width:min(74vw,390px);height:min(74vw,390px);max-width:390px;max-height:390px;border:9px solid #e8bb78;box-shadow:0 0 0 3px #6c2d42,0 0 0 7px #f4d49b99,0 0 45px #ffd08480;margin:20px 0 12px;background:#71354a}
+.winner-stage .winner-name{font:italic 400 clamp(37px,5.7vw,69px)/1.05 Georgia,serif;color:#fff0d5;text-shadow:0 2px 14px #19070e}
+.winner-stage .winner-event{border:1px solid #f0bf80;border-radius:999px;padding:10px 32px;font-size:15px;letter-spacing:.26em;background:#230e19a8;color:#ffe1ac}
+.winner-stage .winner-number{padding:7px 45px 12px;border-radius:16px;border:3px solid #d5a15d;background:linear-gradient(120deg,#dba65f,#ffe6a8 42%,#efbd6f 75%,#ba7d3e);box-shadow:inset 0 0 0 3px #fff2d36b,0 12px 30px #1c071b88;line-height:1.05}
+.winner-stage .winner-number span{font:400 clamp(80px,12vw,142px)/1 Georgia,serif;color:#531b2c;text-shadow:0 1px #fff3d1}
+.winner-stage .winner-prize{font-size:clamp(15px,2vw,22px);letter-spacing:.08em;color:#ffdfa7}
+.winner-stage p{font-size:clamp(15px,1.8vw,20px);line-height:1.55;color:#ffece0;max-width:690px}
+.winner-ribbon{position:absolute;left:25px;top:36%;font-size:43px;color:#f2c885;transform:rotate(-20deg);text-shadow:0 0 20px #ffd485}
+.winner-sparks{top:22%;letter-spacing:clamp(10px,4vw,55px);color:#ffdb9e;filter:drop-shadow(0 0 10px #ffd47a)}
+@keyframes winner-glow{from{opacity:.4;transform:scale(.8)}to{opacity:1;transform:scale(1.15)}}
+@media(max-width:650px){.winner-stage{min-height:720px;padding:32px 17px 40px;gap:12px}.winner-stage .winner-portrait{width:min(68vw,330px);height:min(68vw,330px);border-width:6px}.winner-stage .winner-number{padding:7px 27px}.winner-stage .winner-brand{letter-spacing:.16em}.winner-stage .winner-heading{font-size:clamp(32px,8vw,52px)}}
+@media(prefers-reduced-motion:reduce){.winner-stage:after,.winner-sparks{animation:none}}
+
+/* v6.4: каталог подарков, группировка и премиальная открытка */
+.gift-player-group{border:1px solid #eadbce;border-radius:14px;margin:10px 0;overflow:hidden;background:#fff}
+.gift-player-head{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding:15px 16px;background:#fff9f3;border:0;cursor:pointer;text-align:left;font-weight:700;font-size:15px;color:#39271f}
+.gift-counts{font-weight:500;font-size:13px;color:#6d5b50;white-space:normal;text-align:right}
+.gift-player-items{padding:6px 14px 14px}.gift-item-row{display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1px solid #eee4da;padding:12px 0}
+.gift-catalog-panel{margin-top:24px;padding:14px;border:1px solid #e7d5c5;border-radius:12px}.gift-catalog-panel summary{cursor:pointer;font-weight:700}
+.gift-catalog-row{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid #eee;padding:9px 0}.gift-add-row{display:flex;gap:8px;margin-top:12px}.gift-add-row input{flex:1;min-width:0}
+.gift-assignment{padding:14px;border:1px solid #eee2d6;border-radius:14px;margin-bottom:20px;display:grid;gap:8px}
+.winner-premium-canvas{display:block;width:min(100%,620px);height:auto;margin:18px auto;border-radius:12px;box-shadow:0 14px 44px rgba(45,8,24,.28)}
+@media(max-width:600px){.gift-player-head,.gift-item-row{flex-wrap:wrap}.gift-add-row{flex-direction:column}}
