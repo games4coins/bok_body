@@ -381,3 +381,15 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .gift-assignment{padding:14px;border:1px solid #eee2d6;border-radius:14px;margin-bottom:20px;display:grid;gap:8px}
 .winner-premium-canvas{display:block;width:min(100%,620px);height:auto;margin:18px auto;border-radius:12px;box-shadow:0 14px 44px rgba(45,8,24,.28)}
 @media(max-width:600px){.gift-player-head,.gift-item-row{flex-wrap:wrap}.gift-add-row{flex-direction:column}}
+
+/* v6.5 — единая навигация, доступные имена и кликабельные профили */
+.hero-top{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin-bottom:20px}
+.hero-status{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hero-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;width:100%}
+.hero-actions .admin-link,.hero-top .admin-link{margin:0!important;display:flex;justify-content:center;align-items:center;text-align:center;min-width:0;min-height:48px;padding:10px 7px;border-radius:13px;border:1px solid rgba(255,225,195,.38);background:linear-gradient(155deg,rgba(95,38,18,.44),rgba(67,26,15,.27));box-shadow:inset 0 1px rgba(255,255,255,.13);font-family:inherit;font-size:clamp(12px,2.8vw,15px);font-weight:750;line-height:1.15;letter-spacing:0;white-space:normal;text-wrap:balance;color:#fff}
+.hero-actions .admin-link:hover,.hero-actions .admin-link:focus-visible{background:rgba(90,34,12,.7);outline:2px solid #ffe3b2;outline-offset:2px}
+.brow{grid-template-columns:minmax(125px,2.4fr) repeat(4,minmax(29px,.48fr)) minmax(43px,.65fr);gap:3px;font-size:12px}
+.brow .bn{gap:5px}.brow .bn b{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.18;text-align:left}.brow .bn .avatar-img{flex-shrink:0;width:20px!important;height:20px!important}
+.participant-link{appearance:none;border:0;background:none;padding:3px 0;color:inherit;cursor:pointer;width:100%;font:inherit;text-align:left}.participant-link:hover b,.participant-link:focus-visible b{text-decoration:underline;text-underline-offset:3px}.participant-link:focus-visible,.participant-row:focus-visible{outline:2px solid #b5461a;outline-offset:2px}
+.participant-row{display:flex;width:100%;border:0;background:transparent;text-align:left;color:inherit;font:inherit;cursor:pointer}.participant-row:hover{background:#fff5e9}
+@media(max-width:520px){.hero-actions{gap:7px}.hero-actions .admin-link{font-size:clamp(11px,3.15vw,14px);padding:10px 4px;min-height:52px}.brow{grid-template-columns:minmax(112px,2.5fr) repeat(4,minmax(24px,.43fr)) minmax(34px,.5fr);font-size:11px;gap:2px}.brow.bhead{font-size:10px}.brow .bn .avatar-img{width:18px!important;height:18px!important}.btable{overflow-x:auto}.sheet{max-width:100%}}

@@ -72,10 +72,10 @@
     document.title = 'Эфир №' + st.event.number + ' — бронирование номерков';
     const status = st.paused ? '⏸ Технический перерыв' : st.open ? '● Бронь открыта' : 'Бронь закрыта';
     fill(heroEl, 
-      h('div', { class: 'hero-top' }, h('span', { class: 'pill solid' }, 'Эфир №' + st.event.number), h('span', { class: 'pill' }, status),
+      h('div', { class: 'hero-top' }, h('div', { class: 'hero-status' }, h('span', { class: 'pill solid' }, 'Эфир №' + st.event.number), h('span', { class: 'pill' }, status)), h('nav', { class: 'hero-actions', 'aria-label': 'Разделы сервиса' },
         h('button', { class: 'pill admin-link', type: 'button', onclick: openBalances, title: 'Накопленные номерки и пропуски участников' }, '🎟 Балансы'),
-        h('button', { class: 'pill admin-link', type: 'button', onclick: openCabinet }, '👤 Мой кабинет'),
-        h('a', { class: 'pill admin-link', href: 'admin.html', title: 'Вход для организатора' }, store('nomerok_admin_pw') ? '⚙ Админка' : '🔐 Админ')),
+        h('button', { class: 'pill admin-link', type: 'button', onclick: () => openCabinet() }, '👤 Мой кабинет'),
+        h('a', { class: 'pill admin-link', href: 'admin.html', title: 'Вход для организатора' }, store('nomerok_admin_pw') ? '⚙ Админка' : '🔐 Админ'))),
       h('h1', null, st.event.title || 'Прямой эфир'),
       st.event.date ? h('p', { class: 'sub' }, '📅 ' + st.event.date) : null,
       h('div', { class: 'hero-stats' },
@@ -254,7 +254,7 @@
           h('span', { class: 'n', title: 'Победы' }, '🏆'), h('span', { class: 'n', title: 'Обменено номерков за всё время' }, '🔄'),
           h('span', { class: 'n', title: 'Пропуски эфиров подряд' }, '✖'),h('span',{class:'n'},'❄')),
         rows.length ? rows.map((p) => h('div', { class: 'brow' + (p.ex ? ' ready' : '') },
-          h('span', { class: 'bn' }, avatar(p.name, p.photo, 22), h('b', null, p.name), p.frozen ? h('span', { class: 'frz', title: 'Баланс заморожен' }, '❄') : null,
+          h('button', { class: 'bn participant-link', type: 'button', title: 'Открыть кабинет участника', onclick: () => openCabinet(p.url || p.name) }, avatar(p.name, p.photo, 22), h('b', null, p.name), p.frozen ? h('span', { class: 'frz', title: 'Баланс заморожен' }, '❄') : null,
             p.ex ? h('span', { class: 'star', title: 'Можно обменять' + (p.worth ? ' на ' + p.worth + ' ₽' : '') }, '⭐') : null),
           num(p.bal, p.ex ? 'bal' : ''), num(p.wins || 0), num(p.exch || 0),
           h('span', { class: 'n' }, p.miss > 0 ? h('span', { class: 'xs' }, '✖'.repeat(p.miss)) : '·'), h('span',{class:'n freeze-days'},p.frozen?(p.freezeTo?Math.max(0,Math.ceil((p.freezeTo-Date.now())/86400000))+' дн.':'∞'):'—')))
@@ -276,7 +276,7 @@
 
   // Публичный кабинет БЕЗ авторизации: только те сведения, которые уже видны всем в списке балансов.
   // Нельзя выдавать его за подтверждение владения аккаунтом или давать операции с балансом.
-  async function openCabinet() {
+  async function openCabinet(target) {
     const box=h('div',null,h('p',{class:'lead'},'Загружаем публичные данные…'));
     openModal([h('h3',null,'👤 Кабинет участника (без авторизации)'),box]);
     const r=await api.balances();
@@ -302,7 +302,7 @@
     };
     const showSearch=()=>{q.value='';fill(box,h('p',{class:'lead'},'Публичные сведения. Вы можете просматривать карточки других участников.'),q,matches);draw();q.focus();};
     q.addEventListener('input',draw);
-    const previous=store('nomerok_cabinet')||store('nomerok_vk');
+    const previous=(typeof target==='string'&&target)||store('nomerok_cabinet')||store('nomerok_vk');
     const known=players.find(p=>norm(p.url||'')===norm(previous||'')||norm(p.name)===norm(previous||''));
     if(known)select(known);else showSearch();
   }
@@ -322,7 +322,7 @@
     players.forEach((p) => {
       const l = norm(p.name).charAt(0).toUpperCase();
       if (l !== letter) { letter = l; out.push(h('div', { class: 'letter' }, l)); }
-      out.push(h('div', { class: 'prow' },
+      out.push(h('button', { class: 'prow participant-row', type: 'button', onclick: () => openCabinet(p.url || p.name), title: 'Открыть кабинет участника' },
         avatar(p.name, p.photo),
         h('div', { class: 'pname' }, h('b', null, p.name),
           h('div', { class: 'chips' }, p.items.map((it) => h('span', { class: 'chip' + (it[1] ? '' : ' pend') }, '№' + it[0])), marks(p)))));

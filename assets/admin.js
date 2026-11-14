@@ -465,7 +465,7 @@
       if (r) renderTab();
     } }, 'Сохранить настройки');
     return h('div', null, h('section', { class: 'card' },
-      GROUPS.map(([title, keys]) => h('div', { class: 'set-group' }, h('h3', null, title), keys.filter((k) => byKey[k]).map((k) => control(byKey[k])))),
+      h('div', { class: 'set-group' }, h('h3', null, 'Параметры эфира и бронирования'), A.st.form.map((f) => control(f))),
       saveBtn,
       h('p', { class: 'note-foot' }, 'Время тихих часов и дедлайны считаются в часовом поясе организатора. Изменения часов на подтверждение действуют на новые брони.')),
       h('section', { class: 'card', style: { marginTop: '20px' } },
