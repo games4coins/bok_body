@@ -393,3 +393,8 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .participant-link{appearance:none;border:0;background:none;padding:3px 0;color:inherit;cursor:pointer;width:100%;font:inherit;text-align:left}.participant-link:hover b,.participant-link:focus-visible b{text-decoration:underline;text-underline-offset:3px}.participant-link:focus-visible,.participant-row:focus-visible{outline:2px solid #b5461a;outline-offset:2px}
 .participant-row{display:flex;width:100%;border:0;background:transparent;text-align:left;color:inherit;font:inherit;cursor:pointer}.participant-row:hover{background:#fff5e9}
 @media(max-width:520px){.hero-actions{gap:7px}.hero-actions .admin-link{font-size:clamp(11px,3.15vw,14px);padding:10px 4px;min-height:52px}.brow{grid-template-columns:minmax(112px,2.5fr) repeat(4,minmax(24px,.43fr)) minmax(34px,.5fr);font-size:11px;gap:2px}.brow.bhead{font-size:10px}.brow .bn .avatar-img{width:18px!important;height:18px!important}.btable{overflow-x:auto}.sheet{max-width:100%}}
+
+/* VK ID cabinet — test v6.5.2 */
+.cab-freeze-panel,.cab-deposit{margin:14px 0;padding:14px;border-radius:12px;background:var(--surface,#f7f2ee);border:1px solid rgba(120,80,60,.13)}
+.cab-freeze-panel .input{display:block;width:100%;margin-top:7px;box-sizing:border-box}
+.cab-vk-login{min-height:52px;margin:12px 0}
