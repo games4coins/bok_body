@@ -41,7 +41,7 @@
     detectNew(st);
     A.st = st;
     renderTop();
-    if (A.tab !== 'settings' && A.tab !== 'players' && A.tab !== 'winner' && A.tab !== 'gifts') renderTab();
+    if (A.tab !== 'settings' && A.tab !== 'players' && A.tab !== 'winner' && A.tab !== 'gifts' && A.tab !== 'deposits') renderTab();
     const n = st.bookings.filter((b) => NEEDS_CHECK.indexOf(b.status) >= 0).length;
     document.title = (n ? '(' + n + ') ' : '') + 'Номерок — админка';
   }
@@ -135,7 +135,7 @@
     fill(topEl,
       h('a', { class: 'tab', href: 'index.html', title: 'Страница бронирования для участников' }, '← К бронированию'),
       h('span', { class: 'brand' }, 'Эфир №' + st.event.number),
-      h('div', { class: 'tabs' }, tab('queue', 'Брони', attention || ''), tab('grid', 'Сетка'), tab('players', 'Игроки'), tab('gifts', '🎁 Подарки'), tab('winner', '🎉 Победитель'), tab('settings', 'Настройки')),
+      h('div', { class: 'tabs' }, tab('queue', 'Брони', attention || ''), tab('grid', 'Сетка'), tab('players', 'Игроки'), tab('gifts', '🎁 Подарки'), tab('deposits', '💳 Балансы'), tab('winner', '🎉 Победитель'), tab('settings', 'Настройки')),
       h('span', { class: 'grow' }),
       h('button', { class: 'tab', title: 'Заморозить / возобновить бронирование', onclick: () => setPause(!st.paused) }, st.paused ? '▶ Возобновить' : '⏸ Перерыв'),
       h('button', { class: 'tab', title: 'Звуковой сигнал', onclick: toggleSound }, A.sound ? '🔔 Звук' : '🔕 Звук'),
@@ -172,6 +172,7 @@
     else if (A.tab === 'players') fill(contentEl, playersView());
     else if (A.tab === 'winner') fill(contentEl, winnerView());
     else if (A.tab === 'gifts') fill(contentEl, giftsView());
+    else if (A.tab === 'deposits') fill(contentEl, depositsView());
     else fill(contentEl, settingsView());
     tickTimers();
   }
@@ -271,8 +272,44 @@
           h('div', { style: { display: 'flex', gap: '8px', flex: 'none', flexWrap: 'wrap', justifyContent: 'flex-end' } },
             h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { A.sel.clear(); renderTab(); } }, 'Сбросить'),
             h('button', { class: 'btn btn-soft btn-sm', onclick: blockSelected }, 'Заблокировать'),
-            h('button', { class: 'btn btn-primary btn-sm', onclick: openManual }, 'Назначить вручную'))) : null));
+            h('button', { class: 'btn btn-primary btn-sm', onclick: openManual }, 'Назначить вручную'),
+            h('button', { class: 'btn btn-primary btn-sm', onclick: openDepositFromGrid }, '💳 Списать с баланса'))) : null));
   }
+  async function openDepositFromGrid() {
+    const nums=Array.from(A.sel).sort((a,b)=>a-b);
+    if(!nums.length)return toast('Выберите свободные номерки','bad');
+    const [balances,players]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);
+    if(!balances||!players)return;
+    const accounts=new Map((balances.players||[]).map(p=>[String(p.key),p]));
+    const directory=(players.players||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+    const picker=h('select',{class:'input'},h('option',{value:''},'— Выберите участника —'),
+      ...directory.map(p=>h('option',{value:p.key},p.name)));
+    const info=h('div',{class:'msg'},'Выберите участника для проверки баланса');
+    const priceText=String(A.st.event.priceText||A.st.price||'');
+    const matched=priceText.trim().match(/^(\d[\d\s]*)\s*(?:₽|руб\.?|рублей)?$/i);
+    const price=matched?Number(matched[1].replace(/\s/g,'')):0;
+    const update=()=>{
+      const account=accounts.get(picker.value),balance=account?Number(account.balance):0,cost=price*nums.length;
+      fill(info,h('b',null,'Баланс: '+balance+' ₽ · Списание: '+cost+' ₽'),
+        h('div',{class:'meta'},!price?'Не удалось определить цену из настроек эфира':balance>=cost?'Средств достаточно':'Недостаточно средств для выбранных номерков'));
+      submit.disabled=!picker.value||!price||balance<cost;
+    };
+    const submit=h('button',{class:'btn btn-primary btn-block',disabled:true,onclick:async()=>{
+      const account=accounts.get(picker.value),cost=price*nums.length;
+      if(!account||Number(account.balance)<cost)return toast('Недостаточно средств','bad');
+      if(!confirm('Назначить '+list(nums)+' участнику '+account.name+' и списать '+cost+' ₽ с ТЕСТОВОГО баланса?'))return;
+      submit.disabled=true;
+      const requestId='grid-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+      const r=await act('adminDepositBook',{key:picker.value,numbers:nums,requestId:requestId,note:'Назначено из сетки админки'});
+      if(r){A.sel.clear();closeModal();toast('Тестовая бронь назначена');}
+      else submit.disabled=false;
+    }},'Назначить и списать с баланса');
+    picker.addEventListener('change',update);
+    openModal([h('h3',null,'💳 Бронирование из сетки'),
+      h('p',{class:'lead'},list(nums)+' · '+nums.length+' шт.'),
+      h('p',{class:'hint'},'Списание условных средств. Только для администратора.'),picker,info,submit]);
+  }
+
   function legend(bg, text) { return h('span', null, h('i', { style: { background: bg } }), text); }
 
   async function blockSelected() {
@@ -415,7 +452,7 @@
     const prize=h('input',{class:'input',type:'number',min:'0',step:'100',value:'12000'});
     const canvas=h('canvas',{class:'winner-premium-canvas',width:'1122',height:'1402'});
     const copyPreview=h('div',{class:'winner-copy-preview'});let current=null,revision=0;
-    const bg=new Image();bg.src='assets/winner-premium-bg.png';bg.onload=()=>draw();
+    const bg=new Image();bg.src='/bok_body/assets/winner-premium-bg.png';bg.onload=()=>draw();
     const postText=()=>{if(!current)return '';
       const link=String(current.vkUrl||'').trim(),name=current.name||'Победитель';
       const tagged=/^https:\/\/(?:www\.)?(?:vk\.com|vk\.ru)\/[a-zA-Z0-9_.-]+\/?$/.test(link)?'['+link+'|'+name+']':name;
@@ -584,6 +621,79 @@
   const adoptPlayers = (r) => { A.players = r.players; A.rules = r.rules; };
   const crosses = (n) => (n > 0 ? h('span', { class: 'xs', title: 'Пропусков подряд: ' + n }, '✖'.repeat(n)) : null);
 
+  function depositsView() {
+    const body=h('div'),search=h('input',{class:'input',type:'search',placeholder:'Поиск участника'});
+    const positive=h('input',{type:'checkbox',checked:true});
+    let accounts=[],selected=null,playerDirectory=[];
+    const newId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
+    const refresh=async()=>{const [r,p]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);if(p)playerDirectory=p.players||[];if(r){accounts=r.players||[];draw();}};
+    function draw(){
+      const rows=accounts.filter(p=>(!positive.checked||p.balance>0)&&norm(p.name).includes(norm(search.value)));
+      const newPlayers=positive.checked?[]:playerDirectory.filter(p=>!accounts.some(a=>a.key===p.key)&&norm(p.name).includes(norm(search.value))).map(p=>({key:p.key,name:p.name,balance:0,history:[]}));
+      rows.push(...newPlayers);
+      const cards=rows.map(p=>h('button',{class:'btn btn-soft btn-block',style:{marginTop:'7px',textAlign:'left'},onclick:()=>{selected=p;draw();}},p.name+' · '+p.balance+' ₽'));
+      const current=selected&&(accounts.find(p=>p.key===selected.key)||selected);
+      const key=h('select',{class:'input'},h('option',{value:''},'— Выберите участника —'),...playerDirectory.map(p=>h('option',{value:p.key,selected:!!current&&p.key===current.key},p.name)));
+      key.addEventListener('change',()=>{selected=accounts.find(p=>p.key===key.value)||playerDirectory.find(p=>p.key===key.value)||null;draw();});
+      const amount=h('input',{class:'input',type:'number',min:'1',placeholder:'Сумма пополнения, ₽'});
+      const nums=h('input',{class:'input',placeholder:'Номерки через запятую: 2, 8, 15'});
+      const note=h('input',{class:'input',placeholder:'Комментарий'});
+      const vkId=h('input',{class:'input',inputmode:'numeric',placeholder:'Числовой VK ID, например 55560074'});
+      const linkBtn=h('button',{class:'btn btn-soft btn-block',onclick:async()=>{
+        if(!key.value||!/^\\d{3,15}$/.test(vkId.value.trim()))return toast('Выберите игрока и укажите числовой VK ID','bad');
+        const p=playerDirectory.find(x=>x.key===key.value);
+        if(!p)return toast('Игрок не найден','bad');
+        if(!confirm('Связать VK ID '+vkId.value+' с карточкой «'+p.name+'» ('+(p.url||'нет ссылки')+')? Убедитесь, что это один человек.'))return;
+        const r=await act('adminVkLink',{key:key.value,vkId:vkId.value.trim(),note:'Ручная привязка старого профиля'});
+        if(r)toast('VK ID привязан. Старая карточка и накопления сохранены.');
+      }},'🔗 Привязать старый профиль к VK ID');
+      const credit=h('button',{class:'btn btn-soft btn-block',onclick:async()=>{
+        if(!key.value.trim()||!amount.value)return toast('Укажите игрока и сумму','bad');
+        if(!confirm('Пополнить тестовый баланс на '+amount.value+' ₽?'))return;
+        const r=await act('adminDepositCredit',{key:key.value.trim(),amount:Number(amount.value),requestId:newId(),note:note.value});
+        if(r){accounts=r.players||[];selected=accounts.find(p=>p.key===key.value.trim());draw();toast('Баланс пополнен');}
+      }},'Пополнить условный баланс');
+      const book=h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
+        if(!key.value.trim()||!nums.value.trim())return toast('Укажите игрока и номерки','bad');
+        if(!confirm('Назначить номерки '+nums.value+' и списать условный баланс?'))return;
+        const r=await act('adminDepositBook',{key:key.value.trim(),numbers:nums.value.split(/[,;\\s]+/).map(Number),requestId:newId(),note:note.value});
+        if(r){accounts=r.players||[];selected=accounts.find(p=>p.key===key.value.trim());draw();toast('Номерки назначены');}
+      }},'Назначить и списать');
+      const history=current?(current.history||[]).map(op=>h('div',{class:'gift-item-row'},h('b',null,(op.amount>0?'+':'')+op.amount+' ₽ · '+op.type),h('div',{class:'meta'},String(op.date).slice(0,10)+' · № '+op.numbers+' · '+op.note))):[];
+      fill(body,h('div',{class:'gift-add-row'},search,h('label',null,positive,'Только с остатком')),
+        h('div',null,...cards),
+        h('h3',null,current?current.name+' · '+(current.balance||0)+' ₽':'Операции с условным балансом'),
+        key,amount,note,credit,nums,book,h('h4',null,'Привязка старых VK-профилей'),h('p',{class:'hint'},'Выберите участника и введите его числовой VK ID. Старая ссылка и история останутся без изменений. Не связывайте по одному только имени.'),vkId,linkBtn,h('h4',null,'История'),...history);
+    }
+    const migration=h('div',{class:'card',style:{marginTop:'16px'}});
+    let migrationOffset=0;
+    const migrationRows=h('div');
+    const scan=h('button',{class:'btn btn-soft btn-block',onclick:async()=>{
+      scan.disabled=true;
+      const r=await act('adminVkMigrationPreview',{offset:migrationOffset});
+      scan.disabled=false;
+      if(!r)return;
+      migrationOffset=r.nextOffset;
+      const rows=(r.items||[]).map(p=>{
+        const status=h('span',{class:'meta'},p.status==='resolved'?'VK ID: '+p.vkId:'Не удалось определить VK ID');
+        const apply=h('button',{class:'btn btn-soft btn-sm',disabled:p.status!=='resolved',onclick:async()=>{
+          if(!confirm('Проверили, что «'+p.name+'» действительно владелец '+p.oldUrl+'? Связать с VK ID '+p.vkId+'?'))return;
+          const result=await act('adminVkMigrationApply',{key:p.key,vkId:p.vkId});
+          if(result){apply.disabled=true;apply.textContent='Привязан ✓';}
+        }},'Подтвердить привязку');
+        return h('div',{class:'gift-item-row'},h('b',null,p.name),h('div',{class:'meta'},p.oldUrl),status,apply);
+      });
+      migrationRows.append(...rows);
+      scan.textContent=migrationOffset>=r.total?'Проверка завершена':'Проверить следующие 10 записей';
+      scan.disabled=migrationOffset>=r.total;
+    }},'Проверить первые 10 записей');
+    fill(migration,h('h3',null,'🔗 Проверка старых никнеймов'),h('p',{class:'hint'},'Сверка через VK API без изменения записей. Подтверждайте только проверенные профили: никнейм мог сменить владельца.'),scan,migrationRows);
+    body.parentNode&&body.parentNode.appendChild(migration);
+    search.addEventListener('input',draw);positive.addEventListener('change',draw);
+    refresh();
+    return h('section',{class:'card'},h('h2',null,'💳 Тестовые балансы'),h('p',{class:'hint'},'Только условные суммы. Не принимайте реальные платежи через этот модуль.'),body,migration);
+  }
+
   function giftsView() {
     const body=h('div'),catalogBox=h('div'),suggestions=h('div');
     const player=h('input',{class:'input',placeholder:'Имя или ссылка ВК'});
@@ -596,24 +706,46 @@
         h('div',{class:'gift-catalog-list'},...items.map(x=>h('div',{class:'gift-catalog-row'},h('span',null,x.title),h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{const r=await act('adminGiftCatalogSet',{id:x.id,active:!x.active});if(r)renderCatalog(r.catalog);}},x.active?'Отключить':'Включить')))),
         h('div',{class:'gift-add-row'},newTitle,h('button',{class:'btn btn-soft',onclick:async()=>{if(!newTitle.value.trim())return toast('Введите название','bad');const r=await act('adminGiftCatalogAdd',{title:newTitle.value});if(r)renderCatalog(r.catalog);}},'Добавить в каталог')));
     };
+    let focusedKey=null;
+    const focusToggle=h('button',{class:'btn btn-soft btn-sm',onclick:()=>{focusedKey=null;renderList();}},'Показать всех участников');
+    const editGift=g=>{
+      const title=h('input',{class:'input',value:g.title,placeholder:'Название подарка'});
+      const eventInput=h('input',{class:'input',value:g.event||'',placeholder:'Номер эфира'});
+      const note=h('input',{class:'input',value:g.note||'',placeholder:'Комментарий'});
+      const form=h('div',{class:'gift-edit-panel'},
+        h('b',null,'Редактировать подарок · '+g.name),title,eventInput,note,
+        h('div',{class:'gift-add-row'},
+          h('button',{class:'btn btn-primary btn-sm',onclick:async()=>{
+            if(!title.value.trim())return toast('Укажите название подарка','bad');
+            if(!window.confirm('Заменить подарок «'+g.title+'» на «'+title.value.trim()+'»?'))return;
+            const r=await act('adminGiftEdit',{id:g.id,title:title.value.trim(),event:eventInput.value,note:note.value});
+            if(r){last=r.gifts;renderList();toast('Подарок исправлен');}
+          }},'Сохранить изменения'),
+          h('button',{class:'btn btn-soft btn-sm',onclick:()=>renderList()},'Отмена')));
+      fill(body,form);
+    };
     const renderList=()=>{
       const groups=new Map();for(const g of last){const id=g.key||g.name;if(!groups.has(id))groups.set(id,{name:g.name,gifts:[]});groups.get(id).gifts.push(g);}
-      const arr=Array.from(groups.entries()).sort((a,b)=>a[1].name.localeCompare(b[1].name,'ru'));
-      fill(body,arr.length?arr.map(([key,group])=>{
+      const arr=Array.from(groups.entries()).filter(([key])=>!focusedKey||key===focusedKey).sort((a,b)=>a[1].name.localeCompare(b[1].name,'ru'));
+      if(chosen&&groups.has(chosen.key)&&!focusedKey)arr.sort((a,b)=>(a[0]===chosen.key?-1:b[0]===chosen.key?1:0));
+      fill(body,focusedKey?h('div',{class:'gift-focus-bar'},'Показан один участник · ',focusToggle):null,arr.length?arr.map(([key,group])=>{
         const pending=group.gifts.filter(g=>!g.received).length,done=group.gifts.length-pending;
         return h('div',{class:'gift-player-group'},h('button',{class:'gift-player-head',onclick:()=>{expanded.has(key)?expanded.delete(key):expanded.add(key);renderList();}},
           h('span',null,(expanded.has(key)?'▾ ':'▸ ')+group.name),h('span',{class:'gift-counts'},'📦 Ожидают: '+pending+'   ·   ✅ Получено: '+done)),
+          h('button',{class:'btn btn-soft btn-sm',onclick:()=>{focusedKey=focusedKey===key?null:key;expanded.add(key);renderList();}},focusedKey===key?'Показать всех':'Только этот участник'),
           expanded.has(key)?h('div',{class:'gift-player-items'},...group.gifts.slice().reverse().map(g=>h('div',{class:'gift-item-row'},
             h('div',null,h('b',null,g.title),h('div',{class:'meta'},'Эфир №'+(g.event||'—')+' · '+(g.received?'Получен '+(g.receivedAt||''):'Ожидает выдачи'))),
-            h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{const r=await act('adminGiftReceived',{id:g.id,received:!g.received});if(r){last=r.gifts;renderList();}}},g.received?'Отменить получение':'Отметить полученным')))):null);
+            h('div',{class:'gift-add-row'},
+              h('button',{class:'btn btn-soft btn-sm',onclick:()=>editGift(g)},'✏ Редактировать'),
+              h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{const r=await act('adminGiftReceived',{id:g.id,received:!g.received});if(r){last=r.gifts;renderList();}}},g.received?'Отменить получение':'Отметить полученным'))))):null);
       }):h('p',{class:'hint'},'Подарков пока нет'));
     };
     const refresh=async()=>{const r=await act('adminGifts');if(!r)return;last=r.gifts||[];renderList();renderCatalog(r.catalog||[]);};
     const lookup=async()=>{if(!A.players){const r=await act('adminPlayers');if(!r)return;A.players=r.players;A.rules=r.rules;}
-      const q=norm(player.value.trim());fill(suggestions,q.length<2?null:A.players.filter(p=>norm(p.name).includes(q)||norm(p.url).includes(q)).slice(0,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{chosen=p;player.value=p.name;fill(suggestions);}},p.name)));
+      const q=norm(player.value.trim());fill(suggestions,q.length<2?null:A.players.filter(p=>norm(p.name).includes(q)||norm(p.url).includes(q)).slice(0,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{chosen=p;player.value=p.name;focusedKey=p.key;expanded.add(p.key);fill(suggestions);renderList();}},p.name)));
     };
     player.addEventListener('input',()=>{chosen=null;lookup();});
-    const add=h('button',{class:'btn btn-primary btn-block',onclick:async()=>{if(!chosen)return toast('Выберите участника из подсказок','bad');if(!catalogSelect.value)return toast('Выберите подарок','bad');const r=await act('adminGiftAdd',{key:chosen.key,catalogId:catalogSelect.value,event:event.value});if(r){last=r.gifts;expanded.add(chosen.key);renderList();toast('Подарок назначен');}}},'Назначить подарок');
+    const add=h('button',{class:'btn btn-primary btn-block',onclick:async()=>{if(!chosen)return toast('Выберите участника из подсказок','bad');if(!catalogSelect.value)return toast('Выберите подарок','bad');const r=await act('adminGiftAdd',{key:chosen.key,catalogId:catalogSelect.value,event:event.value});if(r){last=r.gifts;focusedKey=chosen.key;expanded.add(chosen.key);renderList();toast('Подарок назначен');}}},'Назначить подарок');
     refresh();return h('section',{class:'card'},h('h2',null,'🎁 Подарки участников'),h('p',{class:'hint'},'Нажмите на имя, чтобы увидеть все подарки участника. Получение подтверждается вручную.'),
       h('div',{class:'gift-assignment'},h('h3',null,'Назначить подарок'),player,suggestions,catalogSelect,event,add),h('h3',null,'Участники с подарками'),body,
       h('details',{class:'gift-catalog-panel'},h('summary',null,'⚙ Управление каталогом подарков'),catalogBox));
