@@ -311,6 +311,7 @@
       const buttonText=p.frozen?'Запросить досрочную разморозку (−1 номерок)':'Запросить заморозку';
       const action=contact&&((p.frozen)||eligible)?h('a',{class:'btn btn-primary btn-block',href:contact,target:'_blank',rel:'noopener noreferrer'},buttonText):h('button',{class:'btn btn-soft btn-block',disabled:true,title:'Для заморозки требуется баланс не менее 10 номерков'},'Заморозка доступна от 10 номерков');
       const authenticated=!!(verifiedSession&&verifiedSession.ok&&verifiedSession.verified&&verifiedSession.player&&verifiedSession.player.url===p.url);
+      if(!authenticated){fill(box,h('p',{class:'msg err'},'Эта карточка не принадлежит авторизованному VK ID. Персональные данные недоступны.'));return;}
       const token=window.BokVK&&window.BokVK.token&&window.BokVK.token();
       const privateData=authenticated&&token?verifiedSession:null;
       const verified=!!(privateData&&privateData.ok&&privateData.verified);
@@ -387,8 +388,8 @@
       return identity&&url==='id'+identity.id;
     });
     if(known)select(known);
-    else if(identity) fill(box,h('div',{class:'banner info'},'Вы вошли как '+identity.name+'. Ссылка vk.com/id'+identity.id+' не найдена в публичной базе.'));
-    else showSearch(false);
+    else fill(box,h('div',{class:'banner info'},'VK ID подтверждён, но связанная карточка участника не найдена. Обратитесь к администратору для привязки старого профиля.'));
+
     if(identity)box.appendChild(h('button',{class:'btn btn-ghost btn-sm',style:{marginTop:'14px'},onclick:()=>{window.BokVK.logout();closeModal();openCabinet();}},'Выйти из VK ID'));
   }
 
