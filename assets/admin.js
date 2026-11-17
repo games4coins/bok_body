@@ -135,7 +135,7 @@
     fill(topEl,
       h('a', { class: 'tab', href: 'index.html', title: 'Страница бронирования для участников' }, '← К бронированию'),
       h('span', { class: 'brand' }, 'Эфир №' + st.event.number),
-      h('div', { class: 'tabs' }, tab('queue', 'Брони', attention || ''), tab('grid', 'Сетка'), tab('players', 'Игроки'), tab('gifts', '🎁 Подарки'), tab('deposits', '💳 Балансы'), tab('winner', '🎉 Победитель'), tab('settings', 'Настройки')),
+      h('div', { class: 'tabs' }, tab('queue', 'Брони', attention || ''), tab('grid', 'Сетка'), tab('players', 'Игроки'), tab('gifts', '🎁 Подарки'), tab('deposits', '💳 Балансы'), tab('achievements', '🏆 Ачивки'), tab('winner', '🎉 Победитель'), tab('settings', 'Настройки')),
       h('span', { class: 'grow' }),
       h('button', { class: 'tab', title: 'Заморозить / возобновить бронирование', onclick: () => setPause(!st.paused) }, st.paused ? '▶ Возобновить' : '⏸ Перерыв'),
       h('button', { class: 'tab', title: 'Звуковой сигнал', onclick: toggleSound }, A.sound ? '🔔 Звук' : '🔕 Звук'),
@@ -173,12 +173,62 @@
     else if (A.tab === 'winner') fill(contentEl, winnerView());
     else if (A.tab === 'gifts') fill(contentEl, giftsView());
     else if (A.tab === 'deposits') fill(contentEl, depositsView());
+    else if (A.tab === 'achievements') achievementsView();
     else fill(contentEl, settingsView());
     tickTimers();
   }
 
   function tickTimers() {
     document.querySelectorAll('[data-act]').forEach(tickTimer);
+  }
+
+  // ───── Достижения и барабан ─────
+  async function achievementsView(){
+    const host=h('div',{class:'card'},h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',{class:'hint'},'Загружаем каталог и журнал…'));
+    fill(contentEl,host);
+    const data=await act('adminAchState');
+    if(!data)return;
+    const key=h('input',{class:'input',placeholder:'Ключ участника (из списка игроков)'});
+    const amount=h('input',{class:'input',type:'number',value:'1',min:'-100',max:'100'});
+    const reason=h('input',{class:'input',placeholder:'Причина начисления или списания'});
+    const prizeId=h('input',{class:'input',placeholder:'ID приза (пусто для нового)'});
+    const prizeTitle=h('input',{class:'input',placeholder:'Название приза'});
+    const prizeEmoji=h('input',{class:'input',value:'🎁',placeholder:'Эмодзи'});
+    const prizeWeight=h('input',{class:'input',type:'number',min:'0',value:'10',placeholder:'Вес'});
+    const prizeStock=h('input',{class:'input',type:'number',min:'0',placeholder:'Остаток (пусто = без лимита)'});
+    const active=h('input',{type:'checkbox',checked:true});
+    const syncBtn=h('button',{class:'btn btn-soft',onclick:async()=>{
+      const x=await act('adminAchSync',{dryRun:true});
+      if(x)toast('Проверка: '+x.newAwards+' ачивок, '+x.newSpins+' вращений; восстановлений: '+x.repairedSpins);
+    }},'🔎 Проверить расчёт (без записи)');
+    fill(host,h('h2',null,'🏆 Достижения и барабан'),
+      h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),syncBtn,
+      h('h3',null,'🎡 Ручная корректировка вращений'),
+      key,amount,reason,
+      h('button',{class:'btn btn-primary',onclick:async()=>{
+        if(!key.value.trim()||!Number.isInteger(Number(amount.value))||Number(amount.value)===0)return toast('Укажите участника и количество','bad');
+        if(!confirm('Изменить баланс вращений на '+amount.value+' для '+key.value+'?'))return;
+        const x=await act('adminAchSpin',{key:key.value.trim(),amount:Number(amount.value),reason:reason.value});
+        if(x)toast('Новый баланс вращений: '+x.balance);
+      }},'Применить изменение'),
+      h('h3',null,'🎁 Каталог призов · вес выпадения'),
+      h('p',{class:'hint'},'Шанс приза пропорционален его весу среди активных призов с остатком. Вес 0 отключает выпадение.'),
+      ...(data.prizes||[]).map(p=>h('div',{class:'gift-item'},p.emoji+' '+p.title+' · вес '+p.weight+' · остаток '+(p.stock===null?'∞':p.stock)+(p.active?'':' · отключён'),
+        h('button',{class:'btn btn-soft btn-sm',onclick:()=>{prizeId.value=p.id;prizeTitle.value=p.title;prizeEmoji.value=p.emoji;prizeWeight.value=p.weight;prizeStock.value=p.stock===null?'':p.stock;active.checked=p.active;}},'Изменить'))),
+      h('h4',null,'Добавить / изменить приз'),prizeId,prizeTitle,prizeEmoji,prizeWeight,prizeStock,
+      h('label',null,active,' Активен'),
+      h('button',{class:'btn btn-primary',onclick:async()=>{
+        if(!prizeTitle.value.trim())return toast('Введите название','bad');
+        const x=await act('adminAchPrize',{id:prizeId.value.trim()||undefined,title:prizeTitle.value,emoji:prizeEmoji.value,weight:Number(prizeWeight.value),stock:prizeStock.value,active:active.checked});
+        if(x){toast('Приз сохранён');achievementsView();}
+      }},'Сохранить приз'),
+      h('h3',null,'📦 Выигрыши · последние 300'),
+      ...((data.wins||[]).length?(data.wins||[]).map(w=>h('div',{class:'gift-item'},w.key+' · '+w.title+' · '+w.status,
+        w.status==='ОЖИДАЕТ'?h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
+          if(!confirm('Подтвердить выдачу приза?'))return;
+          const x=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
+          if(x)achievementsView();
+        }},'Отметить выданным'):null)):[h('p',{class:'hint'},'Выигрышей пока нет')]));
   }
 
   // ───── Очередь броней ─────
