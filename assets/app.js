@@ -331,6 +331,12 @@
           h('div',null,h('p',{class:'msg err'},privateData&&privateData.error?privateData.error.message:'Требуется повторный вход через VK ID'),
             h('button',{class:'btn btn-soft btn-block',onclick:()=>{window.BokVK.logout();closeModal();openCabinet();}},'Повторить вход'))
       ):null;
+      const exchangeMin=Number(rules.exchangeMin)||0;
+      const exchangeBalance=Number(privatePlayer&&privatePlayer.balance!=null?privatePlayer.balance:p.bal);
+      const exchangeUrl=safeUrl(rules.url);
+      const exchangeUI=authenticated&&exchangeMin>0&&Number.isFinite(exchangeBalance)&&exchangeBalance>=exchangeMin&&exchangeUrl?
+        h('a',{class:'btn btn-primary btn-block',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
+          rules.button||'Обменять баланс на скидку'):null;
       const depositUI=authenticated?h('div',{class:'cab-deposit'},
         h('h4',null,'💳 Тестовый баланс для бронирования'),
         verified?h('div',null,
@@ -346,7 +352,7 @@
         h('div',{class:'cab-profile'},avatar(p.name,p.photo,112),h('div',null,h('h3',{class:p.frozen?'frozen-name':''},p.name),h('p',{class:'meta'},authenticated?(identity.restored?'VK ID · вход сохранён на устройстве':'VK ID · вход выполнен'):'Публичная карточка · без авторизации'))),
         h('div',{class:'cab-stats'},h('div',null,'🎟 Баланс: ',h('b',null,privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:(p.bal==null?'Скрыт':p.bal))),h('div',null,'❌ Пропуски: ',h('b',null,p.miss)),h('div',null,'🏆 Победы: ',h('b',null,p.wins||0)),h('div',null,p.frozen?'❄ Заморожен':'Активен')),
         p.frozen?h('p',{class:'msg'},left===null?'❄ Бессрочная заморозка по старым правилам':'❄ До бесплатной разморозки осталось '+left+' дн.'):null,
-        authenticated?freezeUI:null,depositUI,h('h4',null,'🎁 Подарки'),h('div',{class:'gift-list'},(p.gifts||[]).length?(p.gifts||[]).map(g=>h('div',{class:'gift-item'},h('b',null,g.title),' · ',g.received?'✅ Получен '+(g.receivedAt||''):'📦 Ожидает выдачи')):h('p',{class:'hint'},'Подарков пока нет')),
+        authenticated?freezeUI:null,exchangeUI,depositUI,h('h4',null,'🎁 Подарки'),h('div',{class:'gift-list'},(p.gifts||[]).length?(p.gifts||[]).map(g=>h('div',{class:'gift-item'},h('b',null,g.title),' · ',g.received?'✅ Получен '+(g.receivedAt||''):'📦 Ожидает выдачи')):h('p',{class:'hint'},'Подарков пока нет')),
         h('p',{class:'hint'},authenticated?'Действия с балансом подтверждены VK ID.':'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
     };
     let searchSeq=0;
