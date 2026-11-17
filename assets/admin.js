@@ -278,12 +278,16 @@
   async function openDepositFromGrid() {
     const nums=Array.from(A.sel).sort((a,b)=>a-b);
     if(!nums.length)return toast('Выберите свободные номерки','bad');
-    const [balances,players]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);
-    if(!balances||!players)return;
-    const accounts=new Map((balances.players||[]).map(p=>[String(p.key),p]));
-    const directory=(players.players||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-    const picker=h('select',{class:'input'},h('option',{value:''},'— Выберите участника —'),
-      ...directory.map(p=>h('option',{value:p.key},p.name)));
+    const balances=await act('adminDepositList');
+    if(!balances)return;
+    const funded=(balances.players||[]).filter(p=>Number(p.balance)>0)
+      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
+    const accounts=new Map(funded.map(p=>[String(p.key),p]));
+    const picker=h('select',{class:'input'},h('option',{value:''},'— Выберите участника с депозитом —'),
+      ...funded.map(p=>h('option',{value:String(p.key)},String(p.name)+' · '+Number(p.balance)+' ₽')));
+    const fundedList=h('div',{class:'msg',style:{marginTop:'12px'}},
+      h('b',null,'Участники с ненулевым депозитом ('+funded.length+')'),
+      ...(funded.length?funded.map(p=>h('div',{class:'meta',style:{padding:'4px 0'}},String(p.name)+' — '+Number(p.balance)+' ₽')):[h('p',{class:'hint'},'Положительных депозитов пока нет')]));
     const info=h('div',{class:'msg'},'Выберите участника для проверки баланса');
     const priceText=String(A.st.event.priceText||A.st.price||'');
     const matched=priceText.trim().match(/^(\d[\d\s]*)\s*(?:₽|руб\.?|рублей)?$/i);
@@ -307,7 +311,7 @@
     picker.addEventListener('change',update);
     openModal([h('h3',null,'💳 Бронирование из сетки'),
       h('p',{class:'lead'},list(nums)+' · '+nums.length+' шт.'),
-      h('p',{class:'hint'},'Списание условных средств. Только для администратора.'),picker,info,submit]);
+      h('p',{class:'hint'},'Списание условных средств. Только для администратора.'),picker,info,submit,fundedList]);
   }
 
   function legend(bg, text) { return h('span', null, h('i', { style: { background: bg } }), text); }
