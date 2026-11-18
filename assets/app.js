@@ -364,29 +364,47 @@
         return '🎁';
       };
       const bokWheelArt=data=>{
-        const available=Array.isArray(data.prizes)?data.prizes.filter(p=>p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)).slice(0,12):[];
-        const sectors=available.length?available:[
-          {emoji:'🎁',title:'Подарки'},{emoji:'🎀',title:'Сюрпризы'},
-          {emoji:'🚚',title:'Доставка'},{emoji:'🎟️',title:'Номерки'},
-          {emoji:'🧸',title:'Кукольные призы'},{emoji:'✨',title:'Удача'}];
+        // Display ONLY the real, eligible prize catalog provided by achPrivate_.
+        // Never invent prize sectors: different icons in admin must match the cabinet.
+        const catalog=Array.isArray(data.prizes)?data.prizes:null;
+        const wheel=h('div',{class:'bok-wheel-stage'});
+        if(!catalog){
+          wheel.appendChild(h('div',{class:'bok-wheel-catalog-missing'},
+            h('div',{style:{fontSize:'42px'}},'🎡'),
+            h('b',null,'Каталог призов ещё не подключён'),
+            h('p',{class:'hint'},'В GAS обновите ответ achPrivate_, чтобы показать здесь настоящие призы из админки.')));
+          return wheel;
+        }
+        const sectors=catalog.filter(p=>p&&p.active!==false&&Number(p.weight)>0&&
+          (p.stock==null||Number(p.stock)>0));
+        if(!sectors.length){
+          wheel.appendChild(h('div',{class:'bok-wheel-catalog-missing'},
+            h('div',{style:{fontSize:'42px'}},'🎁'),
+            h('b',null,'Нет доступных призов'),
+            h('p',{class:'hint'},'Активируйте призы с положительным весом и остатком в админке.')));
+          return wheel;
+        }
         const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8','#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
-        const n=sectors.length,disc=h('div',{class:'bok-wheel-disc',role:'img','aria-label':'Барабан удачи с иконками призов',
+        const n=sectors.length;
+        const disc=h('div',{class:'bok-wheel-disc',role:'img',
+          'aria-label':'Активные призы барабана: '+sectors.map(p=>p.title).join(', '),
           style:{position:'relative',width:'232px',height:'232px',overflow:'visible'}});
-        disc.style.background='conic-gradient('+sectors.map((p,i)=>colors[i%colors.length]+' '+(i*100/n)+'% '+((i+1)*100/n)+'%').join(',')+')';
+        disc.style.background='conic-gradient('+sectors.map((p,i)=>
+          colors[i%colors.length]+' '+(i*100/n)+'% '+((i+1)*100/n)+'%').join(',')+')';
         sectors.forEach((p,i)=>{
           const a=((i+.5)*360/n-90)*Math.PI/180;
-          // Inline positioning is intentional: icons stay visible even when a stale CSS file is cached.
-          const icon=h('span',{class:'bok-wheel-sector-icon',
-            style:{position:'absolute',zIndex:'5',display:'flex',alignItems:'center',justifyContent:'center',
-              width:'38px',height:'38px',fontSize:n>8?'22px':'31px',lineHeight:'1',
-              left:(50+37*Math.cos(a))+'%',top:(50+37*Math.sin(a))+'%',
-              transform:'translate(-50%, -50%)',textShadow:'0 2px 3px rgba(40,20,15,.25)',
-              pointerEvents:'none',userSelect:'none'},
-            title:String(p.title||'Подарок'),'aria-hidden':'true'},bokPrizeIcon(p));
-          disc.appendChild(icon);
+          disc.appendChild(h('span',{class:'bok-wheel-sector-icon',
+            style:{position:'absolute',zIndex:'5',display:'flex',alignItems:'center',
+              justifyContent:'center',width:'38px',height:'38px',
+              fontSize:n>14?'17px':n>9?'22px':n>6?'26px':'31px',
+              lineHeight:'1',left:(50+37*Math.cos(a))+'%',top:(50+37*Math.sin(a))+'%',
+              transform:'translate(-50%, -50%)',
+              textShadow:'0 2px 3px rgba(40,20,15,.25)',pointerEvents:'none',userSelect:'none'},
+            title:String(p.title||'Подарок'),'aria-hidden':'true'},String(p.emoji||'🎁').trim()||'🎁'));
         });
         disc.appendChild(h('span',{class:'bok-wheel-core',style:{zIndex:'6'}},'✦'));
-        return h('div',{class:'bok-wheel-stage'},h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+        wheel.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+        return wheel;
       };
       function bokPrizeReveal(prize){
         const prior=document.querySelector('.bok-prize-reveal');if(prior)prior.remove();
@@ -413,7 +431,8 @@
       if(authenticated){
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
-          const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1,onclick:async()=>{
+          const catalogReady=Array.isArray(data.prizes)&&data.prizes.some(p=>p&&p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0));
+          const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1||!catalogReady,onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
             // Start visual rotation immediately. The network request runs in parallel.
@@ -449,7 +468,7 @@
           fill(wheelBox,h('h4',null,'🎡 Барабан удачи · '+data.spins+' вращений'),
             bokWheelArt(data),
             button,h('h4',null,'📦 Мои призы'),
-            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>h('div',{class:'gift-item'},h('span',{style:{fontSize:'21px',marginRight:'8px'}},bokPrizeIcon(w)),w.title+' · '+w.status)):[h('p',{class:'hint'},'Подарков пока нет')]));
+            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));return h('div',{class:'gift-item'},h('span',{style:{fontSize:'21px',marginRight:'8px'}},prize?String(prize.emoji||'🎁'):bokPrizeIcon(w)),w.title+' · '+w.status);}):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
         loadWheel();
       }
