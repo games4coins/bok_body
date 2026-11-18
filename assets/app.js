@@ -404,7 +404,7 @@
     };
     const draw=()=>{
       const seq=++searchSeq,raw=q.value.trim(),t=vkSlug(raw);
-      const arr=t.length>=2?players.filter(p=>norm(p.name).includes(t)||vkSlug(p.url||'').includes(t)).slice(0,20):[];
+      const arr=t.length>=2?window.BokPlayerSearch.filter(players,raw,20):[];
       fill(matches,arr.length?arr.map(p=>h('button',{class:'btn btn-soft btn-block',style:{marginTop:'6px'},onclick:()=>select(p)},p.name+' · 🎟 '+(p.bal==null?'—':p.bal))):h('p',{class:'hint'},t.length>=2?'Проверяем профиль…':'Начните вводить имя или ссылку ВК.'));
       if(arr.length||t.length<2)return;
       const looksVk=raw.includes('vk.')||raw.startsWith('@')||t.startsWith('id')||(/^[a-z0-9_.]{2,64}$/.test(t)&&!raw.includes(' '));
@@ -413,7 +413,10 @@
         if(seq!==searchSeq)return;
         if(!r||!r.ok){const msg=r&&r.error&&(r.error.message||r.error)||'';fill(matches,h('p',{class:'hint'},String(msg).includes('Неизвестное действие')?'Сервер не поддерживает поиск VK ID. Обновите развёртывание Apps Script.':msg||'Не удалось определить профиль ВК.'));return;}
         const id='id'+r.vkId,found=players.filter(p=>vkSlug(p.url||'')===id||(r.linkedUrl&&vkSlug(p.url||'')===vkSlug(r.linkedUrl)));
-        fill(matches,found.length?found.map(p=>h('button',{class:'btn btn-soft btn-block',style:{marginTop:'6px'},onclick:()=>select(p)},p.name+' · 🎟 '+(p.bal==null?'—':p.bal))):h('p',{class:'hint'},'Профиль определён: '+id+'. В публичной базе соответствующая карточка пока не найдена.'));
+        fill(matches,found.length?found.map(p=>h('button',{class:'btn btn-soft btn-block',style:{marginTop:'6px'},onclick:()=>select(p)},p.name+' · 🎟 '+(p.bal==null?'—':p.bal))):h('div',{class:'msg'},
+          h('b',null,'✅ Профиль ВК найден: '+(r.name||id)),
+          h('p',{class:'hint'},'Участник ещё не бронировал номерки. Карточка с нулевым балансом создастся автоматически при первой успешной брони. Вход в чужой личный кабинет не требуется.'),
+          h('button',{class:'btn btn-soft btn-block',onclick:()=>{closeModal();document.querySelector('.ticket.free,.ticket,.tnum')?.scrollIntoView({behavior:'smooth',block:'center'});}},'Выбрать номерки для бронирования')));
       }).catch(()=>{if(seq===searchSeq)fill(matches,h('p',{class:'hint'},'Ошибка проверки ВК'));});
     };
     const showSearch=(reset=false)=>{if(reset)q.value='';fill(box,h('p',{class:'lead'},'Публичные сведения. Вы можете просматривать карточки других участников.'),q,matches);draw();q.focus();};
@@ -593,7 +596,7 @@
       const box = h('div', { class: 'blist', style: { maxHeight: '30vh' } });
       const draw = () => {
         const t = norm(q.value.trim());
-        const rows = r.players.filter((x) => !t || norm(x.name).indexOf(t) >= 0).slice(0, 60);
+        const rows = window.BokPlayerSearch.filter(r.players,q.value,60);
         fill(box, rows.length ? rows.map((x) => h('div', { class: 'prow', style: { cursor: 'pointer' }, onclick: () => choose(x) },
           avatar(x.name, x.photo, 32), h('div', { class: 'pname' }, h('b', null, x.name))))
           : h('div', { class: 'empty' }, r.players.length ? 'Никого не нашли — вставьте ссылку на профиль' : 'Список пока пуст — вставьте ссылку на профиль'));
@@ -638,7 +641,7 @@
     const suggestions=h('div',{class:'live-suggestions'});let directory=[];
     api.players().then(r=>{if(r.ok)directory=r.players||[];});
     const suggest=()=>{const t=norm(vkInput.value.trim());if(t.length<2){fill(suggestions);return;}
-      const rows=directory.filter(p=>norm(p.name).includes(t)).slice(0,8);
+      const rows=window.BokPlayerSearch.filter(directory,vkInput.value,8);
       fill(suggestions,rows.map(p=>h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>{choose(p);fill(suggestions);}},avatar(p.name,p.photo,28),' ',p.name)));
     };
     vkInput.addEventListener('input',suggest);
