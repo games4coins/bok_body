@@ -418,13 +418,13 @@
             catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
             if(outcome&&outcome.ok)localStorage.removeItem(pendingKey);
             await new Promise(resolve=>setTimeout(resolve,2600));
-            if(outcome&&outcome.ok){toast('🎁 '+outcome.prize.title);loadWheel();}
+            if(outcome&&outcome.ok){loadWheel();bokPrizeReveal(outcome.prize||{title:'Сюрприз',emoji:'🎁'});}
             else{toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');loadWheel();}
           }},'🎡 Крутить барабан');
           fill(wheelBox,h('h4',null,'🎡 Барабан удачи · '+data.spins+' вращений'),
-            h('div',{class:'bok-wheel-disc',style:{margin:'14px auto',width:'180px',height:'180px',borderRadius:'50%',border:'7px solid #a86a4c',background:'conic-gradient(#f6a9b8 0 60deg,#f8d79d 60deg 120deg,#b8d8ed 120deg 180deg,#bcaee9 180deg 240deg,#b8dfc9 240deg 300deg,#f3c5a5 300deg 360deg)',display:'grid',placeItems:'center',fontSize:'36px',transition:'transform 2.5s cubic-bezier(.12,.72,.12,1)'}},'🎁'),
+            bokWheelArt(data),
             button,h('h4',null,'📦 Мои призы'),
-            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>h('div',{class:'gift-item'},w.title+' · '+w.status)):[h('p',{class:'hint'},'Подарков пока нет')]));
+            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>h('div',{class:'gift-item'},h('span',{style:{fontSize:'21px',marginRight:'8px'}},bokPrizeIcon(w)),w.title+' · '+w.status)):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
         loadWheel();
       }
