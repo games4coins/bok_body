@@ -332,7 +332,7 @@
         if(x){toast('Достижение выдано');achievementsView();}
       }},'Выдать достижение'),
       h('h3',null,'🎡 Ручная корректировка вращений'),
-      key,amount,reason,
+      spinLookup.container,amount,reason,
       h('button',{class:'btn btn-primary',onclick:async()=>{
         if(!Number.isInteger(Number(amount.value))||Number(amount.value)===0)return toast('Укажите корректное количество вращений','bad');
         const participant=await spinLookup.get();
