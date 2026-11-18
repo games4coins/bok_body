@@ -348,6 +348,60 @@
               h('b',null,a.title),h('div',{class:'meta'},a.description+' · '+a.target),
               a.earned?h('div',{class:'meta'},'Получено ✓'):h('div',{class:'meta'},'Пока не получено')))));
       }).catch(()=>fill(achBox,h('p',{class:'hint'},'Сервис достижений временно недоступен.')));
+
+      // Presentation only; actual result always comes from GAS achSpin.
+      const bokPrizeIcon=p=>{
+        const emoji=String(p&&p.emoji||p&&p.icon||'').trim();
+        if(emoji)return emoji.slice(0,12);
+        const t=String(p&&p.title||'').toLowerCase();
+        if(/ничего|пусто|без приза/.test(t))return '🍀';
+        if(/достав|отправ/.test(t))return '🚚';
+        if(/кист|рук|ладон/.test(t))return '🖐️';
+        if(/стоп|обув|туфл/.test(t))return '🦶';
+        if(/скид|сертификат/.test(t))return '💝';
+        if(/номер|билет|эфир/.test(t))return '🎟️';
+        if(/кукл|тел|bjd/.test(t))return '🧸';
+        return '🎁';
+      };
+      const bokWheelArt=data=>{
+        const available=Array.isArray(data.prizes)?data.prizes.filter(p=>p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)).slice(0,12):[];
+        const sectors=available.length?available:[
+          {emoji:'🎁',title:'Подарки'},{emoji:'🎀',title:'Сюрпризы'},
+          {emoji:'🚚',title:'Доставка'},{emoji:'🎟️',title:'Номерки'},
+          {emoji:'🧸',title:'Кукольные призы'},{emoji:'✨',title:'Удача'}];
+        const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8','#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
+        const n=sectors.length,disc=h('div',{class:'bok-wheel-disc',role:'img','aria-label':'Декоративный барабан удачи'});
+        disc.style.background='conic-gradient('+sectors.map((p,i)=>colors[i%colors.length]+' '+(i*100/n)+'% '+((i+1)*100/n)+'%').join(',')+')';
+        sectors.forEach((p,i)=>{
+          const a=((i+.5)*360/n-90)*Math.PI/180;
+          disc.appendChild(h('span',{class:'bok-wheel-sector-icon',
+            style:{left:(50+35*Math.cos(a))+'%',top:(50+35*Math.sin(a))+'%'},
+            title:String(p.title||'Подарок')},bokPrizeIcon(p)));
+        });
+        disc.appendChild(h('span',{class:'bok-wheel-core'},'✦'));
+        return h('div',{class:'bok-wheel-stage'},h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+      };
+      function bokPrizeReveal(prize){
+        const prior=document.querySelector('.bok-prize-reveal');if(prior)prior.remove();
+        const overlay=h('div',{class:'bok-prize-reveal',role:'dialog','aria-modal':'true','aria-label':'Ваш приз'});
+        const closeButton=h('button',{type:'button',class:'btn btn-primary btn-block'},'🎉 Отлично!');
+        const sparks=h('div',{class:'bok-prize-sparks','aria-hidden':'true'},...Array.from({length:12},(_,i)=>
+          h('span',{style:{'--i':i}},i%3===0?'✧':'✦')));
+        overlay.appendChild(h('div',{class:'bok-prize-card'},sparks,
+          h('div',{class:'bok-prize-kicker'},'✨ БАРАБАН BOK BODY ✨'),
+          h('div',{class:'bok-prize-icon','aria-hidden':'true'},bokPrizeIcon(prize)),
+          h('h3',null,'Вам выпал приз!'),
+          h('div',{class:'bok-prize-name'},String(prize&&prize.title||'Сюрприз')),
+          h('p',{class:'bok-prize-note'},'Выигрыш сохранён · ожидает выдачи'),
+          closeButton));
+        const onKey=e=>{if(e.key==='Escape')close();};
+        const close=()=>{document.removeEventListener('keydown',onKey);overlay.remove();};
+        closeButton.addEventListener('click',close);
+        overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
+        document.body.appendChild(overlay);
+        document.addEventListener('keydown',onKey);
+        closeButton.focus();
+      }
       const wheelBox=h('div',{class:'cab-wheel'});
       if(authenticated){
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
