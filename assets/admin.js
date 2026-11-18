@@ -280,6 +280,108 @@
       }};
   }
 
+
+  // Список и пакетная корректировка доступных вращений BOK.
+  async function openSpinBatchManager() {
+    const host=h('div',null,h('h3',null,'👥 Вращения участников'),
+      h('p',{class:'hint'},'Загружаем балансы из журнала «BOK Вращения»…'));
+    openModal([host]);
+    const roster=await act('adminSpinRoster');
+    if(!host.isConnected)return;
+    if(!roster){fill(host,h('h3',null,'👥 Вращения участников'),
+      h('p',{class:'msg err'},'Не удалось получить список. Проверьте развёртывание GAS.'),
+      h('button',{class:'btn btn-soft',onclick:openSpinBatchManager},'Повторить'));return;}
+    const players=(roster.players||[]).slice();
+    const chosen=new Set();
+    const search=h('input',{class:'input',type:'search',placeholder:'Имя, @ник, ссылка VK или ID',autocomplete:'off'});
+    const onlyPositive=h('input',{type:'checkbox'});
+    const positiveLabel=h('label',{class:'sw'},onlyPositive,' Только с вращениями');
+    const summary=h('div',{class:'hint'});
+    const rosterList=h('div',{class:'blist',style:{maxHeight:'38vh',overflowY:'auto'}});
+    const amount=h('input',{class:'input',type:'number',min:'1',max:'100',step:'1',value:'1'});
+    const reason=h('input',{class:'input',type:'text',maxLength:'100',placeholder:'Причина (например: бонус за эфир)'});
+    const addBtn=h('button',{type:'button',class:'btn btn-primary'},'＋ Начислить выбранным');
+    const resetBtn=h('button',{type:'button',class:'btn btn-soft'},'Обнулить выбранным');
+    const footer=h('p',{class:'hint'},'Сброс обнуляет только доступные вращения. История начислений и выигрышей сохраняется.');
+    const filtered=()=>{
+      const raw=search.value.trim();
+      const found=raw?window.BokPlayerSearch.filter(players,raw,players.length||1):players.slice();
+      return found.filter(p=>!onlyPositive.checked||Number(p.spins)>0);
+    };
+    const draw=()=>{
+      const visible=filtered();
+      summary.textContent='Всего: '+players.length+' · с вращениями: '+roster.positive+
+        ' · доступно всего: '+roster.totalSpins+' · выбрано: '+chosen.size;
+      fill(rosterList,...(visible.length?visible.map(p=>{
+        const check=h('input',{type:'checkbox',checked:chosen.has(String(p.key))});
+        check.addEventListener('change',()=>{check.checked?chosen.add(String(p.key)):chosen.delete(String(p.key));draw();});
+        return h('label',{class:'prow',style:{display:'flex',alignItems:'center',gap:'10px',cursor:'pointer',padding:'10px 6px'}},
+          check,avatar(p.name,null,31),
+          h('span',{style:{flex:'1',minWidth:'0'}},h('b',null,p.name),
+            h('div',{class:'meta'},p.url||('Ключ '+p.key))),
+          h('b',{class:'bal',style:{whiteSpace:'nowrap'}},'🎡 '+p.spins));
+      }):[h('p',{class:'hint'},'Участники не найдены')]));
+    };
+    async function runBatch(mode){
+      const keys=[...chosen].sort();
+      if(!keys.length){toast('Отметьте хотя бы одного участника','bad');return;}
+      if(keys.length>500){toast('За раз можно выбрать не более 500 участников','bad');return;}
+      const n=mode==='add'?Number(amount.value):0;
+      if(mode==='add'&&(!Number.isInteger(n)||n<1||n>100)){
+        toast('Укажите от 1 до 100 вращений на участника','bad');return;
+      }
+      addBtn.disabled=true;resetBtn.disabled=true;
+      try{
+        const body={mode:mode,keys:keys,amount:n,reason:reason.value.trim()};
+        const preview=await act('adminSpinBatch',Object.assign({},body,{dryRun:true}));
+        if(!preview)return;
+        const changeCount=Number(preview.changed)||0;
+        if(!changeCount){toast('Нет изменений: у выбранных участников баланс уже 0');return;}
+        const total=preview.changes.reduce((sum,x)=>sum+Number(x.delta||0),0);
+        const prompt=mode==='add'
+          ?'Начислить '+n+' вращений каждому из '+keys.length+' участников? Итого +'+total+' вращений.'
+          :'ОБНУЛИТЬ доступные вращения у '+keys.length+' участников? Будет списано '+(-total)+' вращений. История сохранится.';
+        if(!window.confirm(prompt+'\n\nОперация будет записана в журнал.'))return;
+        // Preserve the same requestId after uncertain network failures.
+        const pendingKey='bok-spin-batch-pending-v1';
+        const signature=JSON.stringify({mode:mode,amount:n,keys:keys});
+        let pending=null;
+        try{pending=JSON.parse(localStorage.getItem(pendingKey)||'null');}catch(_e){}
+        const requestId=pending&&pending.signature===signature?pending.requestId:
+          (window.crypto&&window.crypto.randomUUID?window.crypto.randomUUID():
+            String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));
+        try{localStorage.setItem(pendingKey,JSON.stringify({signature:signature,requestId:requestId}));}catch(_e){}
+        const applied=await act('adminSpinBatch',Object.assign({},body,{requestId:requestId}));
+        if(!applied){toast('Если связь прервалась, повторите те же параметры — двойного начисления не будет.','bad');return;}
+        try{localStorage.removeItem(pendingKey);}catch(_e){}
+        toast('Готово: обработано '+applied.selected+', изменено '+applied.changed+
+          ', повторных записей: '+applied.replayed);
+        const refreshed=await act('adminSpinRoster');
+        if(refreshed){
+          const balances=new Map((refreshed.players||[]).map(p=>[String(p.key),Number(p.spins)]));
+          players.forEach(p=>{if(balances.has(String(p.key)))p.spins=balances.get(String(p.key));});
+          roster.positive=refreshed.positive;roster.totalSpins=refreshed.totalSpins;
+        }
+        chosen.clear();draw();
+      }finally{addBtn.disabled=false;resetBtn.disabled=false;}
+    }
+    search.addEventListener('input',draw);
+    onlyPositive.addEventListener('change',draw);
+    addBtn.addEventListener('click',()=>runBatch('add').catch(e=>{console.error(e);toast('Ошибка пакетного начисления','bad');addBtn.disabled=false;resetBtn.disabled=false;}));
+    resetBtn.addEventListener('click',()=>runBatch('reset').catch(e=>{console.error(e);toast('Ошибка пакетного сброса','bad');addBtn.disabled=false;resetBtn.disabled=false;}));
+    const selectButtons=h('div',{style:{display:'flex',flexWrap:'wrap',gap:'6px'}},
+      h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>{filtered().forEach(p=>chosen.add(String(p.key)));draw();}},'Выбрать найденных'),
+      h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>{players.forEach(p=>chosen.add(String(p.key)));draw();}},'Выбрать всех'),
+      h('button',{type:'button',class:'btn btn-ghost btn-sm',onclick:()=>{chosen.clear();draw();}},'Снять выделение'));
+    fill(host,h('h3',null,'👥 Участники и доступные вращения'),
+      h('p',{class:'hint'},'Выбирайте участников для пакетного начисления или сброса. Список основан на журнале вращений.'),
+      search,positiveLabel,summary,selectButtons,rosterList,
+      h('p',{class:'hint'},'Количество вращений каждому участнику'),amount,reason,
+      h('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap'}},addBtn,resetBtn),footer);
+    draw();
+    search.focus();
+  }
+
   // ───── Достижения и барабан ─────
   let achViewSeq=0;
   async function achievementsView(){
@@ -328,7 +430,7 @@
       if(x)toast('Проверка: '+x.newAwards+' ачивок, '+x.newSpins+' вращений; восстановлений: '+x.repairedSpins);
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
-      h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),syncBtn,
+      h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
