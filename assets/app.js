@@ -371,53 +371,67 @@
         return '🎁';
       };
       const bokWheelArt=data=>{
-        // Display ONLY the real, eligible prize catalog provided by achPrivate_.
-        // Never invent prize sectors: different icons in admin must match the cabinet.
+        // SVG sectors and icons are rendered together, independent of CSS conic gradients.
+        // The catalog is strictly server-supplied; spin outcome is always determined by GAS.
         const catalog=Array.isArray(data.prizes)?data.prizes:null;
-        const wheel=h('div',{class:'bok-wheel-stage'});
-        if(!catalog){
-          // Backwards-compatible: keep spinning available on older GAS, but show no fake prize icons.
-          const disc=h('div',{class:'bok-wheel-disc',style:{
-            width:'232px',height:'232px',display:'grid',placeItems:'center',
-            background:'conic-gradient(#f4ddc1,#eec6ad,#f3e3d0,#e9c5b7,#f4ddc1)'}},
-            h('span',{class:'bok-wheel-core'},'✦'));
-          wheel.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
-          wheel.appendChild(h('p',{class:'hint',style:{position:'absolute',top:'100%',left:'50%',width:'280px',
-            maxWidth:'90vw',textAlign:'center',transform:'translateX(-50%)'}},
-            'Иконки призов появятся после обновления GAS.'));
-          wheel.style.marginBottom='65px';
-          return wheel;
-        }
-        const sectors=catalog.filter(p=>p&&p.active!==false&&Number(p.weight)>0&&
-          (p.stock==null||Number(p.stock)>0));
-        if(!sectors.length){
-          wheel.appendChild(h('div',{class:'bok-wheel-catalog-missing'},
-            h('div',{style:{fontSize:'42px'}},'🎁'),
-            h('b',null,'Нет доступных призов'),
-            h('p',{class:'hint'},'Активируйте призы с положительным весом и остатком в админке.')));
-          return wheel;
-        }
-        const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8','#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
-        const n=sectors.length;
+        const stage=h('div',{class:'bok-wheel-stage',style:{
+          width:'268px',height:'268px',minHeight:'268px',margin:'16px auto 22px',
+          position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}});
         const disc=h('div',{class:'bok-wheel-disc',role:'img',
-          'aria-label':'Активные призы барабана: '+sectors.map(p=>p.title).join(', '),
-          style:{position:'relative',width:'232px',height:'232px',overflow:'visible'}});
-        disc.style.background='conic-gradient('+sectors.map((p,i)=>
-          colors[i%colors.length]+' '+(i*100/n)+'% '+((i+1)*100/n)+'%').join(',')+')';
-        sectors.forEach((p,i)=>{
-          const a=((i+.5)*360/n-90)*Math.PI/180;
-          disc.appendChild(h('span',{class:'bok-wheel-sector-icon',
-            style:{position:'absolute',zIndex:'5',display:'flex',alignItems:'center',
-              justifyContent:'center',width:'38px',height:'38px',
-              fontSize:n>14?'17px':n>9?'22px':n>6?'26px':'31px',
-              lineHeight:'1',left:(50+37*Math.cos(a))+'%',top:(50+37*Math.sin(a))+'%',
-              transform:'translate(-50%, -50%)',
-              textShadow:'0 2px 3px rgba(40,20,15,.25)',pointerEvents:'none',userSelect:'none'},
-            title:String(p.title||'Подарок'),'aria-hidden':'true'},String(p.emoji||'🎁').trim()||'🎁'));
-        });
-        disc.appendChild(h('span',{class:'bok-wheel-core',style:{zIndex:'6'}},'✦'));
-        wheel.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
-        return wheel;
+          'aria-label':'Барабан с призами',
+          style:{position:'relative',display:'block',flex:'0 0 232px',width:'232px',
+            height:'232px',minWidth:'232px',minHeight:'232px',borderRadius:'50%',
+            background:'#f7dec2',overflow:'hidden'}});
+        const svgNS='http://www.w3.org/2000/svg';
+        const makeSvg=(tag,attrs,text)=>{
+          const el=document.createElementNS(svgNS,tag);
+          Object.keys(attrs||{}).forEach(k=>el.setAttribute(k,String(attrs[k])));
+          if(text!=null)el.textContent=String(text);
+          return el;
+        };
+        const graphic=makeSvg('svg',{viewBox:'0 0 240 240',width:'100%',height:'100%',
+          preserveAspectRatio:'xMidYMid meet','aria-hidden':'true'});
+        graphic.style.display='block';
+        const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8',
+          '#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
+        const sectors=catalog?catalog.filter(p=>p&&p.active!==false&&Number(p.weight)>0&&
+          (p.stock==null||Number(p.stock)>0)):[];
+        if(sectors.length){
+          const n=sectors.length;
+          const radius=119,iconRadius=n>12?82:83;
+          sectors.forEach((p,i)=>{
+            const t0=-Math.PI/2+i*2*Math.PI/n,t1=-Math.PI/2+(i+1)*2*Math.PI/n;
+            const point=t=>[120+radius*Math.cos(t),120+radius*Math.sin(t)];
+            const a=point(t0),b=point(t1);
+            const d=n===1
+              ?'M 120 1 A 119 119 0 1 1 119.99 1 Z'
+              :'M120 120 L'+a[0]+' '+a[1]+' A'+radius+' '+radius+' 0 '+(2*Math.PI/n>Math.PI?1:0)+' 1 '+b[0]+' '+b[1]+' Z';
+            graphic.appendChild(makeSvg('path',{d,fill:colors[i%colors.length],
+              stroke:'#fff4e7','stroke-width':'1.3'}));
+            const t=(t0+t1)/2,px=120+iconRadius*Math.cos(t),py=120+iconRadius*Math.sin(t);
+            const icon=String(p.emoji||'🎁').trim()||'🎁';
+            graphic.appendChild(makeSvg('text',{x:px,y:py,'font-size':n>14?'17':n>10?'20':n>7?'25':'31',
+              'text-anchor':'middle','dominant-baseline':'central',
+              'font-family':'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif'},icon));
+          });
+        }else{
+          graphic.appendChild(makeSvg('circle',{cx:120,cy:120,r:118,fill:'#f2dcc3'}));
+          graphic.appendChild(makeSvg('text',{x:120,y:110,'text-anchor':'middle','font-size':44},'🎁'));
+          graphic.appendChild(makeSvg('text',{x:120,y:144,'text-anchor':'middle','font-size':13,fill:'#815c46'},
+            catalog?'Нет доступных призов':'Каталог загружается'));
+        }
+        graphic.appendChild(makeSvg('circle',{cx:120,cy:120,r:25,
+          fill:'#fff3d5',stroke:'#ae7648','stroke-width':4}));
+        graphic.appendChild(makeSvg('text',{x:120,y:129,'text-anchor':'middle',
+          'font-size':29,fill:'#9d5e36'},'✦'));
+        disc.appendChild(graphic);
+        stage.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+        if(!catalog){
+          const hint=h('p',{class:'hint',style:{margin:'0 auto 12px',textAlign:'center'}},
+            'Каталог призов не получен от GAS. Обновите развёртывание, чтобы показать настоящие иконки.');
+          return h('div',null,stage,hint);
+        }
+        return stage;
       };
       function bokPrizeReveal(prize){
         const prior=document.querySelector('.bok-prize-reveal');if(prior)prior.remove();
@@ -485,17 +499,22 @@
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
         loadWheel();
       }
-      const depositUI=authenticated?h('div',{class:'cab-deposit'},
-        h('h4',null,'💳 Тестовый баланс для бронирования'),
-        verified?h('div',null,
-          h('p',{class:'lead'},'Доступно: '+privateDeposit.balance+' ₽'),
-          h('p',{class:'hint'},'Назначение номерков выполняет администратор.'),
-          h('h4',null,'История операций'),
-          ...(privateDeposit.history.length?privateDeposit.history.map(op=>h('div',{class:'gift-item'},
-            h('b',null,(op.amount>0?'+':'')+op.amount+' ₽ · '+op.type),
-            h('div',{class:'meta'},String(op.date).slice(0,10)+' · Эфир №'+(op.event||'—')+' · '+(op.numbers||'')+' · '+(op.note||'')))):[h('p',{class:'hint'},'Операций пока нет')])):
-          h('p',{class:'hint'},'Баланс доступен после серверной проверки VK ID.')
-      ):null;
+      const depositBalance=verified&&privateDeposit?Number(privateDeposit.balance):0;
+      const depositHistory=verified&&privateDeposit&&Array.isArray(privateDeposit.history)
+        ?privateDeposit.history:[];
+      const depositHasBalance=Number.isFinite(depositBalance)&&depositBalance!==0;
+      const depositUI=authenticated&&verified&&(depositHasBalance||depositHistory.length>0)?
+        h('div',{class:'cab-deposit'},
+          h('h4',null,'💳 Тестовый баланс для бронирования'),
+          depositHasBalance?h('div',null,
+            h('p',{class:'lead'},'Доступно: '+depositBalance+' ₽'),
+            h('p',{class:'hint'},'Назначение номерков выполняет администратор.')):null,
+          depositHistory.length?h('details',{class:'bok-deposit-history'},
+            h('summary',null,'📜 История движения средств ('+depositHistory.length+')'),
+            ...depositHistory.map(op=>h('div',{class:'gift-item'},
+              h('b',null,(Number(op.amount)>0?'+':'')+op.amount+' ₽ · '+op.type),
+              h('div',{class:'meta'},String(op.date||'').slice(0,10)+' · Эфир №'+
+                (op.event||'—')+' · '+(op.numbers||'')+' · '+(op.note||''))))):null):null;
       fill(box,h('button',{class:'btn btn-ghost btn-sm',onclick:()=>showSearch(true)},'← Сменить участника'),
         h('div',{class:'cab-profile'},avatar(p.name,p.photo,112),h('div',null,h('h3',{class:p.frozen?'frozen-name':''},p.name),h('p',{class:'meta'},authenticated?(identity.restored?'VK ID · вход сохранён на устройстве':'VK ID · вход выполнен'):'Публичная карточка · без авторизации'))),
         h('div',{class:'cab-stats'},h('div',null,'🎟 Баланс: ',h('b',null,privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:(p.bal==null?'Скрыт':p.bal))),h('div',null,'❌ Пропуски: ',h('b',null,p.miss)),h('div',null,'🏆 Победы: ',h('b',null,p.wins||0)),h('div',null,p.frozen?'❄ Заморожен':'Активен')),
