@@ -212,7 +212,7 @@
       if(x)toast('Проверка: '+x.newAwards+' ачивок, '+x.newSpins+' вращений; восстановлений: '+x.repairedSpins);
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
-      h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),syncBtn,
+      h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),syncBtn,
       h('h3',null,'🏅 Выдать достижение вручную'),awardKey,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         if(!awardKey.value.trim())return toast('Укажите ключ участника','bad');
