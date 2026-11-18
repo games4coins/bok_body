@@ -182,6 +182,23 @@
     document.querySelectorAll('[data-act]').forEach(tickTimer);
   }
 
+  // Общий серверный ключ по имени, ссылке VK, @нику или ID. Для ручных ачивок.
+  async function adminPlayerKeyByQuery(raw) {
+    const q=String(raw||'').trim();
+    if(!q)return '';
+    if(!A.players) {
+      const res=await act('adminPlayers');
+      if(!res)return '';
+      A.players=res.players||[];A.rules=res.rules;
+    }
+    const exact=A.players.find(p=>String(p.key)===q || window.BokPlayerSearch.slug(p.url)===window.BokPlayerSearch.slug(q));
+    if(exact)return String(exact.key);
+    const hits=window.BokPlayerSearch.filter(A.players,q,30);
+    if(hits.length===1)return String(hits[0].key);
+    toast(hits.length?'Найдено несколько игроков. Уточните имя, VK ссылку или ID.':'Игрок не найден. Добавьте его в разделе «Игроки».','bad');
+    return '';
+  }
+
   // ───── Достижения и барабан ─────
   let achViewSeq=0;
   async function achievementsView(){
@@ -191,8 +208,8 @@
     const data=await act('adminAchState');
     if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
-    const key=h('input',{class:'input',placeholder:'Ключ участника (из списка игроков)'});
-    const awardKey=h('input',{class:'input',placeholder:'Ключ участника для ачивки'});
+    const key=h('input',{class:'input',placeholder:'Игрок: имя, @ник, VK ссылка или ключ'});
+    const awardKey=h('input',{class:'input',placeholder:'Игрок для ачивки: имя, @ник или VK ссылка'});
     const awardType=h('select',{class:'input'},...[
       ['streak5','🧵 5 подряд'],['streak10','🪡 10 подряд'],['streak15','👑 15 подряд'],
       ['visits10','🧸 10 посещений'],['visits20','🎀 20 посещений'],['visits30','🏰 30 посещений'],
@@ -215,17 +232,20 @@
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),syncBtn,
       h('h3',null,'🏅 Выдать достижение вручную'),awardKey,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
-        if(!awardKey.value.trim())return toast('Укажите ключ участника','bad');
+        const playerKey=await adminPlayerKeyByQuery(awardKey.value);
+        if(!playerKey)return;
         if(!confirm('Выдать достижение '+awardType.options[awardType.selectedIndex].text+' участнику '+awardKey.value+'? Повторная выдача блокируется сервером.'))return;
-        const x=await act('adminAchAward',{key:awardKey.value.trim(),id:awardType.value});
+        const x=await act('adminAchAward',{key:playerKey,id:awardType.value});
         if(x){toast('Достижение выдано');achievementsView();}
       }},'Выдать достижение'),
       h('h3',null,'🎡 Ручная корректировка вращений'),
       key,amount,reason,
       h('button',{class:'btn btn-primary',onclick:async()=>{
         if(!key.value.trim()||!Number.isInteger(Number(amount.value))||Number(amount.value)===0)return toast('Укажите участника и количество','bad');
+        const playerKey=await adminPlayerKeyByQuery(key.value);
+        if(!playerKey)return;
         if(!confirm('Изменить баланс вращений на '+amount.value+' для '+key.value+'?'))return;
-        const x=await act('adminAchSpin',{key:key.value.trim(),amount:Number(amount.value),reason:reason.value});
+        const x=await act('adminAchSpin',{key:playerKey,amount:Number(amount.value),reason:reason.value});
         if(x)toast('Новый баланс вращений: '+x.balance);
       }},'Применить изменение'),
       h('h3',null,'🎁 Каталог призов · вес выпадения'),
