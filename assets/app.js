@@ -434,7 +434,63 @@
         }
         return stage;
       };
-      function bokPrizeReveal(prize){
+      // Smooth animation with an accurate final sector. GAS is always the sole
+      // authority for selecting a prize. The client ONLY visualizes its response.
+      function bokStartWheelAnimation(wheel,catalog){
+        if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
+        wheel.style.transition='none';
+        const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
+          Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
+        const accelerationMs=1700,minCruiseMs=2400,velocity=320,brakeMs=4400;
+        let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
+        const done=new Promise(resolve=>{resolveDone=resolve;});
+        const positiveDegrees=n=>((n%360)+360)%360;
+        function tick(now){
+          if(!begin)begin=now;
+          const elapsed=now-begin;
+          // Integrated ease-in acceleration, followed by a constant-speed cruise.
+          // Both phases have the same velocity at the join.
+          const accel=Math.min(accelerationMs,elapsed);
+          const accelAngle=velocity*(2*accelerationMs/Math.PI/1000)*
+            (1-Math.cos(Math.PI*accel/(2*accelerationMs)));
+          const cruiseAngle=velocity*Math.max(0,elapsed-accelerationMs)/1000;
+          let angle=accelAngle+cruiseAngle;
+          if(decided&&elapsed>=minCruiseMs&&!settle){
+            // Identical slice geometry to bokWheelArt. Slice zero begins at 12 o'clock.
+            // Pointer also sits at 12 o'clock, so center of slice i must rotate
+            // by -(i+.5)*360/n degrees modulo 360.
+            const index=eligible.findIndex(p=>String(p.id)===String(selected&&selected.id));
+            matched=index>=0;
+            const indexByTitle=index<0&&selected?
+              eligible.findIndex(p=>String(p.title)===String(selected.title)):-1;
+            const selectedIndex=index>=0?index:indexByTitle;
+            matched=selectedIndex>=0;
+            const desired=matched?-(selectedIndex+.5)*360/eligible.length:0;
+            const correction=positiveDegrees(desired-positiveDegrees(angle));
+            settle={time:now,from:angle,to:angle+720+correction};
+          }
+          if(settle){
+            const fraction=Math.min(1,(now-settle.time)/brakeMs);
+            const t=fraction,t2=t*t,t3=t2*t;
+            const distance=settle.to-settle.from;
+            const tangential=velocity*brakeMs/1000;
+            // Cubic Hermite with an initial velocity matching cruise and
+            // a zero final velocity: no sudden jerk or last-second snap.
+            angle=(2*t3-3*t2+1)*settle.from+
+              (t3-2*t2+t)*tangential+
+              (-2*t3+3*t2)*settle.to;
+            wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
+            if(fraction>=1){resolveDone();return;}
+          }else{
+            wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
+          }
+          requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+        return {choose:prize=>{selected=prize;decided=true;},done,matched:()=>matched};
+      }
+
+      function bokPrizeReveal(prize,onClose){
         const prior=document.querySelector('.bok-prize-reveal');if(prior)prior.remove();
         const overlay=h('div',{class:'bok-prize-reveal',role:'dialog','aria-modal':'true','aria-label':'Ваш приз'});
         const closeButton=h('button',{type:'button',class:'btn btn-primary btn-block'},'🎉 Отлично!');
@@ -448,7 +504,12 @@
           h('p',{class:'bok-prize-note'},'Выигрыш сохранён · ожидает выдачи'),
           closeButton));
         const onKey=e=>{if(e.key==='Escape')close();};
-        const close=()=>{document.removeEventListener('keydown',onKey);overlay.remove();};
+        let closed=false;
+        const close=()=>{
+          if(closed)return;
+          closed=true;document.removeEventListener('keydown',onKey);overlay.remove();
+          if(typeof onClose==='function')onClose();
+        };
         closeButton.addEventListener('click',close);
         overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
         document.body.appendChild(overlay);
@@ -463,25 +524,7 @@
           const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1||(Array.isArray(data.prizes)&&!catalogReady),onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
-            // Start visual rotation immediately. The network request runs in parallel.
-            // No artificial delay is added AFTER the wheel has stopped.
-            const spinAnimation=wheel?new Promise(resolve=>{
-              let finished=false;
-              let timer;
-              const done=()=>{
-                if(finished)return;
-                finished=true;
-                wheel.removeEventListener('transitionend',onEnd);
-                clearTimeout(timer);
-                resolve();
-              };
-              const onEnd=e=>{if(e.target===wheel&&e.propertyName==='transform')done();};
-              wheel.addEventListener('transitionend',onEnd);
-              timer=setTimeout(done,5600);
-              requestAnimationFrame(()=>requestAnimationFrame(()=>{
-                wheel.style.transform='rotate(3240deg)';
-              }));
-            }):Promise.resolve();
+            const animation=bokStartWheelAnimation(wheel,data.prizes);
             const pendingKey='bok-wheel-pending-v1';
             let requestId=localStorage.getItem(pendingKey);
             if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
@@ -489,9 +532,20 @@
             try{outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token(),requestId});}
             catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
             if(outcome&&outcome.ok)localStorage.removeItem(pendingKey);
-            await spinAnimation;
-            if(outcome&&outcome.ok){loadWheel();bokPrizeReveal(outcome.prize||{title:'Сюрприз',emoji:'🎁'});}
-            else{toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');loadWheel();}
+            animation.choose(outcome&&outcome.ok?outcome.prize:null);
+            await animation.done;
+            if(outcome&&outcome.ok){
+              const real=(Array.isArray(data.prizes)?data.prizes:[]).find(p=>
+                String(p.id)===String(outcome.prize&&outcome.prize.id));
+              const shown=Object.assign({},real||{},outcome.prize||{});
+              // Keep the final, correct sector visible behind the result popup.
+              // Refresh the cabinet only when the participant dismisses it.
+              bokPrizeReveal(shown,()=>loadWheel());
+              if(!animation.matched())toast('Приз получен. Каталог колеса изменился — обновите кабинет.',null,5000);
+            }else{
+              toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');
+              loadWheel();
+            }
           }},'🎡 Крутить барабан');
           fill(wheelBox,h('h4',null,'🎡 Барабан удачи · '+data.spins+' вращений'),
             bokWheelArt(data),
