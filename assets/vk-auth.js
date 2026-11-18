@@ -1,11 +1,11 @@
-/* VK ID test integration for BOK Body. Authentication is UI-only until backend token verification is enabled. */
+/* BOK Body: production VK ID app; the GAS backend verifies access tokens. */
 (function(global){
 'use strict';
-const APP_ID=54901191;
-const REDIRECT='https://games4coins.github.io/bok_body_cabinet/';
+const APP_ID=54907336;
+const REDIRECT='https://games4coins.github.io/bok_body/';
 let current=null;
-const CACHE_KEY='bok_vkid_profile_v1';
-const TOKEN_KEY='bok_vkid_session_token_v1';
+const CACHE_KEY='bok_vkid_profile_54907336_v1';
+const TOKEN_KEY='bok_vkid_session_token_54907336_v1';
 let accessToken='';
 try { accessToken=sessionStorage.getItem(TOKEN_KEY)||''; } catch(_) {}
 try {
