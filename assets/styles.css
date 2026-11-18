@@ -490,3 +490,9 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-prize-reveal,.bok-prize-card,.bok-prize-icon,.bok-prize-sparks span{animation:none!important;}
   .bok-wheel-disc{transition:none!important;}
 }
+
+/* BOK 6.7.11: conditional deposit ledger. */
+.bok-deposit-history{margin-top:8px;border-top:1px solid #e6d7cb;padding-top:10px}
+.bok-deposit-history>summary{cursor:pointer;padding:8px 4px;color:#704830;font-weight:700}
+.bok-deposit-history[open]>summary{margin-bottom:6px}
+.bok-deposit-history .gift-item{background:#fffaf6;border-radius:8px;margin:5px 0}
