@@ -356,7 +356,13 @@
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
             if(wheel)wheel.style.transform='rotate(1800deg)';
-            const outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token()});
+            const pendingKey='bok-wheel-pending-v1';
+            let requestId=localStorage.getItem(pendingKey);
+            if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
+            let outcome;
+            try{outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token(),requestId});}
+            catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
+            if(outcome&&outcome.ok)localStorage.removeItem(pendingKey);
             await new Promise(resolve=>setTimeout(resolve,2600));
             if(outcome&&outcome.ok){toast('🎁 '+outcome.prize.title);loadWheel();}
             else{toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');loadWheel();}
