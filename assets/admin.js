@@ -187,39 +187,38 @@
   // Существующие ключи (включая исторические) не меняем: к ним привязаны балансы.
   async function adminFindPlayerByQuery(raw) {
     const query=String(raw||'').trim();
-    if (!query) {toast('Укажите участника','bad');return null;}
-    if (!A.players) {
-      const data=await act('adminPlayers');
-      if (!data) return null;
+    if(!query){toast('Укажите участника','bad');return null;}
+    if(!A.players){
+      const data=await act('adminPlayers');if(!data)return null;
       A.players=data.players||[];A.rules=data.rules;
     }
     const slug=window.BokPlayerSearch.slug(query);
+    const normalized=window.BokPlayerSearch.normalize(query);
     const exact=A.players.filter(p=>String(p.key)===query ||
-      String(p.vkId||'')===query ||
-      (p.url && window.BokPlayerSearch.slug(p.url)===slug) ||
-      window.BokPlayerSearch.normalize(p.name)===window.BokPlayerSearch.normalize(query));
+      (p.url&&window.BokPlayerSearch.slug(p.url)===slug) ||
+      window.BokPlayerSearch.normalize(p.name)===normalized);
     if(exact.length===1)return exact[0];
-    if(exact.length>1){toast('Несколько участников с таким именем — выберите по ссылке VK','bad');return null;}
-    const isVK=/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(query) || /^[a-z][a-z0-9_.]{2,63}$/i.test(query);
-    if(isVK) {
-      const url=/^\d{3,15}$/.test(query)?'id'+query:query;
-      const resolved=await api.post('adminResolveVk',{password:A.pw,vkUrl:url});
-      if(resolved&&resolved.ok){
-        const id=String(resolved.key);
-        const hits=A.players.filter(p=>String(p.key)===id ||
-          String(p.vkId||'')===id ||
-          (p.url&&window.BokPlayerSearch.slug(p.url)==='id'+id) ||
-          (resolved.url&&p.url&&window.BokPlayerSearch.slug(p.url)===window.BokPlayerSearch.slug(resolved.url)));
-        if(hits.length===1)return hits[0];
-        if(hits.length>1){toast('Несколько карточек для одного VK ID. Нужна проверка администратора.','bad');return null;}
-        toast('VK ID '+id+' определён, но карточка игрока отсутствует. Добавьте её через «Игроки».','bad');return null;
-      }
-      toast(resolved&&resolved.error&&resolved.error.message||'Не удалось определить VK ID','bad');
-      return null;
+    if(exact.length>1){toast('Есть несколько карточек с этим именем. Выберите конкретную из подсказок.','bad');return null;}
+    // Единый серверный обработчик сопоставляет VK ID также со старыми привязками.
+    const remote=await api.post('adminPlayerResolve',{password:A.pw,query});
+    if(remote&&remote.ok){
+      if(!remote.exists){toast('VK ID '+remote.vkId+' определён, но карточки нет. Добавьте игрока через раздел «Игроки».','bad');return null;}
+      const candidate=A.players.find(p=>String(p.key)===String(remote.key));
+      if(candidate)return candidate;
+      // Данные админки могли устареть после новой регистрации.
+      const refreshed=await act('adminPlayers');
+      if(refreshed){A.players=refreshed.players||[];A.rules=refreshed.rules;}
+      const match=(A.players||[]).find(p=>String(p.key)===String(remote.key));
+      if(match)return match;
+      toast('Участник найден сервером, но список не обновился. Перезагрузите админку.','bad');return null;
     }
-    const candidates=window.BokPlayerSearch.filter(A.players,query,30);
-    if(candidates.length===1)return candidates[0];
-    toast(candidates.length?'Найдено несколько игроков — выберите из подсказок или вставьте VK ссылку.':'Игрок не найден. Используйте VK ссылку или добавьте карточку.','bad');
+    // Совместимость до установки нового GAS.
+    if(remote&&remote.error&&remote.error.code!=='BAD_ACTION'){
+      toast(remote.error.message||'Не удалось найти игрока','bad');return null;
+    }
+    const matches=window.BokPlayerSearch.filter(A.players,query,30);
+    if(matches.length===1)return matches[0];
+    toast(matches.length?'Найдено несколько игроков. Выберите из подсказок.':'Новый обработчик поиска ещё не опубликован в GAS.','bad');
     return null;
   }
 
@@ -230,7 +229,9 @@
     let chosen=null, seq=0, debounce=null;
     const pick=p=>{
       chosen=p;
-      input.value=p.name+' · VK ID '+(p.vkId||window.BokPlayerSearch.slug(p.url).replace(/^id/,'')||p.key);
+      const slug=window.BokPlayerSearch.slug(p.url);
+      const id=p.vkId||(/^id\d+$/.test(slug)?slug.slice(2):(/^\d+$/.test(String(p.key))?p.key:''));
+      input.value=p.name+(id?' · VK ID '+id:' · ключ '+p.key);
       selected.textContent='✅ Выбран: '+p.name+' · ключ карточки: '+p.key;
       fill(suggestions);
     };
@@ -250,15 +251,16 @@
         clearTimeout(debounce);
         debounce=setTimeout(async()=>{
           const url=/^\d{3,15}$/.test(raw)?'id'+raw:raw;
-          const r=await api.post('adminResolveVk',{password:A.pw,vkUrl:url});
+          const r=await api.post('adminPlayerResolve',{password:A.pw,query:raw});
           if(ownSeq!==seq||chosen)return;
           if(r&&r.ok){
-            const id=String(r.key);
-            const matches=A.players.filter(p=>String(p.key)===id||String(p.vkId||'')===id||
-              (p.url&&window.BokPlayerSearch.slug(p.url)==='id'+id));
-            fill(suggestions,matches.length?
-              matches.map(p=>h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>pick(p)},p.name+' · VK ID '+id)):
-              h('p',{class:'hint'},'VK ID '+id+' найден, но карточки в базе нет. Добавьте игрока в разделе «Игроки».'));
+            const id=String(r.vkId||'');
+            const p=A.players.find(x=>String(x.key)===String(r.key));
+            fill(suggestions,p?
+              h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>pick(p)},p.name+(id?' · VK ID '+id:'')):
+              h('p',{class:'hint'},r.exists?'Карточка найдена, обновите список игроков.':'VK ID '+id+' найден, но карточки в базе нет. Добавьте игрока в разделе «Игроки».'));
+          }else if(r&&r.error&&r.error.code!=='BAD_ACTION'){
+            fill(suggestions,h('p',{class:'hint'},r.error.message||'Не удалось проверить VK-профиль'));
           }
         },400);
       }
