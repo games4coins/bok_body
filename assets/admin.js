@@ -173,7 +173,13 @@
     else if (A.tab === 'winner') fill(contentEl, winnerView());
     else if (A.tab === 'gifts') fill(contentEl, giftsView());
     else if (A.tab === 'deposits') fill(contentEl, depositsView());
-    else if (A.tab === 'achievements') achievementsView();
+    else if (A.tab === 'achievements') achievementsView().catch(e=>{
+      console.error('BOK achievements render error',e);
+      fill(contentEl,h('section',{class:'card'},
+        h('h2',null,'🏆 Ачивки и барабан BOK'),
+        h('p',{class:'msg err'},'Ошибка загрузки раздела. '+(e&&e.message||'Обновите страницу.')),
+        h('button',{class:'btn btn-soft',onclick:renderTab},'Повторить')));
+    });
     else fill(contentEl, settingsView());
     tickTimers();
   }
