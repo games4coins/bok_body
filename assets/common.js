@@ -480,5 +480,30 @@
     return { handle };
   })();
 
+
+  // BOK: единый поиск игроков во всех формах: имя, VK ID, @ник, vk.com/vk.ru.
+  // Это фильтрация уже загруженного списка, она НЕ подтверждает владение VK.
+  function bokSearchSlug(value) {
+    let v = String(value || '').trim().toLocaleLowerCase('ru-RU').replace(/ё/g, 'е');
+    v = v.replace(/^@/, '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/^(?:m\.|new\.)?vk\.(?:com|ru)\//, '');
+    return v.split(/[/?#]/)[0].trim();
+  }
+  function bokSearchNorm(value) {
+    return String(value || '').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').trim().replace(/\s+/g, ' ');
+  }
+  function bokSearchPlayers(players, raw, limit) {
+    const query = bokSearchNorm(raw), slug = bokSearchSlug(raw);
+    if (!query) return (players || []).slice(0, limit || 80);
+    return (players || []).filter(p => {
+      const name = bokSearchNorm(p.name);
+      const url = bokSearchNorm(p.url || p.vkUrl || '');
+      const key = String(p.key || p.id || '').toLowerCase();
+      const playerSlug = bokSearchSlug(url);
+      return name.includes(query) || url.includes(query) ||
+        (slug && (playerSlug.includes(slug) || key === slug || ('id' + key) === slug));
+    }).slice(0, limit || 80);
+  }
+  global.BokPlayerSearch = Object.freeze({ slug: bokSearchSlug, normalize: bokSearchNorm, filter: bokSearchPlayers });
+
   global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
 })(window);
