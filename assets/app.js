@@ -370,15 +370,22 @@
           {emoji:'🚚',title:'Доставка'},{emoji:'🎟️',title:'Номерки'},
           {emoji:'🧸',title:'Кукольные призы'},{emoji:'✨',title:'Удача'}];
         const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8','#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
-        const n=sectors.length,disc=h('div',{class:'bok-wheel-disc',role:'img','aria-label':'Декоративный барабан удачи'});
+        const n=sectors.length,disc=h('div',{class:'bok-wheel-disc',role:'img','aria-label':'Барабан удачи с иконками призов',
+          style:{position:'relative',width:'232px',height:'232px',overflow:'visible'}});
         disc.style.background='conic-gradient('+sectors.map((p,i)=>colors[i%colors.length]+' '+(i*100/n)+'% '+((i+1)*100/n)+'%').join(',')+')';
         sectors.forEach((p,i)=>{
           const a=((i+.5)*360/n-90)*Math.PI/180;
-          disc.appendChild(h('span',{class:'bok-wheel-sector-icon',
-            style:{left:(50+35*Math.cos(a))+'%',top:(50+35*Math.sin(a))+'%'},
-            title:String(p.title||'Подарок')},bokPrizeIcon(p)));
+          // Inline positioning is intentional: icons stay visible even when a stale CSS file is cached.
+          const icon=h('span',{class:'bok-wheel-sector-icon',
+            style:{position:'absolute',zIndex:'5',display:'flex',alignItems:'center',justifyContent:'center',
+              width:'38px',height:'38px',fontSize:n>8?'22px':'31px',lineHeight:'1',
+              left:(50+37*Math.cos(a))+'%',top:(50+37*Math.sin(a))+'%',
+              transform:'translate(-50%, -50%)',textShadow:'0 2px 3px rgba(40,20,15,.25)',
+              pointerEvents:'none',userSelect:'none'},
+            title:String(p.title||'Подарок'),'aria-hidden':'true'},bokPrizeIcon(p));
+          disc.appendChild(icon);
         });
-        disc.appendChild(h('span',{class:'bok-wheel-core'},'✦'));
+        disc.appendChild(h('span',{class:'bok-wheel-core',style:{zIndex:'6'}},'✦'));
         return h('div',{class:'bok-wheel-stage'},h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
       };
       function bokPrizeReveal(prize){
@@ -409,7 +416,25 @@
           const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1,onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
-            if(wheel)wheel.style.transform='rotate(1800deg)';
+            // Start visual rotation immediately. The network request runs in parallel.
+            // No artificial delay is added AFTER the wheel has stopped.
+            const spinAnimation=wheel?new Promise(resolve=>{
+              let finished=false;
+              let timer;
+              const done=()=>{
+                if(finished)return;
+                finished=true;
+                wheel.removeEventListener('transitionend',onEnd);
+                clearTimeout(timer);
+                resolve();
+              };
+              const onEnd=e=>{if(e.target===wheel&&e.propertyName==='transform')done();};
+              wheel.addEventListener('transitionend',onEnd);
+              timer=setTimeout(done,5600);
+              requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                wheel.style.transform='rotate(3240deg)';
+              }));
+            }):Promise.resolve();
             const pendingKey='bok-wheel-pending-v1';
             let requestId=localStorage.getItem(pendingKey);
             if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
@@ -417,7 +442,7 @@
             try{outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token(),requestId});}
             catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
             if(outcome&&outcome.ok)localStorage.removeItem(pendingKey);
-            await new Promise(resolve=>setTimeout(resolve,2600));
+            await spinAnimation;
             if(outcome&&outcome.ok){loadWheel();bokPrizeReveal(outcome.prize||{title:'Сюрприз',emoji:'🎁'});}
             else{toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');loadWheel();}
           }},'🎡 Крутить барабан');
