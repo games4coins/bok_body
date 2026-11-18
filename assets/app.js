@@ -369,10 +369,16 @@
         const catalog=Array.isArray(data.prizes)?data.prizes:null;
         const wheel=h('div',{class:'bok-wheel-stage'});
         if(!catalog){
-          wheel.appendChild(h('div',{class:'bok-wheel-catalog-missing'},
-            h('div',{style:{fontSize:'42px'}},'🎡'),
-            h('b',null,'Каталог призов ещё не подключён'),
-            h('p',{class:'hint'},'В GAS обновите ответ achPrivate_, чтобы показать здесь настоящие призы из админки.')));
+          // Backwards-compatible: keep spinning available on older GAS, but show no fake prize icons.
+          const disc=h('div',{class:'bok-wheel-disc',style:{
+            width:'232px',height:'232px',display:'grid',placeItems:'center',
+            background:'conic-gradient(#f4ddc1,#eec6ad,#f3e3d0,#e9c5b7,#f4ddc1)'}},
+            h('span',{class:'bok-wheel-core'},'✦'));
+          wheel.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+          wheel.appendChild(h('p',{class:'hint',style:{position:'absolute',top:'100%',left:'50%',width:'280px',
+            maxWidth:'90vw',textAlign:'center',transform:'translateX(-50%)'}},
+            'Иконки призов появятся после обновления GAS.'));
+          wheel.style.marginBottom='65px';
           return wheel;
         }
         const sectors=catalog.filter(p=>p&&p.active!==false&&Number(p.weight)>0&&
@@ -432,7 +438,7 @@
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
           const catalogReady=Array.isArray(data.prizes)&&data.prizes.some(p=>p&&p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0));
-          const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1||!catalogReady,onclick:async()=>{
+          const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1||(Array.isArray(data.prizes)&&!catalogReady),onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
             // Start visual rotation immediately. The network request runs in parallel.
