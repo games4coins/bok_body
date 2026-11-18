@@ -437,7 +437,7 @@
       const box = h('div', { class: 'blist', style: { maxHeight: '32vh' } });
       const draw = () => {
         const t = norm(q.value.trim());
-        const rows = A.players.filter((x) => !t || norm(x.name).indexOf(t) >= 0).slice(0, 80);
+        const rows = window.BokPlayerSearch.filter(A.players,q.value,80);
         fill(box, rows.length ? rows.map((x) => h('div', { class: 'prow', style: { cursor: 'pointer' }, onclick: () => choose(x) },
           avatar(x.name, x.photo, 32),
           h('div', { class: 'pname' }, h('b', null, x.name),
@@ -492,7 +492,7 @@
     const schedule = () => { chosen = null; clearTimeout(timer); timer = setTimeout(resolve, 600); };
     vk.addEventListener('change', () => { if (!chosen) resolve(); });
     const live=h('div',{class:'live-suggestions'});
-    vk.addEventListener('input',async()=>{if(!A.players){const r=await act('adminPlayers');if(r){A.players=r.players;A.rules=r.rules;}}const t=norm(vk.value.trim());fill(live,t.length<2?null:(A.players||[]).filter(p=>norm(p.name).includes(t)||norm(p.url).includes(t)).slice(0,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{choose(p);fill(live);}},p.name)));});
+    vk.addEventListener('input',async()=>{if(!A.players){const r=await act('adminPlayers');if(r){A.players=r.players;A.rules=r.rules;}}const t=norm(vk.value.trim());fill(live,t.length<2?null:window.BokPlayerSearch.filter(A.players||[],vk.value,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{choose(p);fill(live);}},p.name)));});
     vk.addEventListener('input', schedule);
     vk.addEventListener('paste', schedule);
 
@@ -699,8 +699,9 @@
     const newId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
     const refresh=async()=>{const [r,p]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);if(p)playerDirectory=p.players||[];if(r){accounts=r.players||[];draw();}};
     function draw(){
-      const rows=accounts.filter(p=>(!positive.checked||p.balance>0)&&norm(p.name).includes(norm(search.value)));
-      const newPlayers=positive.checked?[]:playerDirectory.filter(p=>!accounts.some(a=>a.key===p.key)&&norm(p.name).includes(norm(search.value))).map(p=>({key:p.key,name:p.name,balance:0,history:[]}));
+      const matchedAccounts=new Set(window.BokPlayerSearch.filter(accounts,search.value,accounts.length||1));
+      const rows=accounts.filter(p=>(!positive.checked||p.balance>0)&&matchedAccounts.has(p));
+      const newPlayers=positive.checked?[]:window.BokPlayerSearch.filter(playerDirectory,search.value,playerDirectory.length||1).filter(p=>!accounts.some(a=>a.key===p.key)).map(p=>({key:p.key,name:p.name,balance:0,history:[]}));
       rows.push(...newPlayers);
       const cards=rows.map(p=>h('button',{class:'btn btn-soft btn-block',style:{marginTop:'7px',textAlign:'left'},onclick:()=>{selected=p;draw();}},p.name+' · '+p.balance+' ₽'));
       const current=selected&&(accounts.find(p=>p.key===selected.key)||selected);
@@ -813,7 +814,7 @@
     };
     const refresh=async()=>{const r=await act('adminGifts');if(!r)return;last=r.gifts||[];renderList();renderCatalog(r.catalog||[]);};
     const lookup=async()=>{if(!A.players){const r=await act('adminPlayers');if(!r)return;A.players=r.players;A.rules=r.rules;}
-      const q=norm(player.value.trim());fill(suggestions,q.length<2?null:A.players.filter(p=>norm(p.name).includes(q)||norm(p.url).includes(q)).slice(0,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{chosen=p;player.value=p.name;focusedKey=p.key;expanded.add(p.key);fill(suggestions);renderList();}},p.name)));
+      const q=norm(player.value.trim());fill(suggestions,q.length<2?null:window.BokPlayerSearch.filter(A.players,player.value,8).map(p=>h('button',{class:'btn btn-soft btn-block',onclick:()=>{chosen=p;player.value=p.name;focusedKey=p.key;expanded.add(p.key);fill(suggestions);renderList();}},p.name)));
     };
     player.addEventListener('input',()=>{chosen=null;lookup();});
     const add=h('button',{class:'btn btn-primary btn-block',onclick:async()=>{if(!chosen)return toast('Выберите участника из подсказок','bad');if(!catalogSelect.value)return toast('Выберите подарок','bad');const r=await act('adminGiftAdd',{key:chosen.key,catalogId:catalogSelect.value,event:event.value});if(r){last=r.gifts;focusedKey=chosen.key;expanded.add(chosen.key);renderList();toast('Подарок назначен');}}},'Назначить подарок');
@@ -834,7 +835,8 @@
     const rules = A.rules || {};
     const draw = () => {
       const t = norm(A.pq.trim());
-      const rows = A.players.filter(p=>(!t||norm(p.name).includes(t)||norm(p.url).includes(t))&&(filters.frozen||!p.frozen)&&(filters.zero||p.balance>0)&&(!filters.miss.size||filters.miss.has(Math.min(4,p.misses||0)))&&(!filters.ex||p.balance>=Number(rules.exchangeMin||30))&&(!filters.win||p.wins>0)).sort((a,b)=>filters.sort==='name'?norm(a.name).localeCompare(norm(b.name)):(Number(b[filters.sort]||0)-Number(a[filters.sort]||0)));
+      const matched = new Set(window.BokPlayerSearch.filter(A.players,A.pq,A.players.length||1));
+      const rows = A.players.filter(p=>matched.has(p)&&(filters.frozen||!p.frozen)&&(filters.zero||p.balance>0)&&(!filters.miss.size||filters.miss.has(Math.min(4,p.misses||0)))&&(!filters.ex||p.balance>=Number(rules.exchangeMin||30))&&(!filters.win||p.wins>0)).sort((a,b)=>filters.sort==='name'?norm(a.name).localeCompare(norm(b.name)):(Number(b[filters.sort]||0)-Number(a[filters.sort]||0)));
       fill(listEl, rows.length ? rows.map((p) => h('div', { class: 'prow', style: { cursor: 'pointer' }, onclick: () => openPlayer(p.key) },
         avatar(p.name, p.photo, 38),
         h('div', { class: 'pname' }, h('b', {class:p.frozen?'frozen-name':''}, p.name),
@@ -871,6 +873,27 @@
     const miss = h('input', { class: 'input', type: 'text', inputmode: 'numeric', placeholder: 'Пропусков подряд', value: '0' });
     const note = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Заметка (необязательно)' });
     const err = h('div', { class: 'msg err' });
+    const preview = h('div', { class: 'msg' });
+    let vkTimer = null, vkSeq = 0;
+    async function previewNewPlayer() {
+      const query = vk.value.trim() || (/^@[a-z0-9_.]{2,64}$/i.test(name.value.trim()) ? name.value.trim() : '');
+      const seq = ++vkSeq;
+      if (!query) { fill(preview); return; }
+      fill(preview, h('span', { class: 'hint' }, 'Проверяем профиль ВК…'));
+      const result = await api.post('adminResolveVk', { password: A.pw, vkUrl: query });
+      if (seq !== vkSeq) return;
+      if (!result || !result.ok) {
+        fill(preview, h('span', { class: 'msg err' }, result && result.error ? result.error.message : 'Не удалось проверить профиль'));
+        return;
+      }
+      const existing = (A.players || []).find(p => String(p.key) === String(result.key) || window.BokPlayerSearch.slug(p.url) === 'id'+result.key);
+      fill(preview, h('div', { class: 'profile-card' }, avatar(result.name, result.photo, 42),
+        h('div', null, h('b', null, result.name), h('div', { class: 'meta' },
+          existing ? 'Уже в базе: ' + existing.name + ' — повторно добавлять не нужно' : 'VK ID '+result.key+' · новый участник'))));
+      if (!name.value.trim()) name.placeholder = 'Имя из ВК: ' + result.name;
+    }
+    vk.addEventListener('input', () => { clearTimeout(vkTimer); vkTimer = setTimeout(previewNewPlayer, 500); });
+    name.addEventListener('input', () => { if (!vk.value.trim() && /^@[a-z0-9_.]{2,64}$/i.test(name.value.trim())) { clearTimeout(vkTimer); vkTimer = setTimeout(previewNewPlayer, 500); } });
     const btn = h('button', { class: 'btn btn-primary btn-block', onclick: async () => {
       err.textContent = ''; btn.disabled = true;
       const r = await api.post('adminPlayerAdd', { password: A.pw, vkUrl: vk.value, name: name.value, balance: bal.value, misses: miss.value, note: note.value });
@@ -879,7 +902,7 @@
       adoptPlayers(r); closeModal(); renderTab(); toast('Игрок добавлен');
     } }, 'Добавить');
     openModal([h('h3', null, 'Новый игрок'),
-      h('div', { class: 'field' }, h('label', null, 'Ссылка на профиль ВК'), vk),
+      h('div', { class: 'field' }, h('label', null, 'Ссылка ВК или @никнейм'), vk, preview),
       h('div', { class: 'field' }, h('label', null, 'Имя'), name),
       h('div', { class: 'field' }, h('label', null, 'Накопленные номерки'), bal),
       h('div', { class: 'field' }, h('label', null, 'Текущее число пропусков (✖)'), miss),
