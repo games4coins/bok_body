@@ -309,7 +309,13 @@
       const verified=!!(privateData&&privateData.ok&&privateData.verified);
       const privatePlayer=verified?privateData.player:null;
       const privateDeposit=verified?privateData.deposit:null;
-      const freezeUI=authenticated?h('div',{class:'cab-freeze-panel'},
+      // Заморозка доступна только при накопительном балансе от 10 номерков.
+      // У уже замороженного игрока управление разморозкой остаётся доступным.
+      const freezeBalance=Number(privatePlayer&&privatePlayer.balance!=null?privatePlayer.balance:
+        privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
+      const showFreeze=authenticated&&verified&&(
+        !!privatePlayer.frozen||(Number.isFinite(freezeBalance)&&freezeBalance>=10));
+      const freezeUI=showFreeze?h('div',{class:'cab-freeze-panel'},
         h('h4',null,privatePlayer&&privatePlayer.frozen?'❄ Разморозка':'❄ Самостоятельная заморозка'),
         verified?(privatePlayer.frozen?
           h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
@@ -332,7 +338,8 @@
             h('button',{class:'btn btn-soft btn-block',onclick:()=>{window.BokVK.logout();closeModal();openCabinet();}},'Повторить вход'))
       ):null;
       const exchangeMin=Number(rules.exchangeMin)||0;
-      const exchangeBalance=Number(privatePlayer&&privatePlayer.balance!=null?privatePlayer.balance:p.bal);
+      const exchangeBalance=Number(privatePlayer&&privatePlayer.balance!=null?privatePlayer.balance:
+        privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
       const exchangeUrl=safeUrl(rules.url);
       const exchangeUI=authenticated&&exchangeMin>0&&Number.isFinite(exchangeBalance)&&exchangeBalance>=exchangeMin&&exchangeUrl?
         h('a',{class:'btn btn-primary btn-block',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
