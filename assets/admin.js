@@ -288,6 +288,18 @@
       if(roster){A.players=roster.players||[];A.rules=roster.rules;}
     }
     const playerNames=new Map((A.players||[]).map(p=>[String(p.key),p.name]));
+    // Если тестовый/старый выигрыш не связан с карточкой, пробуем публичное имя VK.
+    const missing=[...new Set((data&&data.wins||[]).map(w=>String(w.key))
+      .filter(id=>!playerNames.has(id)&&/^\d{3,15}$/.test(id)))].slice(0,6);
+    if(missing.length){
+      await Promise.all(missing.map(async id=>{
+        try{
+          const p=await api.post('adminPlayerResolve',{password:A.pw,query:'id'+id});
+          if(p&&p.ok&&p.name)playerNames.set(id,p.name);
+        }catch(_e){}
+      }));
+      if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
+    }
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
