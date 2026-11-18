@@ -232,7 +232,7 @@
     const rules = r.rules || {};
     const all = r.players || [];
     const F = { zero: false, ex: false, win: false, frozen: false, misses: new Set([2,3]) };
-    const q = h('input', { class: 'input', type: 'search', placeholder: 'Поиск по имени', autocomplete: 'off' });
+    const q = h('input', { class: 'input', type: 'search', placeholder: 'Поиск по имени, никнейму или ссылке VK', autocomplete: 'off' });
     const list = h('div', { class: 'btable' });
     const count = h('div', { class: 'hint' });
     const check = (key, label) => h('label', { class: 'sw fl' }, h('input', { type: 'checkbox', onchange: (e) => { F[key] = e.target.checked; draw(); } }), label);
@@ -246,7 +246,7 @@
         if (F.misses.size && !F.misses.has(Number(p.miss||0))) return false;
         if (F.ex && !p.ex) return false;
         if (F.win && !(p.wins > 0)) return false;
-        return !t || norm(p.name).indexOf(t) >= 0;
+        return !t || window.BokPlayerSearch.filter([p],q.value,1).length > 0;
       });
       count.textContent = 'Показано ' + rows.length + ' из ' + all.length;
       fill(list,
