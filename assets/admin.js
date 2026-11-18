@@ -182,21 +182,94 @@
     document.querySelectorAll('[data-act]').forEach(tickTimer);
   }
 
-  // Общий серверный ключ по имени, ссылке VK, @нику или ID. Для ручных ачивок.
-  async function adminPlayerKeyByQuery(raw) {
-    const q=String(raw||'').trim();
-    if(!q)return '';
-    if(!A.players) {
-      const res=await act('adminPlayers');
-      if(!res)return '';
-      A.players=res.players||[];A.rules=res.rules;
+  // Единый идентификатор: ищем по локальной базе, а VK-ник разрешаем через GAS.
+  // В операции передаётся только внутренний ключ существующей карточки.
+  // Существующие ключи (включая исторические) не меняем: к ним привязаны балансы.
+  async function adminFindPlayerByQuery(raw) {
+    const query=String(raw||'').trim();
+    if (!query) {toast('Укажите участника','bad');return null;}
+    if (!A.players) {
+      const data=await act('adminPlayers');
+      if (!data) return null;
+      A.players=data.players||[];A.rules=data.rules;
     }
-    const exact=A.players.find(p=>String(p.key)===q || window.BokPlayerSearch.slug(p.url)===window.BokPlayerSearch.slug(q));
-    if(exact)return String(exact.key);
-    const hits=window.BokPlayerSearch.filter(A.players,q,30);
-    if(hits.length===1)return String(hits[0].key);
-    toast(hits.length?'Найдено несколько игроков. Уточните имя, VK ссылку или ID.':'Игрок не найден. Добавьте его в разделе «Игроки».','bad');
-    return '';
+    const slug=window.BokPlayerSearch.slug(query);
+    const exact=A.players.filter(p=>String(p.key)===query ||
+      String(p.vkId||'')===query ||
+      (p.url && window.BokPlayerSearch.slug(p.url)===slug) ||
+      window.BokPlayerSearch.normalize(p.name)===window.BokPlayerSearch.normalize(query));
+    if(exact.length===1)return exact[0];
+    if(exact.length>1){toast('Несколько участников с таким именем — выберите по ссылке VK','bad');return null;}
+    const isVK=/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(query);
+    if(isVK) {
+      const url=/^\d{3,15}$/.test(query)?'id'+query:query;
+      const resolved=await api.post('adminResolveVk',{password:A.pw,vkUrl:url});
+      if(resolved&&resolved.ok){
+        const id=String(resolved.key);
+        const hits=A.players.filter(p=>String(p.key)===id ||
+          String(p.vkId||'')===id ||
+          (p.url&&window.BokPlayerSearch.slug(p.url)==='id'+id) ||
+          (resolved.url&&p.url&&window.BokPlayerSearch.slug(p.url)===window.BokPlayerSearch.slug(resolved.url)));
+        if(hits.length===1)return hits[0];
+        if(hits.length>1){toast('Несколько карточек для одного VK ID. Нужна проверка администратора.','bad');return null;}
+        toast('VK ID '+id+' определён, но карточка игрока отсутствует. Добавьте её через «Игроки».','bad');return null;
+      }
+      toast(resolved&&resolved.error&&resolved.error.message||'Не удалось определить VK ID','bad');
+      return null;
+    }
+    const candidates=window.BokPlayerSearch.filter(A.players,query,30);
+    if(candidates.length===1)return candidates[0];
+    toast(candidates.length?'Найдено несколько игроков — выберите из подсказок или вставьте VK ссылку.':'Игрок не найден. Используйте VK ссылку или добавьте карточку.','bad');
+    return null;
+  }
+
+  function adminPlayerLookup(placeholder) {
+    const input=h('input',{class:'input',type:'search',placeholder:placeholder||'Имя, @ник, VK ссылка или ID',autocomplete:'off'});
+    const suggestions=h('div',{class:'live-suggestions'});
+    const selected=h('div',{class:'hint'});
+    let chosen=null, seq=0, debounce=null;
+    const pick=p=>{
+      chosen=p;
+      input.value=p.name+' · VK ID '+(p.vkId||window.BokPlayerSearch.slug(p.url).replace(/^id/,'')||p.key);
+      selected.textContent='✅ Выбран: '+p.name+' · ключ карточки: '+p.key;
+      fill(suggestions);
+    };
+    const draw=async()=>{
+      const ownSeq=++seq,raw=input.value.trim();
+      chosen=null;selected.textContent='';
+      if(raw.length<2){fill(suggestions);return;}
+      if(!A.players){
+        const res=await act('adminPlayers');if(ownSeq!==seq)return;
+        if(!res)return;
+        A.players=res.players||[];A.rules=res.rules;
+      }
+      const hits=window.BokPlayerSearch.filter(A.players,raw,10);
+      fill(suggestions,...hits.map(p=>h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>pick(p)},
+        p.name+' · '+(p.url||('ключ '+p.key)))));
+      if(!hits.length&&(/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(raw))){
+        clearTimeout(debounce);
+        debounce=setTimeout(async()=>{
+          const url=/^\d{3,15}$/.test(raw)?'id'+raw:raw;
+          const r=await api.post('adminResolveVk',{password:A.pw,vkUrl:url});
+          if(ownSeq!==seq||chosen)return;
+          if(r&&r.ok){
+            const id=String(r.key);
+            const matches=A.players.filter(p=>String(p.key)===id||String(p.vkId||'')===id||
+              (p.url&&window.BokPlayerSearch.slug(p.url)==='id'+id));
+            fill(suggestions,matches.length?
+              matches.map(p=>h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>pick(p)},p.name+' · VK ID '+id)):
+              h('p',{class:'hint'},'VK ID '+id+' найден, но карточки в базе нет. Добавьте игрока в разделе «Игроки».'));
+          }
+        },400);
+      }
+    };
+    input.addEventListener('input',draw);
+    return {input,container:h('div',null,input,selected,suggestions),
+      async get(){
+        if(chosen)return chosen;
+        const raw=input.value.replace(/\s+·\s+VK ID\s+\d+$/,'').trim();
+        return await adminFindPlayerByQuery(raw);
+      }};
   }
 
   // ───── Достижения и барабан ─────
@@ -207,9 +280,15 @@
     fill(contentEl,host);
     const data=await act('adminAchState');
     if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
+    if(!A.players){
+      const roster=await act('adminPlayers');
+      if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
+      if(roster){A.players=roster.players||[];A.rules=roster.rules;}
+    }
+    const playerNames=new Map((A.players||[]).map(p=>[String(p.key),p.name]));
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
-    const key=h('input',{class:'input',placeholder:'Игрок: имя, @ник, VK ссылка или ключ'});
-    const awardKey=h('input',{class:'input',placeholder:'Игрок для ачивки: имя, @ник или VK ссылка'});
+    const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
+    const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
       ['streak5','🧵 5 подряд'],['streak10','🪡 10 подряд'],['streak15','👑 15 подряд'],
       ['visits10','🧸 10 посещений'],['visits20','🎀 20 посещений'],['visits30','🏰 30 посещений'],
@@ -230,22 +309,22 @@
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),syncBtn,
-      h('h3',null,'🏅 Выдать достижение вручную'),awardKey,awardType,
+      h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
-        const playerKey=await adminPlayerKeyByQuery(awardKey.value);
-        if(!playerKey)return;
-        if(!confirm('Выдать достижение '+awardType.options[awardType.selectedIndex].text+' участнику '+awardKey.value+'? Повторная выдача блокируется сервером.'))return;
-        const x=await act('adminAchAward',{key:playerKey,id:awardType.value});
+        const participant=await awardLookup.get();
+        if(!participant)return;
+        if(!confirm('Выдать достижение '+awardType.options[awardType.selectedIndex].text+' участнику '+participant.name+' ('+participant.key+')? Повторная выдача блокируется сервером.'))return;
+        const x=await act('adminAchAward',{key:participant.key,id:awardType.value});
         if(x){toast('Достижение выдано');achievementsView();}
       }},'Выдать достижение'),
       h('h3',null,'🎡 Ручная корректировка вращений'),
       key,amount,reason,
       h('button',{class:'btn btn-primary',onclick:async()=>{
-        if(!key.value.trim()||!Number.isInteger(Number(amount.value))||Number(amount.value)===0)return toast('Укажите участника и количество','bad');
-        const playerKey=await adminPlayerKeyByQuery(key.value);
-        if(!playerKey)return;
-        if(!confirm('Изменить баланс вращений на '+amount.value+' для '+key.value+'?'))return;
-        const x=await act('adminAchSpin',{key:playerKey,amount:Number(amount.value),reason:reason.value});
+        if(!Number.isInteger(Number(amount.value))||Number(amount.value)===0)return toast('Укажите корректное количество вращений','bad');
+        const participant=await spinLookup.get();
+        if(!participant)return;
+        if(!confirm('Изменить баланс вращений на '+amount.value+' для '+participant.name+' ('+participant.key+')?'))return;
+        const x=await act('adminAchSpin',{key:participant.key,amount:Number(amount.value),reason:reason.value});
         if(x)toast('Новый баланс вращений: '+x.balance);
       }},'Применить изменение'),
       h('h3',null,'🎁 Каталог призов · вес выпадения'),
@@ -260,7 +339,7 @@
         if(x){toast('Приз сохранён');achievementsView();}
       }},'Сохранить приз'),
       h('h3',null,'📦 Выигрыши · последние 300'),
-      ...((data.wins||[]).length?(data.wins||[]).map(w=>h('div',{class:'gift-item'},w.key+' · '+w.title+' · '+w.status,
+      ...((data.wins||[]).length?(data.wins||[]).map(w=>h('div',{class:'gift-item'},(playerNames.get(String(w.key))||('VK ID '+w.key))+' · '+w.title+' · '+w.status,
         w.status==='ОЖИДАЕТ'?h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
           if(!confirm('Подтвердить выдачу приза?'))return;
           const x=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
