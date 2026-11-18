@@ -41,7 +41,7 @@
     detectNew(st);
     A.st = st;
     renderTop();
-    if (A.tab !== 'settings' && A.tab !== 'players' && A.tab !== 'winner' && A.tab !== 'gifts' && A.tab !== 'deposits') renderTab();
+    if (A.tab !== 'settings' && A.tab !== 'players' && A.tab !== 'winner' && A.tab !== 'gifts' && A.tab !== 'deposits' && A.tab !== 'achievements') renderTab();
     const n = st.bookings.filter((b) => NEEDS_CHECK.indexOf(b.status) >= 0).length;
     document.title = (n ? '(' + n + ') ' : '') + 'Номерок — админка';
   }
@@ -183,12 +183,22 @@
   }
 
   // ───── Достижения и барабан ─────
+  let achViewSeq=0;
   async function achievementsView(){
+    const requestSeq=++achViewSeq;
     const host=h('div',{class:'card'},h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',{class:'hint'},'Загружаем каталог и журнал…'));
     fill(contentEl,host);
     const data=await act('adminAchState');
-    if(!data)return;
+    if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
+    if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
     const key=h('input',{class:'input',placeholder:'Ключ участника (из списка игроков)'});
+    const awardKey=h('input',{class:'input',placeholder:'Ключ участника для ачивки'});
+    const awardType=h('select',{class:'input'},...[
+      ['streak5','🧵 5 подряд'],['streak10','🪡 10 подряд'],['streak15','👑 15 подряд'],
+      ['visits10','🧸 10 посещений'],['visits20','🎀 20 посещений'],['visits30','🏰 30 посещений'],
+      ['tickets5','🛍️ 5 номерков'],['tickets10','🧳 10 номерков'],['tickets15','🚂 15 номерков'],
+      ['friends10','💌 10 броней друзьям'],['miss3','😴 3 пропуска']
+    ].map(([id,title])=>h('option',{value:id},title)));
     const amount=h('input',{class:'input',type:'number',value:'1',min:'-100',max:'100'});
     const reason=h('input',{class:'input',placeholder:'Причина начисления или списания'});
     const prizeId=h('input',{class:'input',placeholder:'ID приза (пусто для нового)'});
@@ -203,6 +213,13 @@
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),syncBtn,
+      h('h3',null,'🏅 Выдать достижение вручную'),awardKey,awardType,
+      h('button',{class:'btn btn-soft',onclick:async()=>{
+        if(!awardKey.value.trim())return toast('Укажите ключ участника','bad');
+        if(!confirm('Выдать достижение '+awardType.options[awardType.selectedIndex].text+' участнику '+awardKey.value+'? Повторная выдача блокируется сервером.'))return;
+        const x=await act('adminAchAward',{key:awardKey.value.trim(),id:awardType.value});
+        if(x){toast('Достижение выдано');achievementsView();}
+      }},'Выдать достижение'),
       h('h3',null,'🎡 Ручная корректировка вращений'),
       key,amount,reason,
       h('button',{class:'btn btn-primary',onclick:async()=>{
