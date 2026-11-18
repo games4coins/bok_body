@@ -200,7 +200,7 @@
       window.BokPlayerSearch.normalize(p.name)===window.BokPlayerSearch.normalize(query));
     if(exact.length===1)return exact[0];
     if(exact.length>1){toast('Несколько участников с таким именем — выберите по ссылке VK','bad');return null;}
-    const isVK=/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(query);
+    const isVK=/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(query) || /^[a-z][a-z0-9_.]{2,63}$/i.test(query);
     if(isVK) {
       const url=/^\d{3,15}$/.test(query)?'id'+query:query;
       const resolved=await api.post('adminResolveVk',{password:A.pw,vkUrl:url});
@@ -246,7 +246,7 @@
       const hits=window.BokPlayerSearch.filter(A.players,raw,10);
       fill(suggestions,...hits.map(p=>h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>pick(p)},
         p.name+' · '+(p.url||('ключ '+p.key)))));
-      if(!hits.length&&(/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(raw))){
+      if(!hits.length&&(/^(?:@|https?:\/\/|(?:www\.)?(?:m\.)?vk\.(?:com|ru)\/|id\d+$|\d{3,15}$)/i.test(raw) || /^[a-z][a-z0-9_.]{2,63}$/i.test(raw))){
         clearTimeout(debounce);
         debounce=setTimeout(async()=>{
           const url=/^\d{3,15}$/.test(raw)?'id'+raw:raw;
