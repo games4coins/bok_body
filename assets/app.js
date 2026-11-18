@@ -425,7 +425,8 @@
         graphic.appendChild(makeSvg('text',{x:120,y:129,'text-anchor':'middle',
           'font-size':29,fill:'#9d5e36'},'✦'));
         disc.appendChild(graphic);
-        stage.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'),disc);
+        stage.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'));
+        stage.appendChild(disc);
         if(!catalog){
           const hint=h('p',{class:'hint',style:{margin:'0 auto 12px',textAlign:'center'}},
             'Каталог призов не получен от GAS. Обновите развёртывание, чтобы показать настоящие иконки.');
