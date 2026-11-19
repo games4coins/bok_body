@@ -623,3 +623,16 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-ach-toggle{font-size:11px;padding:8px 10px}
 }
 @media(prefers-reduced-motion:reduce){.bok-ach-card,.bok-ach-progress-fill{transition:none!important}}
+
+
+/* 16 bespoke clay-like BOK icons from the approved illustrated sheet.
+   Each icon is one 4x4 sprite cell; fallback emoji remains underneath. */
+.bok-ach-illustration{position:relative;isolation:isolate;overflow:hidden}
+.bok-ach-sprite-art{
+  position:absolute;inset:0;z-index:1;display:block;
+  width:100%;height:100%;background-image:url('bok-achievement-sprite.svg');
+  background-size:400% 400%;background-repeat:no-repeat;
+  mix-blend-mode:multiply;border-radius:18px;
+  filter:drop-shadow(0 3px 3px rgba(155,80,30,.1));
+}
+.bok-ach-earned .bok-ach-sprite-art{filter:saturate(1.16) drop-shadow(0 3px 3px rgba(155,80,30,.16))}
