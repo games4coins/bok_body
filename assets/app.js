@@ -371,6 +371,12 @@
         freeze1:'❄️',thaw1:'🧊',
         exchange30:'🏅',exchange60:'🎁',exchange90:'🗝️'
       };
+      // 4×4 illustrated icon atlas, matching the approved BOK mock-up.
+      const achArtIndex={
+        streak5:0,streak10:1,streak15:2,visits10:3,visits20:4,visits30:5,
+        tickets5:6,tickets10:7,tickets15:8,friend10:9,miss3:10,
+        freeze1:11,thaw1:12,exchange30:13,exchange60:14,exchange90:15
+      };
       const achCard=a=>{
         const earned=!!a.earned,target=Math.max(1,Number(a.target)||1);
         const hasProgress=a.progress!==null&&a.progress!==undefined&&
@@ -381,9 +387,15 @@
           (Math.round(progress*100)/100)+'/'+target+' · '+pct+'%';
         const tone=earned?' bok-ach-earned':' bok-ach-locked';
         const icon=achIconMap[String(a.id)]||String(a.emoji||'🏆');
+        const artIndex=achArtIndex[String(a.id)];
+        const artPosition=artIndex===undefined?null:{
+          backgroundPositionX:((artIndex%4)*100/3)+'%',
+          backgroundPositionY:(Math.floor(artIndex/4)*100/3)+'%'
+        };
         return h('article',{class:'bok-ach-card'+tone,title:String(a.title||'Достижение')},
           h('div',{class:'bok-ach-illustration','aria-hidden':'true'},
-            h('span',{class:'bok-ach-art'},icon)),
+            h('span',{class:'bok-ach-art'},icon),
+            artPosition?h('span',{class:'bok-ach-sprite-art',style:artPosition}):null),
           h('div',{class:'bok-ach-copy'},
             h('div',{class:'bok-ach-title'},String(a.title||'Достижение')),
             h('div',{class:'bok-ach-description'},String(a.description||'')+
