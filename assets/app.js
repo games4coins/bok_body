@@ -293,7 +293,8 @@
       return;
     }
     const box=h('div',null,h('p',{class:'lead'},'Загружаем публичные данные…'));
-    openModal([h('h3',null,identity?'👤 Личный кабинет · VK ID':'👤 Кабинет участника (без авторизации)'),box]);
+    const cabinetSheet=openModal([h('h3',null,identity?'👤 Личный кабинет · VK ID':'👤 Кабинет участника (без авторизации)'),box]);
+    cabinetSheet.classList.add('bok-cabinet-sheet');
     const r=await api.balances();
     if(!r.ok){fill(box,h('p',{class:'msg err'},'Ошибка загрузки'));return;}
     const players=r.players||[],rules=r.rules||{};
