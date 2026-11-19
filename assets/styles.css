@@ -496,3 +496,130 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .bok-deposit-history>summary{cursor:pointer;padding:8px 4px;color:#704830;font-weight:700}
 .bok-deposit-history[open]>summary{margin-bottom:6px}
 .bok-deposit-history .gift-item{background:#fffaf6;border-radius:8px;margin:5px 0}
+
+
+/* BOK Body 6.7.16 — achievement gallery, inspired by the approved mock-up.
+   Scope to the player's cabinet; no changes to booking/admin screens. */
+.bok-cabinet-sheet{
+  width:min(940px,calc(100vw - 24px));max-width:940px;
+  box-sizing:border-box;padding:22px 24px 28px;
+  background:linear-gradient(180deg,#fffdfb 0%,#ffffff 24%,#fffcf9 100%);
+}
+.bok-cabinet-sheet>.x{position:sticky;top:0;z-index:12;background:#fbefe6}
+.bok-cabinet-sheet .cab-profile{gap:18px;margin:18px 0}
+.bok-cabinet-sheet .cab-stats{gap:9px 13px}
+.bok-cabinet-sheet .cab-stats>div{border-radius:13px;background:#f8f0e9}
+.bok-achievements{margin:24px -3px 19px;color:#3d241c}
+.bok-ach-details{border:0;padding:0}
+.bok-ach-summary{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  list-style:none;cursor:pointer;border-radius:23px;padding:14px 18px;
+  background:linear-gradient(110deg,#fff0e2,#fff7f0 62%,#fde9d8);
+  box-shadow:inset 0 1px #fff,0 5px 14px rgba(156,82,36,.06);
+  -webkit-tap-highlight-color:transparent
+}
+.bok-ach-summary::-webkit-details-marker{display:none}
+.bok-ach-summary::marker{content:''}
+.bok-ach-summary:focus-visible{outline:3px solid #d58141;outline-offset:2px}
+.bok-ach-heading{display:flex;align-items:center;gap:8px;min-width:0;
+  font-weight:900;font-size:clamp(20px,3.6vw,29px);line-height:1.2;color:#54291d}
+.bok-ach-count{white-space:nowrap}
+.bok-ach-trophy{font-size:clamp(28px,4vw,37px);filter:drop-shadow(0 3px 3px #d1a06068)}
+.bok-ach-toggle{
+  flex:none;color:#693823;border-radius:99px;padding:9px 13px;
+  border:1px solid #edc8a8;background:#fffaf6;
+  font-weight:800;font-size:13px;box-shadow:0 3px 6px #a7734730
+}
+.bok-ach-body{padding-top:13px}
+.bok-ach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.bok-ach-card{
+  box-sizing:border-box;position:relative;isolation:isolate;overflow:hidden;
+  display:grid;grid-template-columns:clamp(82px,12vw,116px) minmax(0,1fr);
+  gap:10px;min-height:128px;padding:11px 13px 11px 8px;
+  align-items:center;border-radius:21px;border:1px solid #f0d4be;
+  background:linear-gradient(145deg,#fffaf6,#fff4e9);
+  box-shadow:0 3px 6px #a76f4817,0 9px 24px #bd8d6820;
+  transition:box-shadow .2s ease,transform .2s ease
+}
+.bok-ach-card::before{
+  content:'';position:absolute;left:-50px;top:-60px;z-index:-1;
+  width:220px;height:190px;background:radial-gradient(circle,#fff 0%,transparent 70%);
+  opacity:.7;pointer-events:none
+}
+.bok-ach-card.bok-ach-locked{background:linear-gradient(145deg,#fffaf6,#f7f0e9)}
+.bok-ach-card.bok-ach-locked .bok-ach-illustration{filter:saturate(.72);opacity:.81}
+.bok-ach-card.bok-ach-locked .bok-ach-title{color:#745c50}
+.bok-ach-card.bok-ach-earned{
+  border-color:#f6ce87;background:linear-gradient(135deg,#fff8dc,#ffefd0 62%,#ffe1a3);
+  box-shadow:0 4px 8px #d6a76d44,0 0 0 1px #fff5d0 inset
+}
+.bok-ach-card.bok-ach-earned::before{
+  left:-15px;top:-70px;width:280px;height:280px;opacity:.8;
+  background:repeating-conic-gradient(from 6deg at 36% 56%,#fff8d28a 0deg 13deg,#ffe6a000 13deg 25deg);
+}
+.bok-ach-illustration{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;min-width:0;aspect-ratio:1/1;
+  border-radius:20px;background:radial-gradient(circle at 44% 44%,#fffdf4 2%,#ffe9d700 73%)
+}
+.bok-ach-art{
+  display:block;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',system-ui,sans-serif;
+  font-size:clamp(48px,7vw,82px);line-height:1.2;
+  text-shadow:0 5px 5px #7d43352c,0 1px 0 #fff;
+  filter:drop-shadow(0 5px 3px #a55b4240);
+  transform:translateY(-1px)
+}
+.bok-ach-earned .bok-ach-art{filter:drop-shadow(0 5px 6px #d48a2580) saturate(1.2)}
+.bok-ach-copy{min-width:0;padding-right:13px}
+.bok-ach-title{margin:0 0 5px;font-size:clamp(14px,1.9vw,19px);font-weight:900;
+  color:#4e2419;line-height:1.15;overflow-wrap:break-word}
+.bok-ach-description{font-size:clamp(11px,1.45vw,13px);line-height:1.25;
+  color:#765d50;margin-bottom:6px;overflow-wrap:anywhere}
+.bok-ach-progress-label{font-size:clamp(12px,1.6vw,14px);font-weight:850;
+  color:#663626;margin:0 0 6px}
+.bok-ach-track{position:relative;overflow:hidden;width:100%;height:11px;
+  background:#dfcbbd;border-radius:99px;box-shadow:inset 0 1px 2px #96756444}
+.bok-ach-progress-fill{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(180deg,#ffc55a,#f18a07 52%,#df5c03);
+  box-shadow:inset 0 1px 0 #ffeeba,0 1px 2px #98410c44;
+  transition:width .35s ease}
+.bok-ach-earned .bok-ach-track{background:#f1d5ab}
+.bok-ach-earned .bok-ach-progress-fill{
+  background:linear-gradient(180deg,#ffd864,#f7a514 45%,#e67c00)}
+.bok-ach-status{
+  position:absolute;right:10px;top:9px;
+  display:grid;place-items:center;width:25px;height:25px;
+  border-radius:50%;font-size:15px;font-weight:900;
+  color:#bda28f;line-height:1
+}
+.bok-ach-earned .bok-ach-status{
+  color:#fff;background:linear-gradient(#ffa41d,#e97900);
+  border:2px solid #fff4d8;box-shadow:0 2px 7px #c5792559
+}
+@media (hover:hover){
+  .bok-ach-card:hover{transform:translateY(-2px);box-shadow:0 8px 20px #9b604a33}
+}
+@media(max-width:700px){
+  .bok-cabinet-sheet{width:min(610px,calc(100vw - 12px));padding:18px 13px 22px}
+  .bok-achievements{margin-top:18px}
+  .bok-ach-grid{gap:8px}
+  .bok-ach-card{grid-template-columns:73px minmax(0,1fr);gap:5px;min-height:120px;
+    padding:8px 7px;border-radius:16px}
+  .bok-ach-art{font-size:53px}
+  .bok-ach-copy{padding-right:10px}
+  .bok-ach-title{font-size:14px}
+  .bok-ach-description{font-size:11px}
+  .bok-ach-summary{padding:12px}
+  .bok-ach-heading{font-size:20px}
+}
+@media(max-width:480px){
+  .bok-cabinet-sheet{width:100%;max-width:100%;padding:17px 15px}
+  .bok-ach-grid{grid-template-columns:1fr;gap:9px}
+  .bok-ach-card{grid-template-columns:90px minmax(0,1fr);gap:10px;min-height:107px;padding:9px 12px}
+  .bok-ach-art{font-size:65px}
+  .bok-ach-title{font-size:16px}
+  .bok-ach-description{font-size:12px}
+  .bok-ach-summary{padding:10px}
+  .bok-ach-toggle{font-size:11px;padding:8px 10px}
+}
+@media(prefers-reduced-motion:reduce){.bok-ach-card,.bok-ach-progress-fill{transition:none!important}}
