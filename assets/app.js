@@ -344,17 +344,78 @@
       const exchangeUI=authenticated&&exchangeMin>0&&Number.isFinite(exchangeBalance)&&exchangeBalance>=exchangeMin&&exchangeUrl?
         h('a',{class:'btn btn-primary btn-block',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
           rules.button||'Обменять баланс на скидку'):null;
-      const achBox=h('div',{class:'cab-achievements'},h('h4',null,'🏆 Кукольные достижения BOK'),h('p',{class:'hint'},'Загружаем ачивки…'));
-      api.post('achPublic',{url:p.url}).then(data=>{
-        if(!data||!data.ok){fill(achBox,h('h4',null,'🏆 Достижения'),h('p',{class:'hint'},'Достижения появятся после обновления сервера.'));return;}
-        const earned=(data.achievements||[]).filter(x=>x.earned).length;
-        fill(achBox,h('h4',null,'🏆 Достижения · '+earned+' из '+(data.achievements||[]).length),
-          h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(125px,1fr))',gap:'8px'}},
-            ...(data.achievements||[]).map(a=>h('div',{class:'gift-item',style:{opacity:a.earned?'1':'.5',padding:'10px',textAlign:'center'}},
-              h('div',{style:{fontSize:'26px'}},a.earned?a.emoji:'🔒'),
-              h('b',null,a.title),h('div',{class:'meta'},a.description+' · '+a.target),
-              a.earned?h('div',{class:'meta'},'Получено ✓'):h('div',{class:'meta'},'Пока не получено')))));
-      }).catch(()=>fill(achBox,h('p',{class:'hint'},'Сервис достижений временно недоступен.')));
+      // BOK 6.7.16: Xbox-style progress cards. Never guess missing historic
+      // progress: old GAS returns award flags, not quantitative metrics.
+      const achBox=h('section',{class:'cab-achievements bok-achievements'});
+      const achDetails=h('details',{class:'bok-ach-details',open:true});
+      const achCount=h('span',{class:'bok-ach-count'},'Загружаем…');
+      const achHeading=h('span',{class:'bok-ach-heading'},
+        h('span',{class:'bok-ach-trophy','aria-hidden':'true'},'🏆'),
+        h('span',null,'Достижения · ',achCount));
+      const achToggle=h('span',{class:'bok-ach-toggle','aria-hidden':'true'},'Свернуть ⌃');
+      const achSummary=h('summary',{class:'bok-ach-summary'},achHeading,achToggle);
+      const achBody=h('div',{class:'bok-ach-body'},
+        h('p',{class:'hint'},'Загружаем достижения…'));
+      achDetails.appendChild(achSummary);
+      achDetails.appendChild(achBody);
+      achBox.appendChild(achDetails);
+      achDetails.addEventListener('toggle',()=>{
+        achToggle.textContent=achDetails.open?'Свернуть ⌃':'Развернуть ⌄';
+      });
+      const achIconMap={
+        streak5:'🧵',streak10:'🧶',streak15:'👑',
+        visits10:'👧',visits20:'🎀',visits30:'🏰',
+        tickets5:'🎟️',tickets10:'🧳',tickets15:'🚂',
+        friend10:'💝',miss3:'😴',
+        freeze1:'❄️',thaw1:'🧊',
+        exchange30:'🏅',exchange60:'🎁',exchange90:'🗝️'
+      };
+      const achCard=a=>{
+        const earned=!!a.earned,target=Math.max(1,Number(a.target)||1);
+        const hasProgress=a.progress!==null&&a.progress!==undefined&&
+          a.progress!==''&&Number.isFinite(Number(a.progress));
+        const progress=earned?target:hasProgress?Math.min(target,Math.max(0,Number(a.progress))):null;
+        const pct=progress===null?0:Math.min(100,Math.round(progress/target*100));
+        const progressLabel=progress===null?'Прогресс не рассчитан':
+          (Math.round(progress*100)/100)+'/'+target+' · '+pct+'%';
+        const tone=earned?' bok-ach-earned':' bok-ach-locked';
+        const icon=achIconMap[String(a.id)]||String(a.emoji||'🏆');
+        return h('article',{class:'bok-ach-card'+tone,title:String(a.title||'Достижение')},
+          h('div',{class:'bok-ach-illustration','aria-hidden':'true'},
+            h('span',{class:'bok-ach-art'},icon)),
+          h('div',{class:'bok-ach-copy'},
+            h('div',{class:'bok-ach-title'},String(a.title||'Достижение')),
+            h('div',{class:'bok-ach-description'},String(a.description||'')+
+              (Number(a.target)>0?' · '+a.target:'')),
+            h('div',{class:'bok-ach-progress-label'},progressLabel),
+            h('div',{class:'bok-ach-track',role:'progressbar',
+              'aria-label':'Прогресс: '+String(a.title||''),
+              'aria-valuemin':'0','aria-valuemax':String(target),
+              'aria-valuenow':String(progress===null?0:progress)},
+              h('span',{class:'bok-ach-progress-fill',style:{width:pct+'%'}}))),
+          h('span',{class:'bok-ach-status','aria-label':earned?'Получено':'Ещё не получено'},
+            earned?'✓':'🔒'));
+      };
+      const showAchievementData=data=>{
+        if(!data||!data.ok||!Array.isArray(data.achievements))
+          throw Error('Некорректный ответ достижений');
+        const achievements=data.achievements;
+        const earned=achievements.filter(x=>x.earned).length;
+        achCount.textContent=earned+' из '+achievements.length;
+        const grid=h('div',{class:'bok-ach-grid'},...achievements.map(achCard));
+        fill(achBody,grid);
+      };
+      // The rich endpoint is additive, and old achievements remain available
+      // during installation of its backend routing.
+      api.post('achRich',{url:p.url}).then(data=>{
+        if(data&&data.ok&&Array.isArray(data.achievements))return data;
+        return api.post('achPublic',{url:p.url});
+      }).then(showAchievementData).catch(()=>{
+        api.post('achPublic',{url:p.url}).then(showAchievementData).catch(()=>{
+          fill(achBody,h('p',{class:'hint'},'Достижения временно недоступны.'));
+          achCount.textContent='—';
+        });
+      });
 
       // Presentation only; actual result always comes from GAS achSpin.
       const bokPrizeIcon=p=>{
