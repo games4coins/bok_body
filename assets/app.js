@@ -292,7 +292,7 @@
         e=>{error.textContent='Ошибка входа VK ID: '+(e&&e.message||'повторите вход');});
       return;
     }
-    const box=h('div',null,h('p',{class:'lead'},'Загружаем публичные данные…'));
+    const box=h('div',{class:'bok-cab-body'},h('p',{class:'lead'},'Загружаем публичные данные…'));
     const cabinetSheet=openModal([h('h3',null,identity?'👤 Личный кабинет · VK ID':'👤 Кабинет участника (без авторизации)'),box]);
     cabinetSheet.classList.add('bok-cabinet-sheet');
     const r=await api.balances();
@@ -316,7 +316,7 @@
         privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
       const showFreeze=authenticated&&verified&&(
         !!privatePlayer.frozen||(Number.isFinite(freezeBalance)&&freezeBalance>=10));
-      const freezeUI=showFreeze?h('div',{class:'cab-freeze-panel'},
+      const freezeUI=showFreeze?h('section',{class:'cab-freeze-panel bok-cab-panel'},
         h('h4',null,privatePlayer&&privatePlayer.frozen?'❄ Разморозка':'❄ Самостоятельная заморозка'),
         verified?(privatePlayer.frozen?
           h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
@@ -343,7 +343,7 @@
         privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
       const exchangeUrl=safeUrl(rules.url);
       const exchangeUI=authenticated&&exchangeMin>0&&Number.isFinite(exchangeBalance)&&exchangeBalance>=exchangeMin&&exchangeUrl?
-        h('a',{class:'btn btn-primary btn-block',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
+        h('a',{class:'btn btn-primary btn-block bok-cab-exchange',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
           rules.button||'Обменять баланс на скидку'):null;
       // BOK 6.7.16: Xbox-style progress cards. Never guess missing historic
       // progress: old GAS returns award flags, not quantitative metrics.
@@ -590,7 +590,7 @@
         document.addEventListener('keydown',onKey);
         closeButton.focus();
       }
-      const wheelBox=h('div',{class:'cab-wheel'});
+      const wheelBox=h('section',{class:'cab-wheel bok-cab-panel bok-cab-wheel'});
       if(authenticated){
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
@@ -623,7 +623,7 @@
           }},'🎡 Крутить барабан');
           fill(wheelBox,h('h4',null,'🎡 Барабан удачи · '+data.spins+' вращений'),
             bokWheelArt(data),
-            button,h('h4',null,'📦 Мои призы'),
+            button,h('h4',null,'📦 Призы барабана'),
             ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));return h('div',{class:'gift-item'},h('span',{style:{fontSize:'21px',marginRight:'8px'}},prize?String(prize.emoji||'🎁'):bokPrizeIcon(w)),w.title+' · '+w.status);}):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
         loadWheel();
@@ -633,7 +633,7 @@
         ?privateDeposit.history:[];
       const depositHasBalance=Number.isFinite(depositBalance)&&depositBalance!==0;
       const depositUI=authenticated&&verified&&(depositHasBalance||depositHistory.length>0)?
-        h('div',{class:'cab-deposit'},
+        h('section',{class:'cab-deposit bok-cab-panel'},
           h('h4',null,'💳 Тестовый баланс для бронирования'),
           depositHasBalance?h('div',null,
             h('p',{class:'lead'},'Доступно: '+depositBalance+' ₽'),
@@ -644,12 +644,40 @@
               h('b',null,(Number(op.amount)>0?'+':'')+op.amount+' ₽ · '+op.type),
               h('div',{class:'meta'},String(op.date||'').slice(0,10)+' · Эфир №'+
                 (op.event||'—')+' · '+(op.numbers||'')+' · '+(op.note||''))))):null):null;
-      fill(box,h('button',{class:'btn btn-ghost btn-sm',onclick:()=>showSearch(true)},'← Сменить участника'),
-        h('div',{class:'cab-profile'},avatar(p.name,p.photo,112),h('div',null,h('h3',{class:p.frozen?'frozen-name':''},p.name),h('p',{class:'meta'},authenticated?(identity.restored?'VK ID · вход сохранён на устройстве':'VK ID · вход выполнен'):'Публичная карточка · без авторизации'))),
-        h('div',{class:'cab-stats'},h('div',null,'🎟 Баланс: ',h('b',null,privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:(p.bal==null?'Скрыт':p.bal))),h('div',null,'❌ Пропуски: ',h('b',null,p.miss)),h('div',null,'🏆 Победы: ',h('b',null,p.wins||0)),h('div',null,p.frozen?'❄ Заморожен':'Активен')),
-        p.frozen?h('p',{class:'msg'},left===null?'❄ Бессрочная заморозка по старым правилам':'❄ До бесплатной разморозки осталось '+left+' дн.'):null,
-        authenticated?freezeUI:null,exchangeUI,depositUI,achBox,authenticated?wheelBox:null,h('h4',null,'🎁 Подарки'),h('div',{class:'gift-list'},(p.gifts||[]).length?(p.gifts||[]).map(g=>h('div',{class:'gift-item'},h('b',null,g.title),' · ',g.received?'✅ Получен '+(g.receivedAt||''):'📦 Ожидает выдачи')):h('p',{class:'hint'},'Подарков пока нет')),
-        h('p',{class:'hint'},authenticated?'Действия с балансом подтверждены VK ID.':'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
+      const cabStat=(symbol,label,value,tone='')=>h('div',{class:'bok-cab-stat'+(tone?' bok-cab-stat--'+tone:'')},
+        h('span',{class:'bok-cab-stat-icon','aria-hidden':'true'},symbol),
+        h('span',{class:'bok-cab-stat-copy'},
+          h('span',{class:'bok-cab-stat-label'},label),
+          h('b',{class:'bok-cab-stat-value'},String(value))));
+      const stats=h('div',{class:'cab-stats'},
+        cabStat('🎟️','Баланс',privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:(p.bal==null?'Скрыт':p.bal),'balance'),
+        cabStat('❌','Пропуски',p.miss,'misses'),
+        cabStat('🏆','Победы',p.wins||0,'wins'),
+        cabStat(p.frozen?'❄️':'🌷','Статус',p.frozen?'Заморожен':'Активен',p.frozen?'frozen':'active'));
+      const gifts=h('section',{class:'bok-cab-panel bok-cab-gifts'},
+        h('h4',null,'🎁 Подарки эфиров'),
+        h('div',{class:'gift-list'},(p.gifts||[]).length?(p.gifts||[]).map(g=>
+          h('div',{class:'gift-item'},
+            h('b',null,g.title),
+            h('span',{class:'bok-cab-gift-status'},g.received?'✅ Получен '+(g.receivedAt||''):'📦 Ожидает выдачи')))
+          :h('p',{class:'hint'},'Подарков пока нет')));
+      fill(box,
+        h('button',{class:'btn btn-ghost btn-sm bok-cab-change',onclick:()=>showSearch(true)},'← Сменить участника'),
+        h('div',{class:'cab-profile'},
+          h('div',{class:'bok-cab-avatar'},avatar(p.name,p.photo,112)),
+          h('div',{class:'bok-cab-profile-copy'},
+            h('h3',{class:p.frozen?'frozen-name':''},p.name),
+            h('p',{class:'meta bok-cab-auth-meta'},authenticated?
+              (identity.restored?'VK ID · вход сохранён на устройстве':'VK ID · вход выполнен'):
+              'Публичная карточка · без авторизации'))),
+        stats,
+        p.frozen?h('p',{class:'msg bok-cab-freeze-note'},left===null?
+          '❄ Бессрочная заморозка по старым правилам':
+          '❄ До бесплатной разморозки осталось '+left+' дн.'):null,
+        authenticated?freezeUI:null,exchangeUI,depositUI,achBox,authenticated?wheelBox:null,gifts,
+        h('p',{class:'hint bok-cab-footer-note'},authenticated?
+          'Действия с балансом подтверждены VK ID.':
+          'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
     };
     let searchSeq=0;
     const vkSlug=value=>{
