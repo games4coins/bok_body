@@ -863,3 +863,28 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-cabinet-sheet .bok-cab-panel>h4{font-size:17px}
   .bok-cabinet-sheet .bok-cab-panel{padding:14px 12px}
 }
+
+/* BOK 6.7.20 — admin achievement prize journal controls, read-only filtering. */
+.bok-win-journal{margin-top:25px;padding:19px;border:1px solid #ead6c3;border-radius:21px;background:linear-gradient(135deg,#fffcf8,#fff5ea);box-shadow:0 4px 18px rgba(109,65,39,.09)}
+.bok-win-journal>h3{margin:0 0 7px;font-size:clamp(19px,2.8vw,25px);color:#553123}
+.bok-win-journal>.hint{font-size:12px;color:#8d7060}
+.bok-win-controls{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:16px 0 12px}
+.bok-win-controls>.input{min-width:0;width:100%;max-width:100%;border:1px solid #ebd5c3;border-radius:12px;background:#fffdfa;font-size:13px;padding:11px}
+.bok-win-controls>input[type="search"]{grid-column:span 2}
+.bok-win-hide-label{display:flex;align-items:center;gap:9px;border:1px solid #e9d7c8;border-radius:12px;background:#fffcf8;padding:8px 12px;font-size:13px;font-weight:800;color:#694333;cursor:pointer}
+.bok-win-hide-label input{accent-color:#bf6529;width:17px;height:17px;flex:none}
+.bok-win-meta{font-size:12px;font-weight:750;color:#806452;margin:10px 0}
+.bok-win-list{display:grid;gap:8px}
+.bok-win-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border:1px solid #efdac6;border-radius:15px;background:#fffefd;box-shadow:0 2px 7px rgba(99,49,22,.04)}
+.bok-win-row-main{flex:1;min-width:0;display:grid;gap:5px}
+.bok-win-row-name{font-size:15px;font-weight:900;color:#553123;overflow-wrap:anywhere}
+.bok-win-row-prize{font-size:13px;color:#72513f;overflow-wrap:anywhere}
+.bok-win-row-meta{display:flex;gap:7px 12px;align-items:center;flex-wrap:wrap;color:#9b7e6c;font-size:11px}
+.bok-win-pill{display:inline-flex;border-radius:99px;padding:4px 9px;font-size:11px;font-weight:800;line-height:1.2}
+.bok-win-pill.is-issued{background:#e6f1e9;color:#347a54}
+.bok-win-pill.is-pending{background:#fff0d6;color:#9a591d}
+.bok-win-row>.btn{flex:none;max-width:190px;white-space:normal;font-size:12px}
+.bok-win-pagination{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.bok-win-pagination>span{font-size:13px;font-weight:750;color:#72513f}
+@media(max-width:760px){.bok-win-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.bok-win-controls>input[type="search"]{grid-column:span 2}}
+@media(max-width:480px){.bok-win-journal{margin:20px -9px 0;padding:13px;border-radius:15px}.bok-win-row{padding:12px;align-items:flex-start;flex-direction:column}.bok-win-row>.btn{max-width:100%}.bok-win-controls{gap:7px}.bok-win-controls>.input{font-size:12px;padding:9px}.bok-win-hide-label{font-size:12px}}
