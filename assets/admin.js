@@ -383,6 +383,103 @@
   }
 
   // ───── Достижения и барабан ─────
+  // BOK 6.7.20: client-only viewing of the last 300 prize wins.
+  // Filtering/sorting never modifies Google Sheets or participant balances.
+  function bokWinJournal(wins,playerNames,onIssued){
+    const rows=Array.isArray(wins)?wins.slice():[];
+    const state={search:'',status:'all',prize:'all',sort:'recent',hideIssued:false,page:0,pageSize:25};
+    const nameOf=w=>String(playerNames.get(String(w.key))||('VK ID '+w.key));
+    const statusOf=w=>String(w.status||'Не указан');
+    const isIssued=w=>statusOf(w).toUpperCase()==='ВЫДАН';
+    const dateOf=w=>{
+      const value=w.date||w.createdAt||w.ts||w.time||'';
+      if(!value)return '';
+      if(typeof value==='number'){
+        const d=new Date(value<1e12?value*1000:value);
+        return Number.isNaN(d.getTime())?'':d.toLocaleString('ru-RU');
+      }
+      return String(value);
+    };
+    const search=h('input',{class:'input',type:'search',placeholder:'Участник, VK ID, приз, номер записи…',
+      'aria-label':'Поиск по журналу',oninput:e=>{state.search=norm(e.target.value.trim());state.page=0;draw();}});
+    const statusOptions=[...new Set(rows.map(statusOf))].sort((a,b)=>a.localeCompare(b,'ru'));
+    const status=h('select',{class:'input','aria-label':'Статус выигрыша',onchange:e=>{
+      state.status=e.target.value;state.page=0;draw();
+    }},h('option',{value:'all'},'Все статусы'),...statusOptions.map(v=>h('option',{value:v},v)));
+    const prizeOptions=[...new Set(rows.map(w=>String(w.title||'Приз без названия')))].sort((a,b)=>a.localeCompare(b,'ru'));
+    const prize=h('select',{class:'input','aria-label':'Название приза',onchange:e=>{
+      state.prize=e.target.value;state.page=0;draw();
+    }},h('option',{value:'all'},'Все призы'),...prizeOptions.map(v=>h('option',{value:v},v)));
+    const sort=h('select',{class:'input','aria-label':'Сортировка выигрышей',onchange:e=>{
+      state.sort=e.target.value;state.page=0;draw();
+    }},...[
+      ['recent','Сначала новые'],['old','Сначала старые'],['nameAsc','Участники А–Я'],
+      ['nameDesc','Участники Я–А'],['prizeAsc','По названию приза'],['statusAsc','По статусу']
+    ].map(([v,label])=>h('option',{value:v},label)));
+    const pageSize=h('select',{class:'input','aria-label':'Количество записей на странице',onchange:e=>{
+      state.pageSize=Number(e.target.value)||25;state.page=0;draw();
+    }},...[10,25,50,100].map(n=>h('option',{value:String(n),selected:n===25},n+' записей')));
+    const hideIssued=h('input',{type:'checkbox',onchange:e=>{
+      state.hideIssued=e.target.checked;state.page=0;draw();
+    }});
+    const heading=h('h3',null,'📦 Журнал выигрышей');
+    const caption=h('p',{class:'hint'},'Фильтрация и сортировка загруженных последних 300 записей. Скрытие выданных влияет только на отображение. Ничего из журнала не удаляется.');
+    const controls=h('div',{class:'bok-win-controls'},
+      search,status,prize,sort,pageSize,
+      h('label',{class:'bok-win-hide-label'},hideIssued,h('span',null,'Скрывать выданные')));
+    const meta=h('div',{class:'bok-win-meta','aria-live':'polite'});
+    const list=h('div',{class:'bok-win-list'});
+    const pages=h('div',{class:'bok-win-pagination'});
+    const compare=(a,b)=>String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
+    const draw=()=>{
+      const q=state.search;
+      const filtered=rows.map((w,i)=>({w,i})).filter(({w})=>
+        (!state.hideIssued||!isIssued(w))&&
+        (state.status==='all'||statusOf(w)===state.status)&&
+        (state.prize==='all'||String(w.title||'Приз без названия')===state.prize)&&
+        (!q||norm([nameOf(w),w.key,w.title,w.id,statusOf(w),dateOf(w)].join(' ')).includes(q)));
+      filtered.sort((a,b)=>{
+        if(state.sort==='old')return a.i-b.i;
+        if(state.sort==='nameAsc')return compare(nameOf(a.w),nameOf(b.w))||a.i-b.i;
+        if(state.sort==='nameDesc')return compare(nameOf(b.w),nameOf(a.w))||a.i-b.i;
+        if(state.sort==='prizeAsc')return compare(a.w.title,b.w.title)||a.i-b.i;
+        if(state.sort==='statusAsc')return compare(statusOf(a.w),statusOf(b.w))||a.i-b.i;
+        return b.i-a.i;
+      });
+      const totalPages=Math.max(1,Math.ceil(filtered.length/state.pageSize));
+      state.page=Math.min(state.page,totalPages-1);
+      meta.textContent='Показано '+filtered.length+' из '+rows.length+
+        ' · Ожидают '+rows.filter(w=>!isIssued(w)).length+
+        ' · Выданы '+rows.filter(isIssued).length;
+      const visible=filtered.slice(state.page*state.pageSize,(state.page+1)*state.pageSize);
+      fill(list,visible.length?visible.map(({w})=>
+        h('article',{class:'bok-win-row'},
+          h('div',{class:'bok-win-row-main'},
+            h('div',{class:'bok-win-row-name'},nameOf(w)),
+            h('div',{class:'bok-win-row-prize'},String(w.title||'Приз без названия')),
+            h('div',{class:'bok-win-row-meta'},
+              h('span',{class:'bok-win-pill'+(isIssued(w)?' is-issued':' is-pending')},statusOf(w)),
+              dateOf(w)?h('span',null,dateOf(w)):null,
+              w.id!=null?h('span',null,'№ '+w.id):null)),
+          !isIssued(w)?h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
+            if(!confirm('Подтвердить выдачу приза «'+String(w.title||'')+'» участнику '+nameOf(w)+'?'))return;
+            const result=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
+            if(result)onIssued();
+          }},'✓ Отметить выданным'):null
+        )):h('p',{class:'hint'},'По выбранным фильтрам ничего не найдено.'));
+      fill(pages,
+        h('button',{class:'btn btn-soft btn-sm',disabled:state.page===0,onclick:()=>{
+          state.page--;draw();
+        }},'← Назад'),
+        h('span',null,'Страница '+(state.page+1)+' из '+totalPages),
+        h('button',{class:'btn btn-soft btn-sm',disabled:state.page>=totalPages-1,onclick:()=>{
+          state.page++;draw();
+        }},'Вперёд →'));
+    };
+    const box=h('section',{class:'bok-win-journal'},heading,caption,controls,meta,list,pages);
+    draw();return box;
+  }
+
   let achViewSeq=0;
   async function achievementsView(){
     const requestSeq=++achViewSeq;
@@ -460,13 +557,7 @@
         const x=await act('adminAchPrize',{id:prizeId.value.trim()||undefined,title:prizeTitle.value,emoji:prizeEmoji.value,weight:Number(prizeWeight.value),stock:prizeStock.value,active:active.checked});
         if(x){toast('Приз сохранён');achievementsView();}
       }},'Сохранить приз'),
-      h('h3',null,'📦 Выигрыши · последние 300'),
-      ...((data.wins||[]).length?(data.wins||[]).map(w=>h('div',{class:'gift-item'},(playerNames.get(String(w.key))||('VK ID '+w.key))+' · '+w.title+' · '+w.status,
-        w.status==='ОЖИДАЕТ'?h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
-          if(!confirm('Подтвердить выдачу приза?'))return;
-          const x=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
-          if(x)achievementsView();
-        }},'Отметить выданным'):null)):[h('p',{class:'hint'},'Выигрышей пока нет')]));
+      bokWinJournal(data.wins||[],playerNames,achievementsView));
   }
 
   // ───── Очередь броней ─────
