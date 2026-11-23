@@ -439,7 +439,7 @@
         const emoji=String(p&&p.emoji||p&&p.icon||'').trim();
         // Some older prize records have placeholder punctuation rather than
         // a real pictogram. Never draw those as exclamation-mark sectors.
-        if(emoji&&!/^[!?！？❗❕‼�□\s]+$/u.test(emoji))return emoji.slice(0,12);
+        if(emoji&&!/^[!?！？❗❕‼❔❓�□\s]+$/u.test(emoji))return emoji.slice(0,12);
         const t=String(p&&p.title||'').toLowerCase();
         if(/разблок|ачив|достижен/.test(t))return '🏅';
         if(/сброс|пропуск/.test(t))return '🔄';
