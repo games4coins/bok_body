@@ -211,7 +211,11 @@
   }
 
   // ───── Клиент API ─────
+  // Opt-in, payload-free timing: append ?bok_perf=1 and inspect the console.
+  // Never log access tokens, passwords, bodies, user IDs, or response data.
+  const BOK_API_PERF=new URLSearchParams(window.location.search).has('bok_perf');
   async function call(method, action, payload) {
+    const started=BOK_API_PERF?performance.now():0;
     if (DEMO) { await new Promise((r) => setTimeout(r, 120)); return Demo.handle(action, payload || {}); }
     try {
       let r;
@@ -226,6 +230,8 @@
       return data;
     } catch (e) {
       return { ok: false, error: { code: 'NETWORK', message: 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' } };
+    } finally {
+      if(BOK_API_PERF)console.info('[BOK API] '+String(action)+' · '+Math.round(performance.now()-started)+' мс');
     }
   }
   // Public, read-only balances: small in-tab cache and in-flight deduplication.
