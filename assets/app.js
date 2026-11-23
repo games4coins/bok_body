@@ -444,68 +444,121 @@
         if(/кукл|тел|bjd/.test(t))return '🧸';
         return '🎁';
       };
+      // BOK 6.7.21. Premium animated wheel: every sector still comes from
+      // the actual GAS catalogue, so the stop angle always matches the prize.
       const bokWheelArt=data=>{
-        // SVG sectors and icons are rendered together, independent of CSS conic gradients.
-        // The catalog is strictly server-supplied; spin outcome is always determined by GAS.
         const catalog=Array.isArray(data.prizes)?data.prizes:null;
-        const stage=h('div',{class:'bok-wheel-stage',style:{
-          width:'268px',height:'268px',minHeight:'268px',margin:'16px auto 22px',
-          position:'relative',display:'flex',alignItems:'center',justifyContent:'center'}});
-        const disc=h('div',{class:'bok-wheel-disc',role:'img',
-          'aria-label':'Барабан с призами',
-          style:{position:'relative',display:'block',flex:'0 0 232px',width:'232px',
-            height:'232px',minWidth:'232px',minHeight:'232px',borderRadius:'50%',
-            background:'#f7dec2',overflow:'hidden'}});
-        const svgNS='http://www.w3.org/2000/svg';
-        const makeSvg=(tag,attrs,text)=>{
-          const el=document.createElementNS(svgNS,tag);
-          Object.keys(attrs||{}).forEach(k=>el.setAttribute(k,String(attrs[k])));
-          if(text!=null)el.textContent=String(text);
-          return el;
-        };
-        const graphic=makeSvg('svg',{viewBox:'0 0 240 240',width:'100%',height:'100%',
-          preserveAspectRatio:'xMidYMid meet','aria-hidden':'true'});
-        graphic.style.display='block';
-        const colors=['#f6b3be','#f6daaa','#aedbd8','#c6b8ed','#f6c5a8',
-          '#c4dcb2','#f1b5d7','#efdc9f','#b7d9f1','#e2c6ae','#c3e4d4','#e7bbcc'];
         const sectors=catalog?catalog.filter(p=>p&&p.active!==false&&Number(p.weight)>0&&
           (p.stock==null||Number(p.stock)>0)):[];
+        const stage=h('div',{class:'bok-wheel-stage bok-wheel-luxe',role:'group',
+          'aria-label':'Барабан удачи BOK Body'});
+        const halo=h('div',{class:'bok-wheel-halo','aria-hidden':'true'});
+        const disc=h('div',{class:'bok-wheel-disc bok-wheel-luxe-disc',role:'img',
+          'aria-label':'Призовые сектора: '+sectors.map(p=>String(p.title||'')).join(', ')});
+        const ns='http://www.w3.org/2000/svg';
+        const svg=(tag,attrs,txt)=>{
+          const el=document.createElementNS(ns,tag);
+          for(const [k,v] of Object.entries(attrs||{}))el.setAttribute(k,String(v));
+          if(txt!==undefined)el.textContent=String(txt);
+          return el;
+        };
+        const graphic=svg('svg',{viewBox:'0 0 300 300',width:'100%',height:'100%',
+          preserveAspectRatio:'xMidYMid meet','aria-hidden':'true'});
+        const defs=svg('defs');
+        const gradient=(id,stops,radial)=>{
+          const g=svg(radial?'radialGradient':'linearGradient',
+            radial?{id,cx:'40%',cy:'28%',r:'80%'}:{id,x1:'0%',y1:'0%',x2:'70%',y2:'100%'});
+          stops.forEach(([offset,color])=>g.appendChild(svg('stop',{offset,'stop-color':color})));
+          defs.appendChild(g);
+        };
+        gradient('bok-metal',[['0%','#fff9d7'],['18%','#d99a51'],['42%','#ffe6a2'],
+          ['65%','#a66634'],['86%','#f2bf72'],['100%','#8f4b2d']]);
+        gradient('bok-rose',[['0%','#fff1ec'],['53%','#f5bfd0'],['100%','#d989aa']]);
+        gradient('bok-peach',[['0%','#fff7de'],['53%','#ffd9c4'],['100%','#f2a4a9']]);
+        gradient('bok-lilac',[['0%','#fdf0ff'],['55%','#e8c5ec'],['100%','#cc9dd8']]);
+        gradient('bok-ivory',[['0%','#fffaf1'],['65%','#ffeada'],['100%','#f9b9bb']]);
+        gradient('bok-center',[['0%','#fffefa'],['35%','#ffe1ca'],['100%','#e5a47b']],true);
+        gradient('bok-bulb',[['0%','#ffffff'],['35%','#fff0b1'],['100%','#ffbd4a']],true);
+        graphic.appendChild(defs);
+        // Three golden metal rings, illustrated lights and real prize sectors.
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:148,fill:'url(#bok-metal)',
+          stroke:'#fff4ce','stroke-width':2}));
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:141,fill:'#b77949',
+          stroke:'#fff6d2','stroke-width':1.4}));
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:128,fill:'#f6d2c6'}));
         if(sectors.length){
-          const n=sectors.length;
-          const radius=119,iconRadius=n>12?82:83;
+          const n=sectors.length,R=127,iconR=n>13?103:n>9?100:101;
+          const palette=['bok-rose','bok-peach','bok-lilac','bok-ivory'];
           sectors.forEach((p,i)=>{
             const t0=-Math.PI/2+i*2*Math.PI/n,t1=-Math.PI/2+(i+1)*2*Math.PI/n;
-            const point=t=>[120+radius*Math.cos(t),120+radius*Math.sin(t)];
+            const point=t=>[150+R*Math.cos(t),150+R*Math.sin(t)];
             const a=point(t0),b=point(t1);
-            const d=n===1
-              ?'M 120 1 A 119 119 0 1 1 119.99 1 Z'
-              :'M120 120 L'+a[0]+' '+a[1]+' A'+radius+' '+radius+' 0 '+(2*Math.PI/n>Math.PI?1:0)+' 1 '+b[0]+' '+b[1]+' Z';
-            graphic.appendChild(makeSvg('path',{d,fill:colors[i%colors.length],
-              stroke:'#fff4e7','stroke-width':'1.3'}));
-            const t=(t0+t1)/2,px=120+iconRadius*Math.cos(t),py=120+iconRadius*Math.sin(t);
-            const icon=String(p.emoji||'🎁').trim()||'🎁';
-            graphic.appendChild(makeSvg('text',{x:px,y:py,'font-size':n>14?'17':n>10?'20':n>7?'25':'31',
-              'text-anchor':'middle','dominant-baseline':'central',
-              'font-family':'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif'},icon));
+            const shape=n===1
+              ?'M150 23 A127 127 0 1 1 149.99 23 Z'
+              :'M150 150 L'+a[0].toFixed(3)+' '+a[1].toFixed(3)+
+                ' A127 127 0 '+(2*Math.PI/n>Math.PI?1:0)+' 1 '+
+                b[0].toFixed(3)+' '+b[1].toFixed(3)+' Z';
+            const group=svg('g');
+            group.appendChild(svg('path',{d:shape,
+              fill:'url(#'+palette[i%palette.length]+')',
+              stroke:'#da9d6c','stroke-width':1.4,'stroke-linejoin':'round'}));
+            group.appendChild(svg('title',{},String(p.title||'Приз')));
+            const t=(t0+t1)/2,x=150+iconR*Math.cos(t),y=150+iconR*Math.sin(t);
+            const secret=/секрет|сюрприз|тайн|\\?/.test(String(p.title||'').toLowerCase())||
+              /^[?❔❓]$/.test(String(p.emoji||'').trim());
+            if(secret){
+              group.appendChild(svg('circle',{cx:x,cy:y,r:n>11?13:17,
+                fill:'url(#bok-center)',stroke:'#bd804a','stroke-width':2}));
+              group.appendChild(svg('text',{x,y:y+1,'font-size':n>11?17:25,
+                'text-anchor':'middle','dominant-baseline':'central','font-weight':900,
+                fill:'#a45247','font-family':'Georgia,serif'},'?'));
+            }else{
+              group.appendChild(svg('text',{x,y:y+2,'font-size':n>14?17:n>10?22:n>7?30:35,
+                'text-anchor':'middle','dominant-baseline':'central',
+                'font-family':'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif'},
+                bokPrizeIcon(p)));
+            }
+            graphic.appendChild(group);
           });
         }else{
-          graphic.appendChild(makeSvg('circle',{cx:120,cy:120,r:118,fill:'#f2dcc3'}));
-          graphic.appendChild(makeSvg('text',{x:120,y:110,'text-anchor':'middle','font-size':44},'🎁'));
-          graphic.appendChild(makeSvg('text',{x:120,y:144,'text-anchor':'middle','font-size':13,fill:'#815c46'},
-            catalog?'Нет доступных призов':'Каталог загружается'));
+          graphic.appendChild(svg('circle',{cx:150,cy:150,r:124,fill:'url(#bok-ivory)'}));
+          graphic.appendChild(svg('text',{x:150,y:120,'font-size':42,'text-anchor':'middle'},'🎁'));
+          graphic.appendChild(svg('text',{x:150,y:148,'font-size':12,'text-anchor':'middle',fill:'#8e6649'},
+            catalog?'Нет доступных призов':'Загружаем призы'));
         }
-        graphic.appendChild(makeSvg('circle',{cx:120,cy:120,r:25,
-          fill:'#fff3d5',stroke:'#ae7648','stroke-width':4}));
-        graphic.appendChild(makeSvg('text',{x:120,y:129,'text-anchor':'middle',
-          'font-size':29,fill:'#9d5e36'},'✦'));
+        // The same 300px SVG spins as the sectors: no stale decorative sectors
+        // and no mismatch between a drawn prize and server-side selection.
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:128,fill:'none',
+          stroke:'#fff9e0','stroke-width':2.4}));
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:135,fill:'none',
+          stroke:'#9a5d33','stroke-width':3.8}));
+        for(let i=0;i<32;i++){
+          const angle=i*2*Math.PI/32-Math.PI/2;
+          const x=150+139*Math.cos(angle),y=150+139*Math.sin(angle);
+          graphic.appendChild(svg('circle',{cx:x.toFixed(2),cy:y.toFixed(2),
+            r:i%4===0?4.4:2.3,fill:i%4===0?'url(#bok-bulb)':'#ffedbd',
+            stroke:'#c78d4f','stroke-width':i%4===0?.7:.35,
+            class:i%4===0?'bok-wheel-bulb':'bok-wheel-rivet',
+            style:'--lamp-phase:'+((i%8)*.13)+'s'}));
+        }
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:37,fill:'url(#bok-metal)',
+          stroke:'#fff5d7','stroke-width':2.1}));
+        graphic.appendChild(svg('circle',{cx:150,cy:150,r:31,fill:'url(#bok-center)',
+          stroke:'#bb8450','stroke-width':1.6}));
+        graphic.appendChild(svg('text',{x:150,y:145,'font-size':21,fill:'#a16b3d',
+          'font-family':'Georgia,serif','text-anchor':'middle'},'BOK'));
+        graphic.appendChild(svg('text',{x:150,y:161,'font-size':16,fill:'#a16b3d',
+          'font-family':'Georgia,serif','text-anchor':'middle'},'Body'));
+        graphic.appendChild(svg('text',{x:150,y:176,'font-size':11,
+          'text-anchor':'middle'},'🎀'));
         disc.appendChild(graphic);
-        stage.appendChild(h('span',{class:'bok-wheel-pointer','aria-hidden':'true'},'▼'));
+        stage.appendChild(halo);
         stage.appendChild(disc);
-        if(!catalog){
-          const hint=h('p',{class:'hint',style:{margin:'0 auto 12px',textAlign:'center'}},
-            'Каталог призов не получен от GAS. Обновите развёртывание, чтобы показать настоящие иконки.');
-          return h('div',null,stage,hint);
-        }
+        const pointer=h('span',{class:'bok-wheel-jewel-pointer','aria-hidden':'true'},'◆');
+        stage.appendChild(pointer);
+        if(!catalog)return h('div',null,stage,
+          h('p',{class:'hint',style:{textAlign:'center'}},
+            'Каталог призов недоступен. Обновите сервер и кабинет.'));
         return stage;
       };
       // Smooth animation with an accurate final sector. GAS is always the sole
