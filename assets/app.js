@@ -674,7 +674,12 @@
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
           const catalogReady=Array.isArray(data.prizes)&&data.prizes.some(p=>p&&p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0));
-          const button=h('button',{class:'btn btn-primary btn-block',disabled:Number(data.spins)<1||(Array.isArray(data.prizes)&&!catalogReady),onclick:async()=>{
+          // An unfinished server transaction MUST be retriable using the same
+          // requestId even when the last available spin has been debited.
+          const pendingReplay=(()=>{try{return !!localStorage.getItem('bok-wheel-pending-v1');}catch(_){return false;}})();
+          const button=h('button',{class:'btn btn-primary btn-block',
+            disabled:!pendingReplay&&(Number(data.spins)<1||(Array.isArray(data.prizes)&&!catalogReady)),
+            onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
             const animation=bokStartWheelAnimation(wheel,data.prizes);
@@ -699,7 +704,7 @@
               toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');
               loadWheel();
             }
-          }},'🎡 Крутить барабан');
+          }},pendingReplay?'↻ Восстановить вращение':'🎡 Крутить барабан');
           const counter=h('div',{class:'bok-wheel-spins-counter'},
             h('span',{class:'bok-wheel-spins-icon','aria-hidden':'true'},'🎟️'),
             h('span',null,'Доступно вращений: '),
