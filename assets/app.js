@@ -1004,7 +1004,7 @@
                 h('span',{class:'bok-wheel-history-title'},w.title),
                 h('span',{class:'bok-wheel-history-status'},w.status));
             }):[h('p',{class:'hint'},'Подарков пока нет')]));
-        }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
+        }).catch(()=>{wheelRequested=false;fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен. Закройте и откройте раздел для повторной попытки.'));});
         let wheelRequested=false;
         wheelDetails.addEventListener('toggle',()=>{
           if(wheelDetails.open&&!wheelRequested){
