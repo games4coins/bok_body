@@ -4,7 +4,9 @@
   const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO } = Nomerok;
 
   const CLIENT = clientId();
-  const POLL_MS = 8000;
+  const POLL_PEAK_MS = 8000;
+  const POLL_MIN_MS = 8000;
+  const POLL_MAX_MS = 45000;
   const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false };
   const UNCONF = ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'];
 
@@ -295,12 +297,17 @@
     const box=h('div',{class:'bok-cab-body'},h('p',{class:'lead'},'Загружаем публичные данные…'));
     const cabinetSheet=openModal([h('h3',null,identity?'👤 Личный кабинет · VK ID':'👤 Кабинет участника (без авторизации)'),box]);
     cabinetSheet.classList.add('bok-cabinet-sheet');
-    const r=await api.balances();
+    // Independent requests in parallel: the VK check no longer waits for the
+    // whole public players list. Never cache a verified VK identity.
+    const tokenAtOpen=identity&&window.BokVK&&window.BokVK.token&&window.BokVK.token();
+    const [r,verifiedSession]=await Promise.all([
+      api.balances(),
+      tokenAtOpen?api.post('vkCabinetState',{vkAccessToken:tokenAtOpen}):Promise.resolve(null)
+    ]);
     if(!r.ok){fill(box,h('p',{class:'msg err'},'Ошибка загрузки'));return;}
     const players=r.players||[],rules=r.rules||{};
     const q=h('input',{class:'input',type:'search',placeholder:'Имя или ссылка ВК',value:store('nomerok_cabinet')||store('nomerok_vk')||'',autocomplete:'off'});
     const matches=h('div');
-    const verifiedSession=identity&&window.BokVK&&window.BokVK.token&&window.BokVK.token()?await api.post('vkCabinetState',{vkAccessToken:window.BokVK.token()}):null;
     const select=async p=>{
       store('nomerok_cabinet',p.url||p.name);
       const left=p.freezeTo?Math.max(0,Math.ceil((p.freezeTo-Date.now())/86400000)):null;
@@ -316,39 +323,53 @@
         privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
       const showFreeze=authenticated&&verified&&(
         !!privatePlayer.frozen||(Number.isFinite(freezeBalance)&&freezeBalance>=10));
-      const freezeUI=showFreeze?h('section',{class:'cab-freeze-panel bok-cab-panel'},
-        h('h4',null,privatePlayer&&privatePlayer.frozen?'❄ Разморозка':'❄ Самостоятельная заморозка'),
-        verified?(privatePlayer.frozen?
-          h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
-            if(!window.confirm('Досрочно разморозить баланс со списанием 1 накопленного номерка?'))return;
-            const r=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:false,confirmPenalty:true});
-            if(r.ok){toast('Баланс разморожен');closeModal();openCabinet();}
-            else toast((r.error&&r.error.message)||'Ошибка разморозки','bad');
-          }},'Разморозить (−1 номерок)'):
-          h('div',null,h('p',{class:'hint'},'Срок заморозки: '+privateData.rules.freezeMinDays+'–'+privateData.rules.freezeMaxDays+' дней.'),
-            h('input',{class:'input',type:'number',min:privateData.rules.freezeMinDays,max:privateData.rules.freezeMaxDays,value:'14',id:'bok-freeze-days'}),
-            h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
-              const days=Number(document.getElementById('bok-freeze-days').value);
-              if(!Number.isInteger(days)||days<privateData.rules.freezeMinDays||days>privateData.rules.freezeMaxDays)return toast('Недопустимый срок','bad');
-              if(!window.confirm('Заморозить накопительный баланс на '+days+' дней?'))return;
-              const r=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:true,days:days});
-              if(r.ok){toast('Баланс заморожен');closeModal();openCabinet();}
-              else toast((r.error&&r.error.message)||'Ошибка заморозки','bad');
-            }},'Заморозить баланс'))):
-          h('div',null,h('p',{class:'msg err'},privateData&&privateData.error?privateData.error.message:'Требуется повторный вход через VK ID'),
-            h('button',{class:'btn btn-soft btn-block',onclick:()=>{window.BokVK.logout();closeModal();openCabinet();}},'Повторить вход'))
-      ):null;
+      // Compact premium account action; all state changes remain server-authenticated.
+      const freezeUI=showFreeze?h('details',{class:'bok-cab-account-action bok-cab-freeze-action'},
+        h('summary',{class:'bok-cab-account-summary'},
+          h('span',{class:'bok-cab-account-symbol','aria-hidden':'true'},privatePlayer.frozen?'🌤️':'❄️'),
+          h('span',{class:'bok-cab-account-label'},
+            h('strong',null,privatePlayer.frozen?'Разморозить накопления':'Заморозка накоплений'),
+            h('small',null,privatePlayer.frozen?'Досрочная разморозка · −1 номерок':
+              'Защита баланса на выбранный срок')),
+          h('span',{class:'bok-cab-account-chevron','aria-hidden':'true'},'⌄')),
+        h('div',{class:'bok-cab-account-content'},
+          privatePlayer.frozen?
+            h('button',{class:'btn bok-cab-account-confirm',onclick:async()=>{
+              if(!window.confirm('Досрочно разморозить баланс со списанием 1 накопленного номерка?'))return;
+              const result=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:false,confirmPenalty:true});
+              if(result.ok){toast('Баланс разморожен');closeModal();openCabinet();}
+              else toast((result.error&&result.error.message)||'Ошибка разморозки','bad');
+            }},'🌤️ Разморозить · −1 номерок'):
+          h('div',null,
+            h('p',{class:'hint'},'Срок: '+privateData.rules.freezeMinDays+'–'+privateData.rules.freezeMaxDays+' дней.'),
+            h('div',{class:'bok-cab-freeze-controls'},
+              h('label',{class:'bok-cab-days-label'},'Дней',
+                h('input',{class:'input bok-cab-days-input',type:'number',
+                  min:privateData.rules.freezeMinDays,max:privateData.rules.freezeMaxDays,
+                  value:'14',id:'bok-freeze-days'})),
+              h('button',{class:'btn bok-cab-account-confirm',onclick:async()=>{
+                const days=Number(document.getElementById('bok-freeze-days').value);
+                if(!Number.isInteger(days)||days<privateData.rules.freezeMinDays||days>privateData.rules.freezeMaxDays)return toast('Недопустимый срок','bad');
+                if(!window.confirm('Заморозить накопительный баланс на '+days+' дней?'))return;
+                const result=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:true,days:days});
+                if(result.ok){toast('Баланс заморожен');closeModal();openCabinet();}
+                else toast((result.error&&result.error.message)||'Ошибка заморозки','bad');
+              }},'❄️ Заморозить'))))):null;
       const exchangeMin=Number(rules.exchangeMin)||0;
       const exchangeBalance=Number(privatePlayer&&privatePlayer.balance!=null?privatePlayer.balance:
         privatePlayer&&privatePlayer.bal!=null?privatePlayer.bal:p.bal);
       const exchangeUrl=safeUrl(rules.url);
       const exchangeUI=authenticated&&exchangeMin>0&&Number.isFinite(exchangeBalance)&&exchangeBalance>=exchangeMin&&exchangeUrl?
-        h('a',{class:'btn btn-primary btn-block bok-cab-exchange',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
-          rules.button||'Обменять баланс на скидку'):null;
+        h('a',{class:'bok-cab-account-action bok-cab-exchange-action',href:exchangeUrl,target:'_blank',rel:'noopener noreferrer'},
+          h('span',{class:'bok-cab-account-symbol','aria-hidden':'true'},'🎟️'),
+          h('span',{class:'bok-cab-account-label'},
+            h('strong',null,'Обменять накопления'),
+            h('small',null,'Скидка за накопленные номерки')),
+          h('span',{class:'bok-cab-account-chevron','aria-hidden':'true'},'↗')):null;
       // BOK 6.7.16: Xbox-style progress cards. Never guess missing historic
       // progress: old GAS returns award flags, not quantitative metrics.
       const achBox=h('section',{class:'cab-achievements bok-achievements'});
-      const achDetails=h('details',{class:'bok-ach-details',open:true});
+      const achDetails=h('details',{class:'bok-ach-details'});
       const achCount=h('span',{class:'bok-ach-count'},'Загружаем…');
       const achHeading=h('span',{class:'bok-ach-heading'},
         h('span',{class:'bok-ach-trophy','aria-hidden':'true'},'🏆'),
@@ -362,6 +383,7 @@
       achBox.appendChild(achDetails);
       achDetails.addEventListener('toggle',()=>{
         achToggle.textContent=achDetails.open?'Свернуть ⌃':'Развернуть ⌄';
+        if(achDetails.open)loadAchievements();
       });
       const achIconMap={
         streak5:'🧵',streak10:'🧶',streak15:'👑',
@@ -418,17 +440,20 @@
         const grid=h('div',{class:'bok-ach-grid'},...achievements.map(achCard));
         fill(achBody,grid);
       };
-      // The rich endpoint is additive, and old achievements remain available
-      // during installation of its backend routing.
-      api.post('achRich',{url:p.url}).then(data=>{
-        if(data&&data.ok&&Array.isArray(data.achievements))return data;
-        return api.post('achPublic',{url:p.url});
-      }).then(showAchievementData).catch(()=>{
-        api.post('achPublic',{url:p.url}).then(showAchievementData).catch(()=>{
-          fill(achBody,h('p',{class:'hint'},'Достижения временно недоступны.'));
+      // Lazy, per-cabinet request: only load achievements if opened.
+      let achievementsRequested=false;
+      const loadAchievements=()=>{
+        if(achievementsRequested)return;
+        achievementsRequested=true;
+        api.post('achRich',{url:p.url}).then(data=>{
+          if(data&&data.ok&&Array.isArray(data.achievements))return data;
+          return api.post('achPublic',{url:p.url});
+        }).then(showAchievementData).catch(()=>{
+          fill(achBody,h('p',{class:'hint'},'Не удалось загрузить. Закройте и откройте раздел ещё раз.'));
           achCount.textContent='—';
+          achievementsRequested=false;
         });
-      });
+      };
 
       // Vector-based prize medallions. Source of truth remains GAS title/id.
       // Emoji stored in older rows are only fallback hints for the artwork.
@@ -891,7 +916,15 @@
         document.addEventListener('keydown',onKey);
         closeButton.focus();
       }
-      const wheelBox=h('section',{class:'cab-wheel bok-cab-panel bok-cab-wheel'});
+      const wheelBox=h('div',{class:'bok-cab-wheel-lazy'});
+      const wheelDetails=authenticated?h('details',{class:'bok-cab-wheel-details bok-cab-panel'},
+        h('summary',{class:'bok-cab-wheel-summary'},
+          h('span',{class:'bok-cab-account-symbol','aria-hidden':'true'},'🎡'),
+          h('span',{class:'bok-cab-account-label'},
+            h('strong',null,'Барабан удачи BOK Body'),
+            h('small',null,'Вращения, каталог и история призов')),
+          h('span',{class:'bok-cab-account-chevron','aria-hidden':'true'},'⌄')),
+        wheelBox):null;
       if(authenticated){
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
@@ -969,7 +1002,13 @@
                 h('span',{class:'bok-wheel-history-status'},w.status));
             }):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
-        loadWheel();
+        let wheelRequested=false;
+        wheelDetails.addEventListener('toggle',()=>{
+          if(wheelDetails.open&&!wheelRequested){
+            wheelRequested=true;
+            loadWheel().catch(()=>{wheelRequested=false;});
+          }
+        });
       }
       const depositBalance=verified&&privateDeposit?Number(privateDeposit.balance):0;
       const depositHistory=verified&&privateDeposit&&Array.isArray(privateDeposit.history)
@@ -1017,7 +1056,7 @@
         p.frozen?h('p',{class:'msg bok-cab-freeze-note'},left===null?
           '❄ Бессрочная заморозка по старым правилам':
           '❄ До бесплатной разморозки осталось '+left+' дн.'):null,
-        authenticated?freezeUI:null,exchangeUI,depositUI,achBox,authenticated?wheelBox:null,gifts,
+        authenticated?freezeUI:null,exchangeUI,depositUI,achBox,authenticated?wheelDetails:null,gifts,
         h('p',{class:'hint bok-cab-footer-note'},authenticated?
           'Действия с балансом подтверждены VK ID.':
           'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
