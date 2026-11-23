@@ -812,9 +812,11 @@
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const mod=n=>((n%360)+360)%360;
         // Continuous acceleration: position and speed join cruise smoothly.
+        // Integral of a smoothstep velocity curve: 0 speed at the start,
+        // exactly angularSpeed at the end of the acceleration phase.
         const accelerate=t=>angularSpeed*accelerationMs/1000*
-          (t*t/2-t*t*t/3);
-        const accelerationAngle=angularSpeed*accelerationMs/6000;
+          (t*t*t-.5*t*t*t*t);
+        const accelerationAngle=angularSpeed*accelerationMs/2000;
         const finish=()=>{
           if(stopped)return;
           stopped=true;
