@@ -905,7 +905,12 @@
             let outcome;
             try{outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token(),requestId});}
             catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
-            if(outcome&&outcome.ok)localStorage.removeItem(pendingKey);
+            // A rejected request with NO_SPINS/NO_PRIZES has not created a win
+            // for this requestId; do not leave a permanently pending button.
+            if(outcome&&(outcome.ok||
+                (outcome.error&&['NO_SPINS','NO_PRIZES'].includes(outcome.error.code)))){
+              try{localStorage.removeItem(pendingKey);}catch(_){}
+            }
             animation.choose(outcome&&outcome.ok?outcome.prize:null);
             await animation.done;
             if(outcome&&outcome.ok){
