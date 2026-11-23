@@ -1387,6 +1387,9 @@
     const free=Number(counts.free);
     if(!total||!Number.isFinite(free))return POLL_PEAK_MS;
     const ratio=free/total;
+    // While payment confirmations are still pending, released numbers can
+    // reappear at any moment: keep peak polling even if free=0.
+    if(st.overlay&&st.overlay.kind==='waiting')return POLL_PEAK_MS;
     if(ratio<=0)return 30000;
     if(ratio<=.10)return 20000;
     if(ratio<=.40)return 12000;
