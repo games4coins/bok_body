@@ -604,6 +604,14 @@
         h('button',{class:'btn btn-soft btn-sm',onclick:()=>{prizeId.value=p.id;prizeTitle.value=p.title;prizeEmoji.value=p.emoji;prizeWeight.value=p.weight;prizeStock.value=p.stock===null?'':p.stock;active.checked=p.active;}},'Изменить'))),
       h('h4',null,'Добавить / изменить приз'),prizeId,prizeTitle,prizeEmoji,prizeWeight,prizeStock,
       h('label',null,active,' Активен'),
+      h('div',{class:'bok-secret-presets'},
+        ...[['rose','❔','Секретный приз №1'],['gold','❓','Секретный приз №2']].map(([variant,icon,title])=>
+          h('button',{class:'btn btn-soft btn-sm',onclick:()=>{
+            // The presets are images, not actual prizes until explicitly saved.
+            prizeId.value='';prizeTitle.value=title;prizeEmoji.value=icon;
+            prizeWeight.value='0';prizeStock.value='';active.checked=false;
+            toast('Шаблон заполнен. Укажите вес и нажмите «Сохранить приз», когда приз будет готов.');
+          }},h('img',{src:'assets/bok-wheel-secret-'+variant+'.svg',alt:'?'}),title))),
       h('button',{class:'btn btn-primary',onclick:async()=>{
         if(!prizeTitle.value.trim())return toast('Введите название','bad');
         const x=await act('adminAchPrize',{id:prizeId.value.trim()||undefined,title:prizeTitle.value,emoji:prizeEmoji.value,weight:Number(prizeWeight.value),stock:prizeStock.value,active:active.checked});
