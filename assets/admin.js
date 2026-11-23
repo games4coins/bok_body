@@ -388,6 +388,10 @@
   function bokWinJournal(wins,playerNames,onIssued){
     const rows=Array.isArray(wins)?wins.slice():[];
     const state={search:'',status:'all',prize:'all',sort:'recent',hideIssued:false,page:0,pageSize:25};
+    const chosen=new Set();
+    let saving=false;
+    const idOf=w=>String(w.id||'');
+    const pending=w=>String(w.status||'').toUpperCase()==='ОЖИДАЕТ';
     const nameOf=w=>String(playerNames.get(String(w.key))||('VK ID '+w.key));
     const statusOf=w=>String(w.status||'Не указан');
     const isIssued=w=>statusOf(w).toUpperCase()==='ВЫДАН';
@@ -430,6 +434,43 @@
     const meta=h('div',{class:'bok-win-meta','aria-live':'polite'});
     const list=h('div',{class:'bok-win-list'});
     const pages=h('div',{class:'bok-win-pagination'});
+    const selectionInfo=h('span',{class:'bok-win-selected-count','aria-live':'polite'},'Выбрано: 0');
+    const batchMessage=h('p',{class:'hint bok-win-batch-message','aria-live':'polite'},
+      'Выберите чекбоксами несколько ожидающих призов и нажмите «Отметить выданными».');
+    const selectPage=h('button',{class:'btn btn-soft btn-sm',onclick:()=>{
+      if(saving)return;
+      list.querySelectorAll('input[data-bok-win-id]').forEach(input=>{
+        if(!input.disabled)chosen.add(input.getAttribute('data-bok-win-id'));
+      });
+      draw();
+    }},'☑ Выбрать на странице');
+    const clearSelection=h('button',{class:'btn btn-soft btn-sm',onclick:()=>{
+      if(saving)return;chosen.clear();draw();
+    }},'Снять выделение');
+    const applyBatch=h('button',{class:'btn btn-primary btn-sm',disabled:true,onclick:async()=>{
+      if(saving)return;
+      const targets=rows.filter(w=>pending(w)&&chosen.has(idOf(w)));
+      if(!targets.length)return;
+      const summary=targets.slice(0,3).map(w=>nameOf(w)+' — '+String(w.title||'')).join('\\n');
+      if(!window.confirm('Отметить выданными '+targets.length+' призов?\\n'+
+        summary+(targets.length>3?'\\n… и ещё '+(targets.length-3):'')+
+        '\\n\\nОперация изменит статусы призов в Google-таблице.'))return;
+      saving=true;draw();let updated=0,errors=0;
+      for(const w of targets){
+        batchMessage.textContent='Выдача призов: '+(updated+errors+1)+' из '+targets.length+'…';
+        try{
+          const result=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
+          if(result){w.status='ВЫДАН';chosen.delete(idOf(w));updated++;}
+          else errors++;
+        }catch(error){errors++;console.error('BOK prize issue failed',error);}
+      }
+      saving=false;
+      batchMessage.textContent='Отмечено выданными: '+updated+
+        (errors?' · Ошибок: '+errors+' — повторите оставшиеся.':' · готово, без перезагрузки.');
+      draw();
+    }},'✓ Отметить выданными');
+    const batchBar=h('div',{class:'bok-win-batchbar'},
+      selectionInfo,selectPage,clearSelection,applyBatch);
     const compare=(a,b)=>String(a).localeCompare(String(b),'ru',{numeric:true,sensitivity:'base'});
     const draw=()=>{
       const q=state.search;
@@ -451,9 +492,20 @@
       meta.textContent='Показано '+filtered.length+' из '+rows.length+
         ' · Ожидают '+rows.filter(w=>!isIssued(w)).length+
         ' · Выданы '+rows.filter(isIssued).length;
+      // Discard stale selections when a win has already been issued.
+      rows.forEach(w=>{if(!pending(w))chosen.delete(idOf(w));});
+      selectionInfo.textContent='Выбрано: '+chosen.size;
+      applyBatch.disabled=saving||chosen.size===0;
+      selectPage.disabled=saving;
+      clearSelection.disabled=saving||chosen.size===0;
       const visible=filtered.slice(state.page*state.pageSize,(state.page+1)*state.pageSize);
       fill(list,visible.length?visible.map(({w})=>
         h('article',{class:'bok-win-row'},
+          pending(w)?h('input',{type:'checkbox',class:'bok-win-check',
+            'data-bok-win-id':idOf(w),'aria-label':'Выбрать приз '+String(w.title||'')+' для '+nameOf(w),
+            checked:chosen.has(idOf(w)),disabled:saving,
+            onchange:e=>{if(e.target.checked)chosen.add(idOf(w));else chosen.delete(idOf(w));draw();}
+          }):null,
           h('div',{class:'bok-win-row-main'},
             h('div',{class:'bok-win-row-name'},nameOf(w)),
             h('div',{class:'bok-win-row-prize'},String(w.title||'Приз без названия')),
@@ -461,10 +513,10 @@
               h('span',{class:'bok-win-pill'+(isIssued(w)?' is-issued':' is-pending')},statusOf(w)),
               dateOf(w)?h('span',null,dateOf(w)):null,
               w.id!=null?h('span',null,'№ '+w.id):null)),
-          !isIssued(w)?h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
+          pending(w)?h('button',{class:'btn btn-soft btn-sm',disabled:saving,onclick:async()=>{
             if(!confirm('Подтвердить выдачу приза «'+String(w.title||'')+'» участнику '+nameOf(w)+'?'))return;
             const result=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
-            if(result)onIssued();
+            if(result){w.status='ВЫДАН';chosen.delete(idOf(w));draw();}
           }},'✓ Отметить выданным'):null
         )):h('p',{class:'hint'},'По выбранным фильтрам ничего не найдено.'));
       fill(pages,
@@ -476,7 +528,7 @@
           state.page++;draw();
         }},'Вперёд →'));
     };
-    const box=h('section',{class:'bok-win-journal'},heading,caption,controls,meta,list,pages);
+    const box=h('section',{class:'bok-win-journal'},heading,caption,controls,meta,batchBar,batchMessage,list,pages);
     draw();return box;
   }
 
