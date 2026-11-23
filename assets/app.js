@@ -716,24 +716,82 @@
             'Каталог призов недоступен. Обновите сервер и кабинет.'));
         return stage;
       };
+      // Sound synthesis runs only inside the participant's click gesture.
+      // No audio files or network requests, and a local mute preference.
+      const bokWheelSound=(enabled,count)=>{
+        const Ctx=window.AudioContext||window.webkitAudioContext;
+        if(!enabled||!Ctx)return {tick:()=>{},finish:()=>{},close:()=>{}};
+        let ctx=null,lastSector=null,lastClick=0,closed=false;
+        try{ctx=new Ctx();if(ctx.state==='suspended')ctx.resume().catch(()=>{});}
+        catch(_){return {tick:()=>{},finish:()=>{},close:()=>{}};}
+        const tone=(hz,duration,gainAmount,type='sine')=>{
+          if(closed||!ctx)return;
+          try{
+            const at=ctx.currentTime,osc=ctx.createOscillator(),gain=ctx.createGain();
+            osc.type=type;
+            osc.frequency.setValueAtTime(hz,at);
+            gain.gain.setValueAtTime(.0001,at);
+            gain.gain.exponentialRampToValueAtTime(Math.max(.0002,gainAmount),at+.008);
+            gain.gain.exponentialRampToValueAtTime(.0001,at+duration);
+            osc.connect(gain);gain.connect(ctx.destination);
+            osc.start(at);osc.stop(at+duration+.01);
+          }catch(_){}
+        };
+        return {
+          tick:(angle,now)=>{
+            if(count<2)return;
+            const sector=Math.floor((((angle%360)+360)%360)/(360/count));
+            if(lastSector===null){lastSector=sector;return;}
+            if(sector!==lastSector&&now-lastClick>70){
+              lastSector=sector;lastClick=now;
+              tone(710,.042,.014,'triangle');
+            }
+          },
+          finish:(success)=>{
+            if(success){tone(880,.18,.025);tone(1175,.24,.017);}
+          },
+          close:()=>{
+            if(!ctx)return;
+            setTimeout(()=>{closed=true;try{ctx.close();}catch(_){}} ,380);
+          }
+        };
+      };
+      const bokWheelSoundKey='bok-wheel-sound-enabled-v1';
+      const bokWheelSoundEnabled=()=>{
+        try{return localStorage.getItem(bokWheelSoundKey)!=='false';}
+        catch(_){return true;}
+      };
       // Smooth animation with an accurate final sector. GAS is always the sole
       // authority for selecting a prize. The client ONLY visualizes its response.
-      function bokStartWheelAnimation(wheel,catalog){
+      function bokStartWheelAnimation(wheel,catalog,enableSound){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
         wheel.style.transition='none';
-        wheel.classList.add('is-spinning');
+        wheel.classList.add('is-spinning','is-whirling');
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
         const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        // Shorten the animation ~3x by reducing the number of turns,
-        // NOT by multiplying angular speed. Keep smooth acceleration/braking.
+        // Short showcase: smooth ramp, cruise, gentle braking, no speed multiplier.
         const accelerationMs=reduced?100:600,
           minCruiseMs=reduced?140:1050,
           velocity=reduced?800:400,
           brakeMs=reduced?180:1800;
+        const sound=bokWheelSound(!reduced&&enableSound,eligible.length);
         let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const positiveDegrees=n=>((n%360)+360)%360;
+        let stopped=false;
+        const stop=()=>{
+          if(stopped)return;
+          stopped=true;
+          wheel.classList.remove('is-spinning','is-whirling');
+          if(matched){
+            const sector=wheel.querySelector('.bok-wheel-token[data-bok-winner="true"]');
+            if(sector)sector.classList.add('bok-wheel-token-winner');
+          }
+          sound.finish(matched);
+          sound.close();
+          resolveDone();
+        };
         function tick(now){
           if(!begin)begin=now;
           const elapsed=now-begin;
@@ -769,14 +827,22 @@
               (t3-2*t2+t)*tangential+
               (-2*t3+3*t2)*settle.to;
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
-            if(fraction>=1){wheel.classList.remove('is-spinning');resolveDone();return;}
+            if(fraction>=1){stop();return;}
           }else{
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
           }
+          sound.tick(angle,now);
           requestAnimationFrame(tick);
         }
         requestAnimationFrame(tick);
-        return {choose:prize=>{selected=prize;decided=true;},done,matched:()=>matched};
+        return {choose:prize=>{
+          selected=prize;decided=true;
+          const index=eligible.findIndex(p=>String(p.id)===String(prize&&prize.id));
+          const fallback=index<0&&prize?eligible.findIndex(p=>String(p.title)===String(prize.title)):-1;
+          const found=index>=0?index:fallback;
+          const icons=wheel.querySelectorAll('.bok-wheel-token');
+          icons.forEach((token,i)=>{if(i===found)token.dataset.bokWinner='true';});
+        },done,matched:()=>matched};
       }
 
       function bokPrizeReveal(prize,onClose,outcome){
@@ -793,7 +859,7 @@
           h('span',{style:{'--i':i}},i%3===0?'✧':'✦')));
         overlay.appendChild(h('div',{class:'bok-prize-card'},sparks,
           h('div',{class:'bok-prize-kicker'},'✨ БАРАБАН BOK BODY ✨'),
-          h('div',{class:'bok-prize-icon','aria-hidden':'true'},bokPrizeIcon(prize)),
+          h('div',{class:'bok-prize-icon bok-prize-medallion','aria-hidden':'true'},bokWheelToken(prize,7)),
           h('h3',null,isBonus?'✨ Бонусное вращение!':isNothing?'Ещё один шаг к бонусу':'Вам выпал приз!'),
           h('div',{class:'bok-prize-name'},isBonus?
             '3 раза «Ничего» = +1 вращение':isNothing?
@@ -832,7 +898,7 @@
             onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
-            const animation=bokStartWheelAnimation(wheel,data.prizes);
+            const animation=bokStartWheelAnimation(wheel,data.prizes,bokWheelSoundEnabled());
             const pendingKey='bok-wheel-pending-v1';
             let requestId=localStorage.getItem(pendingKey);
             if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
@@ -855,6 +921,15 @@
               loadWheel();
             }
           }},pendingReplay?'↻ Восстановить вращение':'🎡 Крутить барабан');
+          const mute=h('button',{type:'button',class:'bok-wheel-sound-toggle',
+            'aria-label':'Включить или выключить звук барабана',
+            'aria-pressed':String(bokWheelSoundEnabled()),
+            onclick:()=>{
+              const enabled=!bokWheelSoundEnabled();
+              try{localStorage.setItem(bokWheelSoundKey,String(enabled));}catch(_){}
+              mute.setAttribute('aria-pressed',String(enabled));
+              mute.textContent=enabled?'🔊 Звук включён':'🔇 Без звука';
+            }},bokWheelSoundEnabled()?'🔊 Звук включён':'🔇 Без звука');
           const counter=h('div',{class:'bok-wheel-spins-counter'},
             h('span',{class:'bok-wheel-spins-icon','aria-hidden':'true'},'🎟️'),
             h('span',null,'Доступно вращений: '),
@@ -873,7 +948,7 @@
           fill(wheelBox,
             h('h4',{class:'bok-wheel-title'},'👑 Барабан удачи BOK Body'),
             h('p',{class:'bok-wheel-subtitle'},'Розовое золото, счастливые сюрпризы и настоящие призы'),
-            bokWheelArt(data),counter,nothingHint,button,catalogue,
+            bokWheelArt(data),counter,nothingHint,button,mute,catalogue,
             h('h4',{class:'bok-wheel-history-heading'},'📦 Мои выигрыши'),
             ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{
               const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));
