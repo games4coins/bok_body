@@ -84,6 +84,38 @@ function bokSpinWithNothingBonus_(body){
   result.nothingIssued=bonus.issued;
   return result;
 }
+/** Auth is checked by Code.gs before calling this admin-only route.
+ * One lock, one request, no wallet changes and no redraw requirement.
+ * Re-running is safe: issued prizes keep their original issue date.
+ */
+function bokAdminWinBatch_(body){
+  body=body||{};
+  if(!Array.isArray(body.ids)||!body.ids.length||body.ids.length>100)
+    return err_('BAD_IDS','Выберите от 1 до 100 призов');
+  var ids=[],unique={};
+  body.ids.forEach(function(value){
+    var id=String(value||'').trim();
+    if(id&&id.length<=140&&!unique[id]){unique[id]=true;ids.push(id);}
+  });
+  if(!ids.length)return err_('BAD_IDS','Не указаны ID призов');
+  return withLock_(function(){
+    var sh=achWins_(),rows=achRows_(sh),map={};
+    rows.forEach(function(r,i){map[String(r[0])]={index:i+2,row:r};});
+    var updated=[],already=[],missing=[];
+    ids.forEach(function(id){
+      var win=map[id];
+      if(!win){missing.push(id);return;}
+      var status=String(win.row[5]);
+      if(status==='ВЫДАН'){already.push(id);return;}
+      if(status!=='ОЖИДАЕТ'){missing.push(id);return;}
+      sh.getRange(win.index,6,1,2).setValues([['ВЫДАН',new Date()]]);
+      updated.push(id);
+    });
+    return {ok:true,updated:updated.length,updatedIds:updated,
+      alreadyIds:already,missingIds:missing};
+  });
+}
+
 /** Read-only diagnostic. Does not award anything or change prize statuses. */
 function bokWheelNothingBonusReadOnlyCheck(){
   var wins=achRows_(achWins_()),ledger=achRows_(achSpins_()),counts={},credited={};
