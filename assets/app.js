@@ -316,6 +316,9 @@
       const privateData=authenticated&&token?verifiedSession:null;
       const verified=!!(privateData&&privateData.ok&&privateData.verified);
       const privatePlayer=verified?privateData.player:null;
+      // Prefer current authenticated state over a briefly cached public snapshot.
+      if(authenticated&&privatePlayer&&typeof privatePlayer.frozen==='boolean')
+        p=Object.assign({},p,{frozen:privatePlayer.frozen});
       const privateDeposit=verified?privateData.deposit:null;
       // Заморозка доступна только при накопительном балансе от 10 номерков.
       // У уже замороженного игрока управление разморозкой остаётся доступным.
@@ -337,7 +340,7 @@
             h('button',{class:'btn bok-cab-account-confirm',onclick:async()=>{
               if(!window.confirm('Досрочно разморозить баланс со списанием 1 накопленного номерка?'))return;
               const result=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:false,confirmPenalty:true});
-              if(result.ok){toast('Баланс разморожен');closeModal();openCabinet();}
+              if(result.ok){api.invalidateBalances();toast('Баланс разморожен');closeModal();openCabinet();}
               else toast((result.error&&result.error.message)||'Ошибка разморозки','bad');
             }},'🌤️ Разморозить · −1 номерок'):
           h('div',null,
@@ -352,7 +355,7 @@
                 if(!Number.isInteger(days)||days<privateData.rules.freezeMinDays||days>privateData.rules.freezeMaxDays)return toast('Недопустимый срок','bad');
                 if(!window.confirm('Заморозить накопительный баланс на '+days+' дней?'))return;
                 const result=await api.post('vkCabinetFreeze',{vkAccessToken:window.BokVK.token(),frozen:true,days:days});
-                if(result.ok){toast('Баланс заморожен');closeModal();openCabinet();}
+                if(result.ok){api.invalidateBalances();toast('Баланс заморожен');closeModal();openCabinet();}
                 else toast((result.error&&result.error.message)||'Ошибка заморозки','bad');
               }},'❄️ Заморозить'))))):null;
       const exchangeMin=Number(rules.exchangeMin)||0;
