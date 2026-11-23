@@ -373,7 +373,7 @@
       // progress: old GAS returns award flags, not quantitative metrics.
       const achBox=h('section',{class:'cab-achievements bok-achievements'});
       const achDetails=h('details',{class:'bok-ach-details'});
-      const achCount=h('span',{class:'bok-ach-count'},'Загружаем…');
+      const achCount=h('span',{class:'bok-ach-count'},'открыть');
       const achHeading=h('span',{class:'bok-ach-heading'},
         h('span',{class:'bok-ach-trophy','aria-hidden':'true'},'🏆'),
         h('span',null,'Достижения · ',achCount));
@@ -448,6 +448,7 @@
       const loadAchievements=()=>{
         if(achievementsRequested)return;
         achievementsRequested=true;
+        achCount.textContent='Загружаем…';
         api.post('achRich',{url:p.url}).then(data=>{
           if(data&&data.ok&&Array.isArray(data.achievements))return data;
           return api.post('achPublic',{url:p.url});
