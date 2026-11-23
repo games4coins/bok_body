@@ -770,11 +770,13 @@
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
         const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        // Short showcase: smooth ramp, cruise, gentle braking, no speed multiplier.
-        const accelerationMs=reduced?100:600,
-          minCruiseMs=reduced?140:1050,
-          velocity=reduced?800:400,
-          brakeMs=reduced?180:1800;
+        // Target TOTAL animation duration: 3 seconds from the button click,
+        // including the wait for GAS. A slow network can extend this deadline.
+        // Only the server selects the prize; never guess or reveal early.
+        const totalMs=reduced?350:3000,
+          accelerationMs=reduced?70:450,
+          minCruiseMs=reduced?90:550,
+          velocity=reduced?800:400;
         const sound=bokWheelSound(!reduced&&enableSound,eligible.length);
         let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
@@ -814,13 +816,17 @@
             matched=selectedIndex>=0;
             const desired=matched?-(selectedIndex+.5)*360/eligible.length:0;
             const correction=positiveDegrees(desired-positiveDegrees(angle));
-            settle={time:now,from:angle,to:angle+(reduced?120:360)+correction};
+            const duration=Math.max(reduced?100:450,totalMs-elapsed);
+            // Fewer turns when the API is slow so the finish stays smooth.
+            const extraTurns=reduced?0:(duration>1600?360:0);
+            settle={time:now,from:angle,to:angle+extraTurns+correction,
+              duration:duration};
           }
           if(settle){
-            const fraction=Math.min(1,(now-settle.time)/brakeMs);
+            const fraction=Math.min(1,(now-settle.time)/settle.duration);
             const t=fraction,t2=t*t,t3=t2*t;
             const distance=settle.to-settle.from;
-            const tangential=velocity*brakeMs/1000;
+            const tangential=velocity*settle.duration/1000;
             // Cubic Hermite with an initial velocity matching cruise and
             // a zero final velocity: no sudden jerk or last-second snap.
             angle=(2*t3-3*t2+1)*settle.from+
