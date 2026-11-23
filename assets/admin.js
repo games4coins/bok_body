@@ -972,6 +972,14 @@
     const nextNum = /^\d+$/.test(cur) ? String(Number(cur) + 1) : '';
     const open = st.bookings.filter((b) => NEEDS_CHECK.indexOf(b.status) >= 0).length;
     const people = participants();
+    // Confirmed ticket numbers are used for winner search, but the actual
+    // archive still receives the original participant keys.
+    const ticketsByKey=new Map();
+    st.bookings.forEach(b=>{
+      if(b.status!=='ПОДТВЕРЖДЕНА'||!b.key)return;
+      if(!ticketsByKey.has(b.key))ticketsByKey.set(b.key,[]);
+      (Array.isArray(b.numbers)?b.numbers:[]).forEach(n=>ticketsByKey.get(b.key).push(String(n)));
+    });
     const win = new Set();
     let noWinner = false;
     const numInput = h('input', { class: 'input', type: 'text', maxlength: '40', placeholder: 'Номер следующего эфира', value: nextNum });
@@ -989,17 +997,40 @@
     force.addEventListener('change', () => { reset(); refreshBtn(); });
     [numInput, dateInput].forEach((i) => i.addEventListener('input', reset));
 
-    const noBox = h('input', { type: 'checkbox', onchange: (e) => { noWinner = e.target.checked; if (noWinner) { win.clear(); boxes.forEach((x) => { x.checked = false; }); } reset(); refreshBtn(); } });
+    const noBox = h('input', { type: 'checkbox', onchange: (e) => { noWinner = e.target.checked; if (noWinner) { win.clear(); boxes.forEach((x) => { x.checked = false; }); } reset(); refreshBtn();if(typeof filterWinnerRows==='function')filterWinnerRows(); } });
     const boxes = [];
     const rows = people.map((pp) => {
       const cb = h('input', { type: 'checkbox', onchange: (e) => {
         if (e.target.checked) { win.add(pp.key); noWinner = false; noBox.checked = false; } else win.delete(pp.key);
-        reset(); refreshBtn();
+        reset(); refreshBtn();if(typeof filterWinnerRows==='function')filterWinnerRows();
       } });
       boxes.push(cb);
       return h('label', { class: 'prow', style: { cursor: 'pointer' } }, cb, avatar(pp.name, pp.photo, 32),
-        h('div', { class: 'pname' }, h('b', null, pp.name), h('div', { class: 'meta' }, pp.tickets + ' номерк.')));
+        h('div', { class: 'pname' }, h('b', null, pp.name),
+          h('div', { class: 'meta' }, pp.tickets + ' номерк. · '+
+            (ticketsByKey.get(pp.key)||[]).map(n=>'№'+n).join(', '))));
     });
+    const winnerSearch=h('input',{class:'input bok-winner-search',type:'search',
+      placeholder:'🔎 Поиск по фамилии или номерку (например, 27)',
+      'aria-label':'Найти победителя по фамилии или номерку',
+      oninput:()=>filterWinnerRows()});
+    const winnerCount=h('div',{class:'hint bok-winner-count','aria-live':'polite'});
+    const winnerList=h('div',{class:'blist bok-winner-list',style:{maxHeight:'28vh'}},rows);
+    function filterWinnerRows(){
+      const input=norm(winnerSearch.value.trim()).replace(/^№\\s*/,'').trim();
+      const isTicket=/^\\d+$/.test(input);
+      let visible=0;
+      people.forEach((pp,i)=>{
+        const match=!input||norm(pp.name).includes(input)||
+          norm(String(pp.key)).includes(input)||
+          (ticketsByKey.get(pp.key)||[]).some(n=>isTicket?n===input:norm('№'+n).includes(input));
+        rows[i].hidden=!match;
+        if(match)visible++;
+      });
+      winnerCount.textContent='Найдено: '+visible+' из '+people.length+
+        ' · Выбрано победителей: '+win.size;
+    }
+    filterWinnerRows();
 
     function drawPreview(r) {
       const sm = r.summary;
@@ -1038,8 +1069,9 @@
       h('p', { class: 'lead' }, 'Брони уйдут во вкладку «Архив №' + cur + '», сетка очистится. Участникам, не выигравшим, номерки этого эфира накопятся на балансе; победитель теряет накопленное.'),
       open > 0 ? h('div', { class: 'banner warn', style: { margin: '0 0 12px' } }, h('span', null, '⚠️'), h('span', null,
         'Неподтверждённых броней: ' + open + '. ', h('label', { class: 'sw', style: { marginTop: '8px' } }, force, 'Закрыть их вместе с эфиром (в архиве — со статусом «ИСТЕКЛА»)'))) : null,
-      h('div', { class: 'field' }, h('label', null, 'Кто победил? (отметьте одного или нескольких)'),
-        people.length ? h('div', { class: 'blist', style: { maxHeight: '28vh' } }, rows) : h('div', { class: 'hint' }, 'Нет подтверждённых участников со ссылкой ВК.'),
+      h('div', { class: 'field bok-winner-field' }, h('label', null, 'Кто победил? (отметьте одного или нескольких)'),
+        people.length?[winnerSearch,winnerCount,winnerList]:
+          h('div', { class: 'hint' }, 'Нет подтверждённых участников со ссылкой ВК.'),
         h('label', { class: 'sw', style: { marginTop: '8px' } }, noBox, 'Без победителя')),
       h('div', { class: 'field' }, h('label', null, 'Номер следующего эфира'), numInput),
       h('div', { class: 'field' }, h('label', null, 'Дата и время следующего эфира'), dateInput),
