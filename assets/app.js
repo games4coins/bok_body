@@ -437,8 +437,16 @@
         // "Ничего" for durable accounting and the three-in-a-row rule.
         if(/^ничего[!.\\s]*$/i.test(title))return '🍀';
         const emoji=String(p&&p.emoji||p&&p.icon||'').trim();
-        if(emoji)return emoji.slice(0,12);
+        // Some older prize records have placeholder punctuation rather than
+        // a real pictogram. Never draw those as exclamation-mark sectors.
+        if(emoji&&!/^[!?！？❗❕‼�□\s]+$/u.test(emoji))return emoji.slice(0,12);
         const t=String(p&&p.title||'').toLowerCase();
+        if(/разблок|ачив|достижен/.test(t))return '🏅';
+        if(/сброс|пропуск/.test(t))return '🔄';
+        if(/снеж|зимн/.test(t))return '❄️';
+        if(/крем|космет|уход/.test(t))return '🧴';
+        if(/монет|баланс|бонус|рубл/.test(t))return '🪙';
+        if(/секрет|тайн|сюрприз/.test(t))return '❔';
         if(/ничего|пусто|без приза/.test(t))return '🍀';
         if(/достав|отправ/.test(t))return '🚚';
         if(/кист|рук|ладон/.test(t))return '🖐️';
