@@ -1146,20 +1146,27 @@
     renderGrid(); renderAction();
   }
 
+  // Single in-flight refresh prevents a slow GAS response from stacking
+  // multiple identical requests during the booking rush.
+  let refreshFlight=null;
   async function refresh(showErr) {
-    const [st, mine] = await Promise.all([api.state(), api.mine(CLIENT)]);
-    if (st && st.ok) {
-      S.st = st;
-      if (mine && mine.ok) { S.mine = mine.bookings; S.quiet = mine.quiet || null; }
-      S.loaded = true;
-      renderAll();
-    } else if (!S.loaded) {
-      fill(app, h('div', { class: 'card', style: { marginTop: '40px', textAlign: 'center' } },
-        h('h2', null, 'Не удалось загрузить'), h('p', { class: 'lead' }, (st && st.error && st.error.message) || 'Попробуйте обновить страницу.'),
-        h('button', { class: 'btn btn-primary', onclick: () => location.reload() }, 'Обновить')));
-    } else if (showErr) {
-      toast('Нет связи с сервером, повторим автоматически', 'bad');
-    }
+    if(refreshFlight)return refreshFlight;
+    refreshFlight=(async()=>{
+      const [st, mine] = await Promise.all([api.state(), api.mine(CLIENT)]);
+      if (st && st.ok) {
+        S.st = st;
+        if (mine && mine.ok) { S.mine = mine.bookings; S.quiet = mine.quiet || null; }
+        S.loaded = true;
+        renderAll();
+      } else if (!S.loaded) {
+        fill(app, h('div', { class: 'card', style: { marginTop: '40px', textAlign: 'center' } },
+          h('h2', null, 'Не удалось загрузить'), h('p', { class: 'lead' }, (st && st.error && st.error.message) || 'Попробуйте обновить страницу.'),
+          h('button', { class: 'btn btn-primary', onclick: () => location.reload() }, 'Обновить')));
+      } else if (showErr) {
+        toast('Нет связи с сервером, повторим автоматически', 'bad');
+      }
+    })().finally(()=>{refreshFlight=null;});
+    return refreshFlight;
   }
 
   async function markPaid(b) {
@@ -1366,10 +1373,46 @@
     tickTimers();
   }
 
-  // ───── Запуск ─────
-  refresh().then(() => {
-    setInterval(() => { if (!document.hidden) refresh(false); }, POLL_MS);
-    setInterval(tickTimers, 1000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(false); });
+  // ───── Адаптивное обновление бронирований ─────
+  // Peak booking period: 8 seconds. As free numbers disappear, reduce
+  // background traffic. When paused/closed: 45 seconds. No stale booking
+  // decisions: each reservation still goes through the authoritative GAS lock.
+  function pollDelay(){
+    const st=S.st;
+    if(!st||!st.open||st.paused)return POLL_MAX_MS;
+    const counts=st.counts||{},total=Number(counts.total)||0;
+    const free=Number(counts.free);
+    if(!total||!Number.isFinite(free))return POLL_PEAK_MS;
+    const ratio=free/total;
+    if(ratio<=0)return 30000;
+    if(ratio<=.10)return 20000;
+    if(ratio<=.40)return 12000;
+    return POLL_PEAK_MS;
+  }
+  let refreshTimer=null,visibilityRefreshAt=0;
+  const scheduleRefresh=()=>{
+    if(refreshTimer!==null)clearTimeout(refreshTimer);
+    if(document.hidden)return;
+    const jitter=Math.floor(Math.random()*900); // spread concurrent browsers
+    refreshTimer=setTimeout(async()=>{
+      refreshTimer=null;
+      if(document.hidden)return;
+      await refresh(false);
+      scheduleRefresh();
+    },Math.max(POLL_MIN_MS,pollDelay())+jitter);
+  };
+  refresh().finally(scheduleRefresh);
+  setInterval(tickTimers,1000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){
+      if(refreshTimer!==null)clearTimeout(refreshTimer);
+      refreshTimer=null;
+      return;
+    }
+    const now=Date.now();
+    if(now-visibilityRefreshAt>3000){
+      visibilityRefreshAt=now;
+      refresh(false).finally(scheduleRefresh);
+    }else scheduleRefresh();
   });
 })();
