@@ -1030,3 +1030,95 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
  .bok-wheel-halo,.bok-wheel-luxe-disc .bok-wheel-bulb,
  .bok-wheel-luxe-disc.is-spinning+.bok-wheel-jewel-pointer{animation:none!important}
 }
+
+
+/* ── BOK premium vector-wheel, 2026-11-23 ── */
+.bok-wheel-luxe-disc .bok-wheel-token{
+  position:absolute;z-index:4;box-sizing:border-box;display:grid;place-items:center;
+  transform:translate(-50%,-50%);border-radius:50%;
+  pointer-events:none;user-select:none;
+  filter:drop-shadow(0 3px 3px rgba(125,76,45,.30));
+  transition:filter .25s ease;
+}
+.bok-wheel-luxe-disc .bok-wheel-token::before{
+  content:"";position:absolute;inset:0;border-radius:50%;
+  background:
+    radial-gradient(circle at 30% 22%,rgba(255,255,255,.97),transparent 34%),
+    conic-gradient(from 25deg,#fff1bd,#c68441,#fbe09b,#ad692f,#ffe4a3,#bb7839,#fff1bd);
+  box-shadow:inset 0 0 0 1px #fff6d2,inset 0 0 0 3px #d39b57,
+    inset 0 -4px 7px rgba(114,57,28,.25),0 2px 0 #a56f3c;
+}
+.bok-wheel-luxe-disc .bok-wheel-token::after{
+  content:"";position:absolute;inset:11%;border-radius:50%;
+  border:1px solid rgba(205,139,82,.7);
+  background:radial-gradient(circle at 35% 27%,#fffdf3 0%,#ffe9dc 43%,#ecc0c4 100%);
+  box-shadow:inset 0 2px 5px #ffffffbf,0 1px 2px #83533b3a;
+}
+.bok-wheel-token-inner{
+  position:relative;z-index:2;display:grid;place-items:center;
+  width:67%;height:67%;
+}
+.bok-wheel-token-inner svg{
+  display:block;width:100%;height:100%;overflow:visible;
+  filter:drop-shadow(0 1px 1px #7a4e3e30);
+}
+.bok-wheel-luxe-disc.is-whirling{
+  filter:drop-shadow(0 0 16px rgba(244,174,93,.38)) saturate(1.1);
+}
+.bok-wheel-luxe-disc.is-whirling .bok-wheel-token{
+  animation:bokMedallionGlimmer .75s ease-in-out infinite alternate;
+}
+.bok-wheel-token-winner{
+  animation:bokWinningMedallion .85s ease-in-out 3!important;
+}
+.bok-wheel-token-winner::before{
+  box-shadow:0 0 10px #fff1b9,0 0 25px #f9c882,
+    inset 0 0 0 1px #fff9dd,inset 0 0 0 3px #c9924f!important;
+}
+@keyframes bokMedallionGlimmer{
+  from{filter:drop-shadow(0 2px 2px #8e523b40) brightness(.99)}
+  to{filter:drop-shadow(0 3px 5px #fff3c498) brightness(1.13)}
+}
+@keyframes bokWinningMedallion{
+  0%,100%{filter:drop-shadow(0 3px 3px #96643e) brightness(1)}
+  50%{filter:drop-shadow(0 0 12px #ffec9a) brightness(1.35)}
+}
+.bok-wheel-sound-toggle{
+  display:block;margin:0 auto 12px;padding:7px 14px;
+  border:1px solid #f0d6c4;border-radius:999px;
+  background:linear-gradient(145deg,#fffaf4,#fff1ea);
+  color:#925e53;font:700 12px/1.25 var(--font,Arial,sans-serif);
+  cursor:pointer;transition:background .2s ease,box-shadow .2s ease;
+}
+.bok-wheel-sound-toggle:hover,
+.bok-wheel-sound-toggle:focus-visible{
+  background:#fff9ef;box-shadow:0 0 0 3px #f5d6bc70;
+}
+.bok-prize-medallion{
+  width:112px;height:112px;margin:15px auto 10px!important;
+  display:grid;place-items:center;
+}
+.bok-prize-medallion>.bok-wheel-token{
+  position:relative;left:auto!important;top:auto!important;
+  width:96px!important;height:96px!important;
+  display:grid;place-items:center;transform:none;
+}
+.bok-prize-medallion .bok-wheel-token::before{
+  content:"";position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(#fff5c5,#b77639,#ffe8aa,#bd793d,#fff5c5);
+  box-shadow:0 3px 12px #b7846750,inset 0 0 0 3px #fff5ca;
+}
+.bok-prize-medallion .bok-wheel-token::after{
+  content:"";position:absolute;inset:9%;border-radius:50%;
+  border:2px solid #e5b176;
+  background:radial-gradient(circle at 36% 24%,#fffdf6,#ffe8e0 60%,#e8b4c8);
+}
+.bok-prize-medallion .bok-wheel-token-inner{
+  position:relative;z-index:1;width:65%;height:65%;
+}
+.bok-prize-medallion .bok-wheel-token-inner svg{width:100%;height:100%}
+@media(prefers-reduced-motion:reduce){
+  .bok-wheel-luxe-disc.is-whirling,
+  .bok-wheel-luxe-disc.is-whirling .bok-wheel-token,
+  .bok-wheel-token-winner{animation:none!important}
+}
