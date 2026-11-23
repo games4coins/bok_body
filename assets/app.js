@@ -432,6 +432,10 @@
 
       // Presentation only; actual result always comes from GAS achSpin.
       const bokPrizeIcon=p=>{
+        const title=String(p&&p.title||'').trim();
+        // Friendly visual name; the GAS prize retains its original ID/title
+        // "Ничего" for durable accounting and the three-in-a-row rule.
+        if(/^ничего[!.\\s]*$/i.test(title))return '🍀';
         const emoji=String(p&&p.emoji||p&&p.icon||'').trim();
         if(emoji)return emoji.slice(0,12);
         const t=String(p&&p.title||'').toLowerCase();
@@ -642,7 +646,8 @@
           h('div',{class:'bok-prize-icon','aria-hidden':'true'},bokPrizeIcon(prize)),
           h('h3',null,isBonus?'✨ Бонусное вращение!':isNothing?'Ещё один шаг к бонусу':'Вам выпал приз!'),
           h('div',{class:'bok-prize-name'},isBonus?
-            '3 раза «Ничего» = +1 вращение':String(prize&&prize.title||'Сюрприз')),
+            '3 раза «Ничего» = +1 вращение':isNothing?
+              '🍀 Шаг к удаче':String(prize&&prize.title||'Сюрприз')),
           h('p',{class:'bok-prize-note'},isBonus?
             'Все три «Ничего» отмечены выданными · вращение начислено автоматически':
             isNothing&&progress!==null?
@@ -708,7 +713,8 @@
             h('div',{class:'bok-wheel-catalog-grid'},...(data.prizes||[]).map((p,i)=>
               h('div',{class:'bok-wheel-catalog-item'},
                 h('span',{class:'bok-wheel-catalog-icon'},bokPrizeIcon(p)),
-                h('span',null,String(p.title||'Секретный приз'))))));
+                h('span',null,/^ничего[!.\\s]*$/i.test(String(p.title||'').trim())?
+                  'Шаг к удаче · 3 = вращение':String(p.title||'Секретный приз'))))));
           fill(wheelBox,
             h('h4',{class:'bok-wheel-title'},'👑 Барабан удачи BOK Body'),
             h('p',{class:'bok-wheel-subtitle'},'Розовое золото, счастливые сюрпризы и настоящие призы'),
