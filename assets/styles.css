@@ -1218,3 +1218,71 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-cabinet-sheet .bok-cab-freeze-controls{align-items:stretch}
   .bok-cabinet-sheet .bok-cab-account-confirm{max-width:none}
 }
+
+
+/* BOK 6.7.22-P2: compact paired cabinet actions & readable prize history */
+.bok-cabinet-sheet .bok-cab-actions-row{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;align-items:start;margin:12px 0;
+}
+.bok-cabinet-sheet .bok-cab-actions-row>.bok-cab-account-action{
+  width:100%;min-width:0;margin:0!important;
+}
+.bok-cabinet-sheet .bok-cab-actions-row>.bok-cab-exchange-action{
+  min-height:83px;box-sizing:border-box;align-self:start;
+}
+.bok-cabinet-sheet .bok-cab-actions-row>.bok-cab-freeze-action>.bok-cab-account-summary{
+  min-height:83px;box-sizing:border-box;
+}
+.bok-cabinet-sheet .bok-cab-wheel-lazy .bok-wheel-history-row{
+  display:grid!important;grid-template-columns:32px minmax(0,1fr) auto;
+  align-items:center;gap:10px;
+  padding:10px 12px;line-height:1.35;
+  border:1px solid #efddcf;background:#fffdfa;
+  border-radius:12px;margin:7px 0;min-width:0;
+}
+.bok-cabinet-sheet .bok-wheel-history-row>.bok-wheel-history-icon{
+  width:30px;margin:0!important;font-size:23px;line-height:1;
+  text-align:center;display:grid;place-items:center;
+}
+.bok-cabinet-sheet .bok-wheel-history-row>.bok-wheel-history-title{
+  min-width:0;overflow-wrap:anywhere;word-break:normal;
+  font-size:13px;font-weight:750;color:#654334;
+  padding:0!important;margin:0!important;
+}
+.bok-cabinet-sheet .bok-wheel-history-row>.bok-wheel-history-status{
+  justify-self:end;white-space:nowrap;flex:none;
+  display:inline-flex;align-items:center;
+  font-size:10px;font-weight:800;letter-spacing:.015em;line-height:1.3;
+  padding:5px 9px;border-radius:999px;margin:0!important;
+  color:#946633;background:#fff0d6;border:1px solid #f2d9a9;
+}
+.bok-cabinet-sheet .bok-wheel-history-row>.bok-wheel-history-status.is-issued{
+  color:#397758;background:#e6f1e9;border-color:#c9e5cf;
+}
+.bok-cabinet-sheet .bok-wheel-server-wait{
+  margin:9px auto 12px;max-width:430px;text-align:center;
+  font-size:12px;line-height:1.45;color:#99644f;
+  padding:10px 14px;border-radius:12px;background:#fff5e9;
+}
+.bok-cabinet-sheet .bok-wheel-server-wait[hidden]{display:none!important}
+.bok-wheel-luxe-disc.is-waiting-server{
+  filter:drop-shadow(0 0 7px #f2dab990); 
+}
+@media(max-width:560px){
+  .bok-cabinet-sheet .bok-cab-actions-row{gap:8px}
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-account-summary,
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-exchange-action{padding:9px;gap:7px}
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-account-symbol{
+    width:31px;height:31px;font-size:18px;border-radius:9px;
+  }
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-account-label strong{font-size:12px}
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-account-label small{font-size:10px}
+  .bok-cabinet-sheet .bok-cab-actions-row .bok-cab-account-chevron{font-size:17px}
+  .bok-cabinet-sheet .bok-wheel-history-row{
+    grid-template-columns:27px minmax(0,1fr)!important;gap:8px!important;
+  }
+  .bok-cabinet-sheet .bok-wheel-history-row>.bok-wheel-history-status{
+    grid-column:2;justify-self:start;
+  }
+}
