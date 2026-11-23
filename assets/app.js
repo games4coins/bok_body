@@ -430,31 +430,177 @@
         });
       });
 
-      // Presentation only; actual result always comes from GAS achSpin.
-      const bokPrizeIcon=p=>{
-        const title=String(p&&p.title||'').trim();
-        // Friendly visual name; the GAS prize retains its original ID/title
-        // "Ничего" for durable accounting and the three-in-a-row rule.
-        if(/^ничего[!.\\s]*$/i.test(title))return '🍀';
+      // Vector-based prize medallions. Source of truth remains GAS title/id.
+      // Emoji stored in older rows are only fallback hints for the artwork.
+      const bokPrizeVisual=p=>{
+        const title=String(p&&p.title||'').trim(), t=title.toLowerCase();
         const emoji=String(p&&p.emoji||p&&p.icon||'').trim();
-        // Some older prize records have placeholder punctuation rather than
-        // a real pictogram. Never draw those as exclamation-mark sectors.
-        if(emoji&&!/^[!?！？❗❕‼❔❓�□\s]+$/u.test(emoji))return emoji.slice(0,12);
-        const t=String(p&&p.title||'').toLowerCase();
-        if(/разблок|ачив|достижен/.test(t))return '🏅';
-        if(/сброс|пропуск/.test(t))return '🔄';
-        if(/снеж|зимн/.test(t))return '❄️';
-        if(/крем|космет|уход/.test(t))return '🧴';
-        if(/монет|баланс|бонус|рубл/.test(t))return '🪙';
-        if(/секрет|тайн|сюрприз/.test(t))return '❔';
-        if(/ничего|пусто|без приза/.test(t))return '🍀';
-        if(/достав|отправ/.test(t))return '🚚';
-        if(/кист|рук|ладон/.test(t))return '🖐️';
-        if(/стоп|обув|туфл/.test(t))return '🦶';
-        if(/скид|сертификат/.test(t))return '💝';
-        if(/номер|билет|эфир/.test(t))return '🎟️';
-        if(/кукл|тел|bjd/.test(t))return '🧸';
-        return '🎁';
+        if(/^ничего[!.\s]*$/i.test(title)||/^(пусто|без приза)$/i.test(title))return 'clover';
+        if(/секретн|тайн(?:ый|ая|ое|ые)\s+приз/.test(t))return 'secret';
+        if(/разблок|ачив|достижен|награда/.test(t))return 'medal';
+        if(/сброс|пропуск|штраф/.test(t))return 'reset';
+        if(/вращени|крутить|дополнительн.*ход/.test(t))return 'dice';
+        if(/скид|сертификат|промокод|купон/.test(t))return 'ticket';
+        if(/снеж|зимн|мороз/.test(t))return 'snow';
+        if(/крем|космет|уход|баночк/.test(t))return 'care';
+        if(/достав|отправ|пересыл/.test(t))return 'parcel';
+        if(/кист|ладон|жестов/.test(t))return 'hand';
+        if(/стоп|обув|туфл/.test(t))return 'shoe';
+        if(/номер|билет|эфир/.test(t))return 'calendar';
+        if(/кукл|тел|bjd|подар/.test(t))return 'gift';
+        if(/монет|баланс|бонус|рубл|денеж/.test(t))return 'coins';
+        if(/любим|серд|лайк|симпат/.test(t))return 'heart';
+        if(/шанс|удач|джекпот/.test(t))return 'trophy';
+        if(/🎲|🎰/.test(emoji))return 'dice';
+        if(/🍀|☘/.test(emoji))return 'clover';
+        if(/❄|⛄/.test(emoji))return 'snow';
+        if(/🏆|🥇/.test(emoji))return 'trophy';
+        if(/❤️|💖|💕|💗|♥/.test(emoji))return 'heart';
+        if(/❌|✖|🔄|🔁/.test(emoji))return 'reset';
+        if(/✅|✔/.test(emoji))return 'check';
+        if(/💸|💰|🪙|💵|💲/.test(emoji))return 'coins';
+        if(/🎟|🗓|📅/.test(emoji))return 'calendar';
+        if(/🧴|🫙/.test(emoji))return 'care';
+        if(/🎁|🎀/.test(emoji))return 'gift';
+        return 'gift';
+      };
+      const bokPrizeIcon=p=>{
+        const v=bokPrizeVisual(p);
+        return ({clover:'🍀',secret:'❔',medal:'🏅',reset:'🔄',dice:'🎲',
+          ticket:'🎟️',snow:'❄️',care:'🧴',parcel:'📦',hand:'🖐️',
+          shoe:'👠',calendar:'📅',gift:'🎁',coins:'🪙',
+          heart:'💗',trophy:'🏆',check:'✅'})[v]||'🎁';
+      };
+      const bokWheelSvg=(tag,attrs,txt)=>{
+        const node=document.createElementNS('http://www.w3.org/2000/svg',tag);
+        Object.entries(attrs||{}).forEach(([k,v])=>node.setAttribute(k,String(v)));
+        if(txt!==undefined)node.textContent=String(txt);
+        return node;
+      };
+      const bokWheelGlyph=prize=>{
+        const visual=bokPrizeVisual(prize);
+        const art=bokWheelSvg('svg',{viewBox:'0 0 64 64',width:64,height:64,
+          'aria-hidden':'true',focusable:'false'});
+        const item=(tag,attrs,txt)=>art.appendChild(bokWheelSvg(tag,attrs,txt));
+        const path=(d,fill='none',stroke='#a66b43',sw=3)=>item('path',{
+          d,fill,stroke,'stroke-width':sw,'stroke-linecap':'round','stroke-linejoin':'round'});
+        const circle=(cx,cy,r,fill,stroke='#b77e42',sw=2)=>item('circle',{
+          cx,cy,r,fill,stroke,'stroke-width':sw});
+        const rect=(x,y,width,height,rx,fill,stroke='#b77e42',sw=2)=>item('rect',{
+          x,y,width,height,rx,fill,stroke,'stroke-width':sw});
+        switch(visual){
+          case 'clover':
+            [[24,22],[40,22],[24,38],[40,38]].forEach(([x,y])=>
+              circle(x,y,9,'#69b995','#3d9469',1.4));
+            path('M32 36 C33 44 29 50 25 53','none','#408b64',3.8);
+            circle(28,27,2.5,'#d3ffe7','none',0);
+            break;
+          case 'secret':
+            circle(32,32,21,'#f6c4d4','#cc9a5b',2);
+            path('M23 24 C23 11 43 11 43 25 C43 34 32 34 32 42',
+              'none','#a86179',5);
+            circle(32,49,3,'#a86179','none',0);
+            break;
+          case 'medal':
+            path('M19 9 L29 25 L21 32 L11 15 Z','#eab1c9','#c47b90',2);
+            path('M45 9 L35 25 L43 32 L53 15 Z','#d1b6ec','#9e83b9',2);
+            circle(32,35,18,'#e8af57','#ab7134',2.5);
+            circle(32,35,13,'#ffe2a1','#d5a158',1);
+            path('M32 24 L35 31 L43 32 L37 38 L39 46 L32 42 L25 46 L27 38 L21 32 L29 31 Z',
+              '#cb8a49','#b07532',1);
+            break;
+          case 'reset':
+            path('M47 23 A19 19 0 1 0 51 34','none','#c47d76',5);
+            path('M46 12 L48 25 L36 23','none','#c47d76',5);
+            path('M22 31 L29 38 L42 25','none','#66aa81',4.5);
+            break;
+          case 'dice':
+            rect(14,15,36,35,7,'#fff7e9','#bf8a62',2.5);
+            [[23,24],[41,24],[32,33],[23,42],[41,42]].forEach(([x,y])=>
+              circle(x,y,3.3,'#ca8a9d','none',0));
+            break;
+          case 'ticket':
+            path('M13 20 H51 V29 Q44 32 51 39 V45 H13 V39 Q20 32 13 29 Z',
+              '#f6d89b','#c28d4e',2.7);
+            path('M33 21 V45','none','#cf9a5c',2);
+            item('text',{x:23,y:38,'font-size':15,'text-anchor':'middle',fill:'#ac7440',
+              'font-weight':800},'%');
+            break;
+          case 'snow':
+            [0,60,120].forEach(deg=>{
+              const g=bokWheelSvg('g',{transform:'rotate('+deg+' 32 32)'});
+              g.appendChild(bokWheelSvg('path',{
+                d:'M32 10 V54 M25 17 L32 23 L39 17 M25 47 L32 41 L39 47',
+                fill:'none',stroke:'#75b6d2','stroke-width':3.6,'stroke-linecap':'round',
+                'stroke-linejoin':'round'}));
+              art.appendChild(g);
+            });
+            break;
+          case 'care':
+            rect(17,24,30,27,7,'#fff3e8','#c89b76',2);
+            rect(19,16,26,10,3,'#d5a56e','#a67549',2);
+            path('M22 36 Q32 29 42 36','none','#d1a3af',3);
+            path('M32 32 V43','none','#d1a3af',3);
+            break;
+          case 'parcel':
+            path('M13 24 L32 15 L51 24 L51 46 L32 55 L13 46 Z','#edbc95','#b78a67',2.5);
+            path('M13 24 L32 33 L51 24 M32 33 V55','none','#fff0d4',2.5);
+            path('M22 20 L41 29','none','#c88c7e',4);
+            break;
+          case 'hand':
+            path('M21 49 L17 34 Q17 29 21 29 L25 36 V17 Q25 13 29 15 L31 31 V11 Q31 8 35 11 L36 31 V16 Q36 12 40 16 L40 32 V22 Q40 18 44 22 L45 40 Q41 52 31 53 Z',
+              '#ffe1c2','#c38c78',2.5);
+            break;
+          case 'shoe':
+            path('M13 39 Q23 40 28 20 L39 24 Q38 37 53 39 L53 47 Q35 52 13 47 Z',
+              '#de9aa5','#af6d78',2.5);
+            path('M25 32 L35 36','none','#fff3dd',2.5);
+            break;
+          case 'calendar':
+            rect(12,17,40,36,5,'#fff4e5','#be8b63',2.5);
+            path('M12 27 H52 M23 12 V23 M41 12 V23','none','#c18b6c',4);
+            path('M22 39 L30 46 L43 32','none','#76b88a',4);
+            break;
+          case 'coins':
+            [[42,37],[33,31],[24,25]].forEach(([x,y])=>{
+              item('ellipse',{cx:x,cy:y+9,rx:12,ry:5,fill:'#c0873e',stroke:'#ac7134','stroke-width':2});
+              rect(x-12,y,24,9,4,'#e8b567','#b37b38',2);
+              item('ellipse',{cx:x,cy:y,rx:12,ry:5,fill:'#ffe3a0',stroke:'#be8947','stroke-width':2});
+            });
+            break;
+          case 'heart':
+            path('M32 52 C19 42 11 33 11 24 C11 12 25 11 32 21 C39 11 53 12 53 24 C53 33 45 42 32 52 Z',
+              '#e995a9','#b96a81',2.5);
+            path('M18 24 Q19 18 25 19','none','#ffe9ef',3);
+            break;
+          case 'trophy':
+            path('M19 15 H45 V30 Q44 40 34 42 V49 H44 V53 H20 V49 H30 V42 Q20 40 19 30 Z',
+              '#efbf72','#b98545',2.5);
+            path('M19 19 H12 V25 Q12 36 23 36 M45 19 H52 V25 Q52 36 41 36',
+              'none','#c89453',3);
+            break;
+          case 'check':
+            rect(13,13,38,38,9,'#b1d6b8','#7aa884',2.5);
+            path('M22 33 L29 40 L43 24','none','#fffef1',5);
+            break;
+          case 'gift':
+          default:
+            rect(15,26,34,26,5,'#efc3cf','#c78e96',2.4);
+            rect(12,20,40,13,5,'#f9dedc','#c78e96',2.4);
+            path('M32 21 V52 M14 31 H50','none','#bb738a',3);
+            path('M32 21 C19 23 17 8 25 9 C30 9 32 16 32 21 C32 16 34 9 39 9 C47 8 45 23 32 21',
+              '#ffe3d6','#b87e91',2);
+        }
+        return art;
+      };
+      const bokWheelToken=(prize,n)=>{
+        const kind=bokPrizeVisual(prize);
+        const node=h('span',{class:'bok-wheel-token bok-wheel-token--'+kind,
+          'aria-hidden':'true',title:String(prize&&prize.title||'Приз')});
+        const inner=h('span',{class:'bok-wheel-token-inner'});
+        inner.appendChild(bokWheelGlyph(prize));
+        node.appendChild(inner);
+        return node;
       };
       // BOK 6.7.21. Premium animated wheel: every sector still comes from
       // the actual GAS catalogue, so the stop angle always matches the prize.
@@ -498,7 +644,7 @@
         graphic.appendChild(svg('circle',{cx:150,cy:150,r:141,fill:'#b77949',
           stroke:'#fff6d2','stroke-width':1.4}));
         graphic.appendChild(svg('circle',{cx:150,cy:150,r:128,fill:'#f6d2c6'}));
-        const emojiOverlays=[];
+        const tokenOverlays=[];
         if(sectors.length){
           const n=sectors.length,R=127,iconR=n>13?103:n>9?100:101;
           const palette=['bok-rose','bok-peach','bok-lilac','bok-ivory'];
@@ -517,25 +663,7 @@
               stroke:'#da9d6c','stroke-width':1.4,'stroke-linejoin':'round'}));
             group.appendChild(svg('title',{},String(p.title||'Приз')));
             const t=(t0+t1)/2,x=150+iconR*Math.cos(t),y=150+iconR*Math.sin(t);
-            // Question-mark emoji is often a legacy placeholder in the GAS catalog.
-            // Only explicitly secret prizes get the illustrated question-mark medallion.
-            const secret=/секретн(?:ый|ая|ое|ые)\s+приз|тайн(?:ый|ая|ое|ые)\s+приз/i.test(String(p.title||''));
-            if(secret){
-              group.appendChild(svg('circle',{cx:x,cy:y,r:n>11?13:17,
-                fill:'url(#bok-center)',stroke:'#bd804a','stroke-width':2}));
-              group.appendChild(svg('text',{x,y:y+1,'font-size':n>11?17:25,
-                'text-anchor':'middle','dominant-baseline':'central','font-weight':900,
-                fill:'#a45247','font-family':'Georgia,serif'},'?'));
-              // Two reserve illustrations; no extra prize sectors are invented.
-              const imgSize=n>11?29:37;
-              group.appendChild(svg('image',{href:'assets/bok-wheel-secret-'+
-                (i%2?'gold':'rose')+'.svg',x:(x-imgSize/2).toFixed(2),
-                y:(y-imgSize/2).toFixed(2),width:imgSize,height:imgSize}));
-            }else{
-              // Browser SVG fonts sometimes replace colorful emoji with "!".
-              // Real HTML emoji overlays rotate with the same wheel disc.
-              emojiOverlays.push({x,y,emoji:bokPrizeIcon(p),title:String(p.title||'Приз'),n});
-            }
+            tokenOverlays.push({x,y,prize:p,n});
             graphic.appendChild(group);
           });
         }else{
@@ -570,12 +698,14 @@
         graphic.appendChild(svg('text',{x:150,y:176,'font-size':11,
           'text-anchor':'middle'},'🎀'));
         disc.appendChild(graphic);
-        emojiOverlays.forEach(item=>{
-          disc.appendChild(h('span',{class:'bok-wheel-html-emoji','aria-hidden':'true',
-            title:item.title,style:{
-              left:(item.x/3)+'%',top:(item.y/3)+'%',
-              fontSize:(item.n>14?17:item.n>10?21:item.n>7?29:34)+'px'
-            }},item.emoji));
+        tokenOverlays.forEach(item=>{
+          const token=bokWheelToken(item.prize,item.n);
+          const size=item.n>14?30:item.n>10?38:item.n>8?46:51;
+          token.style.left=(item.x/3)+'%';
+          token.style.top=(item.y/3)+'%';
+          token.style.width=size+'px';
+          token.style.height=size+'px';
+          disc.appendChild(token);
         });
         stage.appendChild(halo);
         stage.appendChild(disc);
