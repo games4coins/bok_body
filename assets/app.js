@@ -790,86 +790,95 @@
         try{return localStorage.getItem(bokWheelSoundKey)!=='false';}
         catch(_){return true;}
       };
-      // Presentation-only animation: 2.4s visible spin plus at most .85s
-      // for the exact server-selected sector. Never spin indefinitely while
-      // waiting for a slow GAS response; never invent a winning result.
+      // The API request begins before this animation. Keep the wheel moving
+      // until the server result arrives, then decelerate ONCE to that exact
+      // prize. No intermediate stop, rewind, fake landing or client-side draw.
       function bokStartWheelAnimation(wheel,catalog,enableSound){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
         const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-        const firstMs=reduced?180:2350;
-        const finalMs=reduced?120:800;
-        const firstAngle=reduced?30:720;
+        // Nominal duration ~5.8 seconds: 4s accelerating/cruising + 1.8s brake.
+        // Slow GAS replies extend the cruise; they never cause a false stop.
+        const earliestBrakeMs=reduced?120:4000;
+        const accelerationMs=reduced?90:900;
+        const brakeMs=reduced?220:1800;
+        const angularSpeed=reduced?440:390; // degrees/second at cruising speed
         const sound=bokWheelSound(!reduced&&enableSound,eligible.length);
         wheel.style.transition='none';
         wheel.classList.add('is-spinning','is-whirling');
-        let begin=null,phaseOneFinished=false,decided=false,selected=null;
-        let matched=false,stopped=false,finalizing=false,angle=0,resolveDone;
+        let start=null,angle=0,selected=null,decided=false,matched=false;
+        let braking=null,stopped=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const mod=n=>((n%360)+360)%360;
-        const smooth=t=>t*t*(3-2*t); // smooth first acceleration and deceleration
+        // Continuous acceleration: position and speed join cruise smoothly.
+        const accelerate=t=>angularSpeed*accelerationMs/1000*
+          (t*t/2-t*t*t/3);
+        const accelerationAngle=angularSpeed*accelerationMs/6000;
         const finish=()=>{
           if(stopped)return;
           stopped=true;
           wheel.classList.remove('is-spinning','is-whirling','is-waiting-server');
           if(matched){
-            const winner=wheel.querySelector('.bok-wheel-token[data-bok-winner="true"]');
-            if(winner)winner.classList.add('bok-wheel-token-winner');
+            const token=wheel.querySelector('.bok-wheel-token[data-bok-winner="true"]');
+            if(token)token.classList.add('bok-wheel-token-winner');
           }
-          sound.finish(matched);sound.close();resolveDone();
+          sound.finish(matched);
+          sound.close();
+          resolveDone();
         };
-        function finalize(){
-          if(finalizing||!phaseOneFinished||!decided)return;
-          finalizing=true;
-          wheel.classList.remove('is-waiting-server');
-          if(!selected){finish();return;}
-          const index=eligible.findIndex(p=>String(p.id)===String(selected.id));
-          const titleIndex=index<0?eligible.findIndex(p=>String(p.title)===String(selected.title)):-1;
-          const chosenIndex=index>=0?index:titleIndex;
-          matched=chosenIndex>=0;
-          if(!matched){finish();return;}
-          wheel.querySelectorAll('.bok-wheel-token').forEach((token,i)=>{
-            if(i===chosenIndex)token.dataset.bokWinner='true';
-          });
-          const desired=-(chosenIndex+.5)*360/eligible.length;
-          // Keep movement in the forward direction, with an accurate stop.
+        const beginBrake=(now)=>{
+          const index=selected?eligible.findIndex(p=>String(p.id)===String(selected.id)):-1;
+          const fallback=index<0&&selected?
+            eligible.findIndex(p=>String(p.title)===String(selected.title)):-1;
+          const selectedIndex=index>=0?index:fallback;
+          matched=selectedIndex>=0;
+          if(matched){
+            wheel.querySelectorAll('.bok-wheel-token').forEach((token,i)=>{
+              if(i===selectedIndex)token.dataset.bokWinner='true';
+            });
+          }
+          const desired=matched?-(selectedIndex+.5)*360/eligible.length:mod(angle);
           const correction=mod(desired-mod(angle));
-          const from=angle,to=angle+correction;
-          const finalBegin=performance.now();
-          function finalFrame(now){
-            const t=Math.min(1,(now-finalBegin)/finalMs);
-            // Visibly ease into the selected sector instead of snapping.
-            const ease=1-Math.pow(1-t,3);
-            angle=from+(to-from)*ease;
+          // Minimum forward travel keeps the deceleration monotonic even if
+          // the requested sector is only a few degrees ahead of the pointer.
+          const velocityDistance=angularSpeed*brakeMs/1000;
+          const minDistance=velocityDistance/3+20;
+          let distance=correction;
+          while(distance<minDistance)distance+=360;
+          braking={start:now,from:angle,to:angle+distance,
+            duration:brakeMs,tangent:velocityDistance};
+          wheel.classList.remove('is-waiting-server');
+        };
+        function frame(now){
+          if(stopped)return;
+          if(start===null)start=now;
+          const elapsed=now-start;
+          if(!braking&&decided&&elapsed>=earliestBrakeMs)beginBrake(now);
+          if(braking){
+            const t=Math.min(1,(now-braking.start)/braking.duration);
+            const t2=t*t,t3=t2*t;
+            // Hermite interpolation preserves the incoming wheel velocity,
+            // then slows to zero on the exact GAS-selected sector.
+            angle=(2*t3-3*t2+1)*braking.from+
+              (t3-2*t2+t)*braking.tangent+
+              (-2*t3+3*t2)*braking.to;
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
             sound.tick(angle,now);
-            if(t<1)requestAnimationFrame(finalFrame);
-            else finish();
+            if(t>=1){finish();return;}
+          }else{
+            const ramp=Math.min(1,elapsed/accelerationMs);
+            angle=elapsed<accelerationMs
+              ?accelerate(ramp)
+              :accelerationAngle+angularSpeed*(elapsed-accelerationMs)/1000;
+            wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
+            sound.tick(angle,now);
           }
-          requestAnimationFrame(finalFrame);
+          requestAnimationFrame(frame);
         }
-        function initialFrame(now){
-          if(begin===null)begin=now;
-          const t=Math.min(1,(now-begin)/firstMs);
-          angle=firstAngle*smooth(t);
-          wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
-          sound.tick(angle,now);
-          if(t<1)requestAnimationFrame(initialFrame);
-          else{
-            phaseOneFinished=true;
-            wheel.classList.remove('is-whirling');
-            if(decided)finalize();
-            else{
-              wheel.classList.remove('is-spinning');
-              wheel.classList.add('is-waiting-server');
-              sound.close();
-            }
-          }
-        }
-        requestAnimationFrame(initialFrame);
-        return {
-          choose:prize=>{selected=prize;decided=true;finalize();},
+        requestAnimationFrame(frame);
+        return{
+          choose:prize=>{selected=prize;decided=true;},
           done,matched:()=>matched
         };
       }
@@ -951,13 +960,13 @@
               ok:false,error:{code:'NETWORK',message:'Связь прервалась. Повторите попытку с тем же запросом.'}
             }));
             const animation=bokStartWheelAnimation(wheel,data.prizes,bokWheelSoundEnabled());
-            // If GAS is still working when the short spin ends, park the wheel
-            // and show a clear waiting state instead of spinning indefinitely.
+            // If GAS is slow, keep the wheel cruising and show an explanation.
+            // It must not visibly stop until the authoritative prize is known.
             let serverAnswered=false;
             const pendingMessage=setTimeout(()=>{
               if(waitingLabel&&!serverAnswered){
                 waitingLabel.hidden=false;
-                button.textContent='⏳ Ожидаем подтверждение GAS…';
+                button.textContent='🎡 Барабан вращается · ждём GAS…';
               }
             },2600);
             const outcome=await spinRequest;
@@ -1014,7 +1023,7 @@
             h('p',{class:'bok-wheel-subtitle'},'Розовое золото, счастливые сюрпризы и настоящие призы'),
             bokWheelArt(data),counter,nothingHint,button,
             h('p',{class:'bok-wheel-server-wait',role:'status',hidden:true},
-              'Google обрабатывает результат. Приз будет показан после подтверждения сервера.'),
+              'Определяем выигрыш на сервере. Колесо остановится сразу на настоящем призе.'),
             mute,catalogue,
             h('h4',{class:'bok-wheel-history-heading'},'📦 Мои выигрыши'),
             ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{
