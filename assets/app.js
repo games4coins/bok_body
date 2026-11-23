@@ -517,8 +517,9 @@
               stroke:'#da9d6c','stroke-width':1.4,'stroke-linejoin':'round'}));
             group.appendChild(svg('title',{},String(p.title||'Приз')));
             const t=(t0+t1)/2,x=150+iconR*Math.cos(t),y=150+iconR*Math.sin(t);
-            const secret=/секрет|сюрприз|тайн|\\?/.test(String(p.title||'').toLowerCase())||
-              /^[?❔❓]$/.test(String(p.emoji||'').trim());
+            // Question-mark emoji is often a legacy placeholder in the GAS catalog.
+            // Only explicitly secret prizes get the illustrated question-mark medallion.
+            const secret=/секретн(?:ый|ая|ое|ые)\s+приз|тайн(?:ый|ая|ое|ые)\s+приз/i.test(String(p.title||''));
             if(secret){
               group.appendChild(svg('circle',{cx:x,cy:y,r:n>11?13:17,
                 fill:'url(#bok-center)',stroke:'#bd804a','stroke-width':2}));
@@ -587,14 +588,6 @@
       };
       // Smooth animation with an accurate final sector. GAS is always the sole
       // authority for selecting a prize. The client ONLY visualizes its response.
-      function bokWheelDurationScale(){
-        // Default: 2.5 times shorter than the original 6.7.21 animation.
-        // Local override is presentation-only; no GAS changes or authority.
-        try{
-          const n=Number(localStorage.getItem('bok-wheel-duration-scale-v1'));
-          return Number.isFinite(n)&&n>=0.2&&n<=1.5?n:0.4;
-        }catch(_){return 0.4;}
-      }
       function bokStartWheelAnimation(wheel,catalog){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
         wheel.style.transition='none';
@@ -602,11 +595,12 @@
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
         const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const scale=bokWheelDurationScale();
-        const accelerationMs=(reduced?120:1850)*scale,
-          minCruiseMs=(reduced?400:3200)*scale,
-          velocity=(reduced?800:400)/scale,
-          brakeMs=(reduced?450:5300)*scale;
+        // Shorten the animation ~3x by reducing the number of turns,
+        // NOT by multiplying angular speed. Keep smooth acceleration/braking.
+        const accelerationMs=reduced?100:600,
+          minCruiseMs=reduced?140:1050,
+          velocity=reduced?800:400,
+          brakeMs=reduced?180:1800;
         let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const positiveDegrees=n=>((n%360)+360)%360;
@@ -632,7 +626,7 @@
             matched=selectedIndex>=0;
             const desired=matched?-(selectedIndex+.5)*360/eligible.length:0;
             const correction=positiveDegrees(desired-positiveDegrees(angle));
-            settle={time:now,from:angle,to:angle+(reduced?360:1800)+correction};
+            settle={time:now,from:angle,to:angle+(reduced?120:360)+correction};
           }
           if(settle){
             const fraction=Math.min(1,(now-settle.time)/brakeMs);
