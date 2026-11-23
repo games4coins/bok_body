@@ -512,6 +512,11 @@
               group.appendChild(svg('text',{x,y:y+1,'font-size':n>11?17:25,
                 'text-anchor':'middle','dominant-baseline':'central','font-weight':900,
                 fill:'#a45247','font-family':'Georgia,serif'},'?'));
+              // Two reserve illustrations; no extra prize sectors are invented.
+              const imgSize=n>11?29:37;
+              group.appendChild(svg('image',{href:'assets/bok-wheel-secret-'+
+                (i%2?'gold':'rose')+'.svg',x:(x-imgSize/2).toFixed(2),
+                y:(y-imgSize/2).toFixed(2),width:imgSize,height:imgSize}));
             }else{
               group.appendChild(svg('text',{x,y:y+2,'font-size':n>14?17:n>10?22:n>7?30:35,
                 'text-anchor':'middle','dominant-baseline':'central',
@@ -566,9 +571,12 @@
       function bokStartWheelAnimation(wheel,catalog){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
         wheel.style.transition='none';
+        wheel.classList.add('is-spinning');
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
-        const accelerationMs=1700,minCruiseMs=2400,velocity=320,brakeMs=4400;
+        const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const accelerationMs=reduced?120:1850,minCruiseMs=reduced?400:3200,
+          velocity=reduced?800:400,brakeMs=reduced?450:5300;
         let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const positiveDegrees=n=>((n%360)+360)%360;
@@ -594,7 +602,7 @@
             matched=selectedIndex>=0;
             const desired=matched?-(selectedIndex+.5)*360/eligible.length:0;
             const correction=positiveDegrees(desired-positiveDegrees(angle));
-            settle={time:now,from:angle,to:angle+720+correction};
+            settle={time:now,from:angle,to:angle+(reduced?360:1800)+correction};
           }
           if(settle){
             const fraction=Math.min(1,(now-settle.time)/brakeMs);
@@ -607,7 +615,7 @@
               (t3-2*t2+t)*tangential+
               (-2*t3+3*t2)*settle.to;
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
-            if(fraction>=1){resolveDone();return;}
+            if(fraction>=1){wheel.classList.remove('is-spinning');resolveDone();return;}
           }else{
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
           }
@@ -617,7 +625,13 @@
         return {choose:prize=>{selected=prize;decided=true;},done,matched:()=>matched};
       }
 
-      function bokPrizeReveal(prize,onClose){
+      function bokPrizeReveal(prize,onClose,outcome){
+        const isNothing=/^ничего[!.\\s]*$/i.test(String(prize&&prize.title||'').trim());
+        const isBonus=!!(isNothing&&outcome&&outcome.nothingMilestone);
+        const progress=outcome&&Number.isFinite(Number(outcome.nothingProgress))?
+          Number(outcome.nothingProgress):null;
+        const extra=outcome&&Number(outcome.bonusSpinsApplied)>0?
+          Number(outcome.bonusSpinsApplied):0;
         const prior=document.querySelector('.bok-prize-reveal');if(prior)prior.remove();
         const overlay=h('div',{class:'bok-prize-reveal',role:'dialog','aria-modal':'true','aria-label':'Ваш приз'});
         const closeButton=h('button',{type:'button',class:'btn btn-primary btn-block'},'🎉 Отлично!');
@@ -626,9 +640,16 @@
         overlay.appendChild(h('div',{class:'bok-prize-card'},sparks,
           h('div',{class:'bok-prize-kicker'},'✨ БАРАБАН BOK BODY ✨'),
           h('div',{class:'bok-prize-icon','aria-hidden':'true'},bokPrizeIcon(prize)),
-          h('h3',null,'Вам выпал приз!'),
-          h('div',{class:'bok-prize-name'},String(prize&&prize.title||'Сюрприз')),
-          h('p',{class:'bok-prize-note'},'Выигрыш сохранён · ожидает выдачи'),
+          h('h3',null,isBonus?'✨ Бонусное вращение!':isNothing?'Ещё один шаг к бонусу':'Вам выпал приз!'),
+          h('div',{class:'bok-prize-name'},isBonus?
+            '3 раза «Ничего» = +1 вращение':String(prize&&prize.title||'Сюрприз')),
+          h('p',{class:'bok-prize-note'},isBonus?
+            'Все три «Ничего» отмечены выданными · вращение начислено автоматически':
+            isNothing&&progress!==null?
+              '«Ничего»: '+progress+'/3 · каждые 3 дают дополнительное вращение':
+              'Выигрыш сохранён · ожидает выдачи'),
+          extra>0&&!isBonus?h('p',{class:'bok-wheel-bonus-note'},
+            '🎀 Дополнительно начислено вращений: '+extra):null,
           closeButton));
         const onKey=e=>{if(e.key==='Escape')close();};
         let closed=false;
@@ -667,17 +688,39 @@
               const shown=Object.assign({},real||{},outcome.prize||{});
               // Keep the final, correct sector visible behind the result popup.
               // Refresh the cabinet only when the participant dismisses it.
-              bokPrizeReveal(shown,()=>loadWheel());
+              bokPrizeReveal(shown,()=>loadWheel(),outcome);
               if(!animation.matched())toast('Приз получен. Каталог колеса изменился — обновите кабинет.',null,5000);
             }else{
               toast((outcome&&outcome.error&&outcome.error.message)||'Не удалось выполнить вращение','bad');
               loadWheel();
             }
           }},'🎡 Крутить барабан');
-          fill(wheelBox,h('h4',null,'🎡 Барабан удачи · '+data.spins+' вращений'),
-            bokWheelArt(data),
-            button,h('h4',null,'📦 Призы барабана'),
-            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));return h('div',{class:'gift-item'},h('span',{style:{fontSize:'21px',marginRight:'8px'}},prize?String(prize.emoji||'🎁'):bokPrizeIcon(w)),w.title+' · '+w.status);}):[h('p',{class:'hint'},'Подарков пока нет')]));
+          const counter=h('div',{class:'bok-wheel-spins-counter'},
+            h('span',{class:'bok-wheel-spins-icon','aria-hidden':'true'},'🎟️'),
+            h('span',null,'Доступно вращений: '),
+            h('b',null,String(data.spins)));
+          const nothingProgress=Number(data.nothingProgress);
+          const nothingHint=Number.isInteger(nothingProgress)&&nothingProgress>=0&&nothingProgress<3?
+            h('p',{class:'bok-wheel-nothing-progress'},'🍀 Три «Ничего» = одно бонусное вращение · ',
+              h('b',null,nothingProgress+'/3')):null;
+          const catalogue=h('details',{class:'bok-wheel-catalog'},
+            h('summary',null,'🎁 Посмотреть призы барабана'),
+            h('div',{class:'bok-wheel-catalog-grid'},...(data.prizes||[]).map((p,i)=>
+              h('div',{class:'bok-wheel-catalog-item'},
+                h('span',{class:'bok-wheel-catalog-icon'},bokPrizeIcon(p)),
+                h('span',null,String(p.title||'Секретный приз'))))));
+          fill(wheelBox,
+            h('h4',{class:'bok-wheel-title'},'👑 Барабан удачи BOK Body'),
+            h('p',{class:'bok-wheel-subtitle'},'Розовое золото, счастливые сюрпризы и настоящие призы'),
+            bokWheelArt(data),counter,nothingHint,button,catalogue,
+            h('h4',{class:'bok-wheel-history-heading'},'📦 Мои выигрыши'),
+            ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{
+              const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));
+              return h('div',{class:'gift-item'},
+                h('span',{class:'bok-wheel-history-icon'},prize?String(prize.emoji||'🎁'):bokPrizeIcon(w)),
+                h('span',{class:'bok-wheel-history-title'},w.title),
+                h('span',{class:'bok-wheel-history-status'},w.status));
+            }):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен.')));
         loadWheel();
       }
