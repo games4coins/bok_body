@@ -71,7 +71,8 @@
     A.pw = ''; A.known = null; A.st = null;
     store('nomerok_admin_pw', null);
     try { sessionStorage.removeItem('nomerok_admin_pw'); } catch (e) { /* ignore */ }
-    clearInterval(A.poll);
+    clearTimeout(A.poll);
+    A.poll=null;
     renderLogin();
   }
 
@@ -105,16 +106,43 @@
     buildShell();
     setState(r);
     renderTab();
-    clearInterval(A.poll);
-    A.poll = setInterval(pollOnce, POLL_MS);
+    clearTimeout(A.poll);
+    scheduleAdminPoll();
     return true;
   }
 
-  async function pollOnce() {
-    const r = await api.post('adminState', { password: A.pw });
-    if (r.ok) setState(r);
-    else if (r.error && r.error.code === 'AUTH') logout();
+  // No stacked adminState requests during slow GAS executions.
+  // Keep 10s in an active booking period; reduce background work when closed.
+  let adminPollFlight=null;
+  function adminPollDelay(){
+    const st=A.st;
+    if(st&&st.paused)return 30000;
+    if(st&&st.open===false)return 30000;
+    return POLL_MS;
   }
+  function scheduleAdminPoll(){
+    clearTimeout(A.poll);
+    if(!A.pw||document.hidden)return;
+    A.poll=setTimeout(async()=>{
+      A.poll=null;
+      await pollOnce();
+      if(A.pw)scheduleAdminPoll();
+    },adminPollDelay()+Math.floor(Math.random()*800));
+  }
+  async function pollOnce() {
+    if(!A.pw||adminPollFlight)return adminPollFlight;
+    adminPollFlight=(async()=>{
+      const r = await api.post('adminState', { password: A.pw });
+      if (r.ok&&A.pw)setState(r);
+      else if (r.error && r.error.code === 'AUTH') logout();
+    })().finally(()=>{adminPollFlight=null;});
+    return adminPollFlight;
+  }
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){clearTimeout(A.poll);A.poll=null;return;}
+    if(!A.pw)return;
+    pollOnce().finally(()=>{if(A.pw)scheduleAdminPoll();});
+  });
 
   // ───── Каркас ─────
   let topEl, pauseEl, warnEl, contentEl;
