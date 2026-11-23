@@ -228,10 +228,25 @@
       return { ok: false, error: { code: 'NETWORK', message: 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' } };
     }
   }
+  // Public, read-only balances: small in-tab cache and in-flight deduplication.
+  // Private VK identity, bookings and spins are NEVER cached here.
+  let balancesCache=null,balancesUntil=0,balancesFlight=null;
+  const clearBalancesCache=()=>{balancesCache=null;balancesUntil=0;};
+  const balancesCached=()=>{
+    const now=Date.now();
+    if(balancesCache&&now<balancesUntil)return Promise.resolve(balancesCache);
+    if(balancesFlight)return balancesFlight;
+    balancesFlight=call('GET','balances',{action:'balances'}).then(result=>{
+      if(result&&result.ok){balancesCache=result;balancesUntil=Date.now()+12000;}
+      return result;
+    }).finally(()=>{balancesFlight=null;});
+    return balancesFlight;
+  };
   const api = {
     state: () => call('GET', 'state', { action: 'state' }),
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
-    balances: () => call('GET', 'balances', { action: 'balances' }),
+    balances: balancesCached,
+    invalidateBalances: clearBalancesCache,
     players: () => call('GET', 'players', { action: 'players' }),
     post: (action, body) => call('POST', action, body)
   };
