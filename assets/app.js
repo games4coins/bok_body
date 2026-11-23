@@ -790,94 +790,88 @@
         try{return localStorage.getItem(bokWheelSoundKey)!=='false';}
         catch(_){return true;}
       };
-      // Smooth animation with an accurate final sector. GAS is always the sole
-      // authority for selecting a prize. The client ONLY visualizes its response.
+      // Presentation-only animation: 2.4s visible spin plus at most .85s
+      // for the exact server-selected sector. Never spin indefinitely while
+      // waiting for a slow GAS response; never invent a winning result.
       function bokStartWheelAnimation(wheel,catalog,enableSound){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
-        wheel.style.transition='none';
-        wheel.classList.add('is-spinning','is-whirling');
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
-        const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        // Target TOTAL animation duration: 3 seconds from the button click,
-        // including the wait for GAS. A slow network can extend this deadline.
-        // Only the server selects the prize; never guess or reveal early.
-        const totalMs=reduced?350:3000,
-          accelerationMs=reduced?70:450,
-          minCruiseMs=reduced?90:550,
-          velocity=reduced?800:400;
+        const reduced=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        const firstMs=reduced?180:2350;
+        const finalMs=reduced?120:800;
+        const firstAngle=reduced?30:720;
         const sound=bokWheelSound(!reduced&&enableSound,eligible.length);
-        let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
+        wheel.style.transition='none';
+        wheel.classList.add('is-spinning','is-whirling');
+        let begin=null,phaseOneFinished=false,decided=false,selected=null;
+        let matched=false,stopped=false,finalizing=false,angle=0,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
-        const positiveDegrees=n=>((n%360)+360)%360;
-        let stopped=false;
-        const stop=()=>{
+        const mod=n=>((n%360)+360)%360;
+        const smooth=t=>t*t*(3-2*t); // smooth first acceleration and deceleration
+        const finish=()=>{
           if(stopped)return;
           stopped=true;
-          wheel.classList.remove('is-spinning','is-whirling');
+          wheel.classList.remove('is-spinning','is-whirling','is-waiting-server');
           if(matched){
-            const sector=wheel.querySelector('.bok-wheel-token[data-bok-winner="true"]');
-            if(sector)sector.classList.add('bok-wheel-token-winner');
+            const winner=wheel.querySelector('.bok-wheel-token[data-bok-winner="true"]');
+            if(winner)winner.classList.add('bok-wheel-token-winner');
           }
-          sound.finish(matched);
-          sound.close();
-          resolveDone();
+          sound.finish(matched);sound.close();resolveDone();
         };
-        function tick(now){
-          if(!begin)begin=now;
-          const elapsed=now-begin;
-          // Integrated ease-in acceleration, followed by a constant-speed cruise.
-          // Both phases have the same velocity at the join.
-          const accel=Math.min(accelerationMs,elapsed);
-          const accelAngle=velocity*(2*accelerationMs/Math.PI/1000)*
-            (1-Math.cos(Math.PI*accel/(2*accelerationMs)));
-          const cruiseAngle=velocity*Math.max(0,elapsed-accelerationMs)/1000;
-          let angle=accelAngle+cruiseAngle;
-          if(decided&&elapsed>=minCruiseMs&&!settle){
-            // Identical slice geometry to bokWheelArt. Slice zero begins at 12 o'clock.
-            // Pointer also sits at 12 o'clock, so center of slice i must rotate
-            // by -(i+.5)*360/n degrees modulo 360.
-            const index=eligible.findIndex(p=>String(p.id)===String(selected&&selected.id));
-            matched=index>=0;
-            const indexByTitle=index<0&&selected?
-              eligible.findIndex(p=>String(p.title)===String(selected.title)):-1;
-            const selectedIndex=index>=0?index:indexByTitle;
-            matched=selectedIndex>=0;
-            const desired=matched?-(selectedIndex+.5)*360/eligible.length:0;
-            const correction=positiveDegrees(desired-positiveDegrees(angle));
-            const duration=Math.max(reduced?100:450,totalMs-elapsed);
-            // Fewer turns when the API is slow so the finish stays smooth.
-            const extraTurns=reduced?0:(duration>1600?360:0);
-            settle={time:now,from:angle,to:angle+extraTurns+correction,
-              duration:duration};
-          }
-          if(settle){
-            const fraction=Math.min(1,(now-settle.time)/settle.duration);
-            const t=fraction,t2=t*t,t3=t2*t;
-            const distance=settle.to-settle.from;
-            const tangential=velocity*settle.duration/1000;
-            // Cubic Hermite with an initial velocity matching cruise and
-            // a zero final velocity: no sudden jerk or last-second snap.
-            angle=(2*t3-3*t2+1)*settle.from+
-              (t3-2*t2+t)*tangential+
-              (-2*t3+3*t2)*settle.to;
+        function finalize(){
+          if(finalizing||!phaseOneFinished||!decided)return;
+          finalizing=true;
+          wheel.classList.remove('is-waiting-server');
+          if(!selected){finish();return;}
+          const index=eligible.findIndex(p=>String(p.id)===String(selected.id));
+          const titleIndex=index<0?eligible.findIndex(p=>String(p.title)===String(selected.title)):-1;
+          const chosenIndex=index>=0?index:titleIndex;
+          matched=chosenIndex>=0;
+          if(!matched){finish();return;}
+          wheel.querySelectorAll('.bok-wheel-token').forEach((token,i)=>{
+            if(i===chosenIndex)token.dataset.bokWinner='true';
+          });
+          const desired=-(chosenIndex+.5)*360/eligible.length;
+          // Keep movement in the forward direction, with an accurate stop.
+          const correction=mod(desired-mod(angle));
+          const from=angle,to=angle+correction;
+          const finalBegin=performance.now();
+          function finalFrame(now){
+            const t=Math.min(1,(now-finalBegin)/finalMs);
+            // Visibly ease into the selected sector instead of snapping.
+            const ease=1-Math.pow(1-t,3);
+            angle=from+(to-from)*ease;
             wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
-            if(fraction>=1){stop();return;}
-          }else{
-            wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
+            sound.tick(angle,now);
+            if(t<1)requestAnimationFrame(finalFrame);
+            else finish();
           }
-          sound.tick(angle,now);
-          requestAnimationFrame(tick);
+          requestAnimationFrame(finalFrame);
         }
-        requestAnimationFrame(tick);
-        return {choose:prize=>{
-          selected=prize;decided=true;
-          const index=eligible.findIndex(p=>String(p.id)===String(prize&&prize.id));
-          const fallback=index<0&&prize?eligible.findIndex(p=>String(p.title)===String(prize.title)):-1;
-          const found=index>=0?index:fallback;
-          const icons=wheel.querySelectorAll('.bok-wheel-token');
-          icons.forEach((token,i)=>{if(i===found)token.dataset.bokWinner='true';});
-        },done,matched:()=>matched};
+        function initialFrame(now){
+          if(begin===null)begin=now;
+          const t=Math.min(1,(now-begin)/firstMs);
+          angle=firstAngle*smooth(t);
+          wheel.style.transform='rotate('+angle.toFixed(3)+'deg)';
+          sound.tick(angle,now);
+          if(t<1)requestAnimationFrame(initialFrame);
+          else{
+            phaseOneFinished=true;
+            wheel.classList.remove('is-whirling');
+            if(decided)finalize();
+            else{
+              wheel.classList.remove('is-spinning');
+              wheel.classList.add('is-waiting-server');
+              sound.close();
+            }
+          }
+        }
+        requestAnimationFrame(initialFrame);
+        return {
+          choose:prize=>{selected=prize;decided=true;finalize();},
+          done,matched:()=>matched
+        };
       }
 
       function bokPrizeReveal(prize,onClose,outcome){
@@ -941,7 +935,16 @@
             onclick:async()=>{
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
+            const waitingLabel=wheelBox.querySelector('.bok-wheel-server-wait');
             const animation=bokStartWheelAnimation(wheel,data.prizes,bokWheelSoundEnabled());
+            // A slow GAS response must not make the wheel spin for 14+ seconds.
+            // After the short animation, explain that server confirmation remains pending.
+            const pendingMessage=setTimeout(()=>{
+              if(waitingLabel&&button.disabled){
+                waitingLabel.hidden=false;
+                button.textContent='⏳ Ожидаем подтверждение GAS…';
+              }
+            },2600);
             const pendingKey='bok-wheel-pending-v1';
             let requestId=localStorage.getItem(pendingKey);
             if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
@@ -954,7 +957,9 @@
                 (outcome.error&&['NO_SPINS','NO_PRIZES'].includes(outcome.error.code)))){
               try{localStorage.removeItem(pendingKey);}catch(_){}
             }
+            clearTimeout(pendingMessage);
             animation.choose(outcome&&outcome.ok?outcome.prize:null);
+            if(waitingLabel)waitingLabel.hidden=true;
             await animation.done;
             if(outcome&&outcome.ok){
               const real=(Array.isArray(data.prizes)?data.prizes:[]).find(p=>
@@ -996,14 +1001,18 @@
           fill(wheelBox,
             h('h4',{class:'bok-wheel-title'},'👑 Барабан удачи BOK Body'),
             h('p',{class:'bok-wheel-subtitle'},'Розовое золото, счастливые сюрпризы и настоящие призы'),
-            bokWheelArt(data),counter,nothingHint,button,mute,catalogue,
+            bokWheelArt(data),counter,nothingHint,button,
+            h('p',{class:'bok-wheel-server-wait',role:'status',hidden:true},
+              'Google обрабатывает результат. Приз будет показан после подтверждения сервера.'),
+            mute,catalogue,
             h('h4',{class:'bok-wheel-history-heading'},'📦 Мои выигрыши'),
             ...((data.wins||[]).length?(data.wins||[]).slice().reverse().map(w=>{
               const prize=(data.prizes||[]).find(p=>String(p.title)===String(w.title));
-              return h('div',{class:'gift-item'},
-                h('span',{class:'bok-wheel-history-icon'},prize?String(prize.emoji||'🎁'):bokPrizeIcon(w)),
-                h('span',{class:'bok-wheel-history-title'},w.title),
-                h('span',{class:'bok-wheel-history-status'},w.status));
+              return h('div',{class:'gift-item bok-wheel-history-row'},
+                h('span',{class:'bok-wheel-history-icon','aria-hidden':'true'},prize?bokPrizeIcon(prize):bokPrizeIcon(w)),
+                h('span',{class:'bok-wheel-history-title'},String(w.title||'Приз')),
+                h('span',{class:'bok-wheel-history-status'+(w.status==='ВЫДАН'?' is-issued':' is-pending')},
+                  String(w.status||'ОЖИДАЕТ')));
             }):[h('p',{class:'hint'},'Подарков пока нет')]));
         }).catch(()=>{wheelRequested=false;fill(wheelBox,h('p',{class:'hint'},'Барабан временно недоступен. Закройте и откройте раздел для повторной попытки.'));});
         let wheelRequested=false;
@@ -1060,7 +1069,10 @@
         p.frozen?h('p',{class:'msg bok-cab-freeze-note'},left===null?
           '❄ Бессрочная заморозка по старым правилам':
           '❄ До бесплатной разморозки осталось '+left+' дн.'):null,
-        authenticated?freezeUI:null,exchangeUI,depositUI,achBox,authenticated?wheelDetails:null,gifts,
+        (authenticated&&freezeUI&&exchangeUI)?
+          h('div',{class:'bok-cab-actions-row'},freezeUI,exchangeUI):
+          (authenticated?freezeUI:null),(!authenticated||!freezeUI)?exchangeUI:null,
+        depositUI,achBox,authenticated?wheelDetails:null,gifts,
         h('p',{class:'hint bok-cab-footer-note'},authenticated?
           'Действия с балансом подтверждены VK ID.':
           'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
