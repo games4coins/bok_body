@@ -582,6 +582,35 @@
       if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
     }
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
+    // Browser-local presentation preference. Default 0.4 = 2.5x faster.
+    // Global cross-device settings require a GAS settings endpoint (future release).
+    const wheelSpeedKey='bok-wheel-duration-scale-v1';
+    const wheelSpeedChoices=[
+      ['0.25','Очень быстро · 4×'],['0.4','Быстро · 2,5× (по умолчанию)'],
+      ['0.5','Ускоренно · 2×'],['0.75','Плавно · 1,33×'],
+      ['1','Оригинальная длительность']
+    ];
+    let wheelSpeedSaved='0.4';
+    try{
+      const value=localStorage.getItem(wheelSpeedKey);
+      if(wheelSpeedChoices.some(pair=>pair[0]===value))wheelSpeedSaved=value;
+    }catch(_){}
+    const wheelSpeedSelect=h('select',{class:'input'},
+      ...wheelSpeedChoices.map(([value,label])=>h('option',{
+        value,selected:value===wheelSpeedSaved
+      },label)));
+    wheelSpeedSelect.value=wheelSpeedSaved;
+    wheelSpeedSelect.addEventListener('change',()=>{
+      try{
+        localStorage.setItem(wheelSpeedKey,wheelSpeedSelect.value);
+        toast('Скорость барабана сохранена для этого браузера');
+      }catch(_){toast('Не удалось сохранить настройку браузера','bad');}
+    });
+    const wheelSpeedPanel=h('section',{class:'bok-wheel-local-speed'},
+      h('h3',null,'⏱️ Длительность вращения барабана'),
+      h('label',null,'Скорость анимации (только на этом устройстве)'),
+      wheelSpeedSelect,
+      h('p',{class:'hint'},'По умолчанию колесо вращается в 2,5 раза быстрее для всех участников. Изменение здесь сохраняется только в текущем браузере. Общую настройку через админку для всех пользователей добавим позже вместе с GAS.'));
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
@@ -604,6 +633,7 @@
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
+      wheelSpeedPanel,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
