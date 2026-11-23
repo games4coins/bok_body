@@ -506,12 +506,6 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
   filter:drop-shadow(0 2px 3px #8d554d60);
 }
-.bok-wheel-local-speed{
-  margin:13px 0 19px;padding:15px;border:1px solid #ecd1bf;
-  background:linear-gradient(145deg,#fff9f7,#fff0e9);border-radius:15px;
-}
-.bok-wheel-local-speed .input{width:100%;max-width:320px;margin-top:8px}
-.bok-wheel-local-speed .hint{margin:9px 0 0;font-size:12px}
 
 /* BOK Body 6.7.16 — achievement gallery, inspired by the approved mock-up.
    Scope to the player's cabinet; no changes to booking/admin screens. */
