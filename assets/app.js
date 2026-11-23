@@ -490,6 +490,7 @@
         graphic.appendChild(svg('circle',{cx:150,cy:150,r:141,fill:'#b77949',
           stroke:'#fff6d2','stroke-width':1.4}));
         graphic.appendChild(svg('circle',{cx:150,cy:150,r:128,fill:'#f6d2c6'}));
+        const emojiOverlays=[];
         if(sectors.length){
           const n=sectors.length,R=127,iconR=n>13?103:n>9?100:101;
           const palette=['bok-rose','bok-peach','bok-lilac','bok-ivory'];
@@ -522,10 +523,9 @@
                 (i%2?'gold':'rose')+'.svg',x:(x-imgSize/2).toFixed(2),
                 y:(y-imgSize/2).toFixed(2),width:imgSize,height:imgSize}));
             }else{
-              group.appendChild(svg('text',{x,y:y+2,'font-size':n>14?17:n>10?22:n>7?30:35,
-                'text-anchor':'middle','dominant-baseline':'central',
-                'font-family':'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif'},
-                bokPrizeIcon(p)));
+              // Browser SVG fonts sometimes replace colorful emoji with "!".
+              // Real HTML emoji overlays rotate with the same wheel disc.
+              emojiOverlays.push({x,y,emoji:bokPrizeIcon(p),title:String(p.title||'Приз'),n});
             }
             graphic.appendChild(group);
           });
@@ -561,6 +561,13 @@
         graphic.appendChild(svg('text',{x:150,y:176,'font-size':11,
           'text-anchor':'middle'},'🎀'));
         disc.appendChild(graphic);
+        emojiOverlays.forEach(item=>{
+          disc.appendChild(h('span',{class:'bok-wheel-html-emoji','aria-hidden':'true',
+            title:item.title,style:{
+              left:(item.x/3)+'%',top:(item.y/3)+'%',
+              fontSize:(item.n>14?17:item.n>10?21:item.n>7?29:34)+'px'
+            }},item.emoji));
+        });
         stage.appendChild(halo);
         stage.appendChild(disc);
         const pointer=h('span',{class:'bok-wheel-jewel-pointer','aria-hidden':'true'},'◆');
@@ -572,6 +579,14 @@
       };
       // Smooth animation with an accurate final sector. GAS is always the sole
       // authority for selecting a prize. The client ONLY visualizes its response.
+      function bokWheelDurationScale(){
+        // Default: 2.5 times shorter than the original 6.7.21 animation.
+        // Local override is presentation-only; no GAS changes or authority.
+        try{
+          const n=Number(localStorage.getItem('bok-wheel-duration-scale-v1'));
+          return Number.isFinite(n)&&n>=0.2&&n<=1.5?n:0.4;
+        }catch(_){return 0.4;}
+      }
       function bokStartWheelAnimation(wheel,catalog){
         if(!wheel)return {choose:()=>{},done:Promise.resolve(),matched:()=>false};
         wheel.style.transition='none';
@@ -579,8 +594,11 @@
         const eligible=Array.isArray(catalog)?catalog.filter(p=>p&&p.active!==false&&
           Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0)):[];
         const reduced=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const accelerationMs=reduced?120:1850,minCruiseMs=reduced?400:3200,
-          velocity=reduced?800:400,brakeMs=reduced?450:5300;
+        const scale=bokWheelDurationScale();
+        const accelerationMs=(reduced?120:1850)*scale,
+          minCruiseMs=(reduced?400:3200)*scale,
+          velocity=(reduced?800:400)/scale,
+          brakeMs=(reduced?450:5300)*scale;
         let begin=0,decided=false,selected=null,settle=null,matched=false,resolveDone;
         const done=new Promise(resolve=>{resolveDone=resolve;});
         const positiveDegrees=n=>((n%360)+360)%360;
