@@ -888,3 +888,136 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .bok-win-pagination>span{font-size:13px;font-weight:750;color:#72513f}
 @media(max-width:760px){.bok-win-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.bok-win-controls>input[type="search"]{grid-column:span 2}}
 @media(max-width:480px){.bok-win-journal{margin:20px -9px 0;padding:13px;border-radius:15px}.bok-win-row{padding:12px;align-items:flex-start;flex-direction:column}.bok-win-row>.btn{max-width:100%}.bok-win-controls{gap:7px}.bok-win-controls>.input{font-size:12px;padding:9px}.bok-win-hide-label{font-size:12px}}
+\n
+/* BOK Body 6.7.21 — rose-gold wheel, interactive jewel, smooth premium finish. */
+.bok-cabinet-sheet .bok-cab-wheel{
+  text-align:center;
+  background:radial-gradient(ellipse at 50% 6%,#fffaf6,#ffece2 58%,#fff6ed 100%);
+  border:1px solid #e5b7a0;
+  box-shadow:0 8px 29px rgba(176,105,81,.16),inset 0 2px 0 #fff;
+  overflow:hidden;
+}
+.bok-cabinet-sheet .bok-wheel-title{
+  color:#673c36;font:600 clamp(23px,4vw,34px)/1.15 Georgia,'Times New Roman',serif;
+  letter-spacing:-.015em;text-align:center!important;
+  margin:0!important;padding:3px 0 5px!important;border:0!important;
+}
+.bok-wheel-subtitle{
+  color:#985f53;font:500 13px/1.45 var(--font);
+  text-align:center;margin:3px auto 7px!important;
+}
+.bok-cabinet-sheet .bok-wheel-luxe{
+  display:grid!important;place-items:center;width:min(100%,445px)!important;height:auto!important;
+  min-height:0!important;aspect-ratio:1;margin:12px auto 20px!important;isolation:isolate;
+  position:relative!important;
+}
+.bok-wheel-halo{
+  position:absolute;z-index:-1;inset:-4%;border-radius:50%;
+  background:conic-gradient(from 10deg,#f4c8ae55 0deg,#fff4d2cc 34deg,
+    #e0a7bb55 80deg,#fff7e599 140deg,#da9bc877 210deg,#fffbe3 280deg,#f4c8ae55 360deg);
+  filter:blur(15px);opacity:.87;pointer-events:none;
+  animation:bokWheelHalo 11s linear infinite;
+}
+.bok-cabinet-sheet .bok-wheel-luxe-disc{
+  width:94%!important;height:94%!important;min-width:0!important;min-height:0!important;
+  flex:0 0 94%!important;position:relative!important;display:block!important;
+  border:0!important;background:transparent!important;overflow:visible!important;
+  border-radius:50%!important;transform-origin:center center!important;
+  box-shadow:0 8px 23px #874d3540,0 0 0 1px #fff4d7;
+  will-change:transform;backface-visibility:hidden;
+}
+.bok-wheel-luxe-disc svg{display:block;width:100%;height:100%;overflow:visible;
+  filter:drop-shadow(0 5px 7px #85573444)}
+.bok-wheel-luxe-disc.is-spinning svg{
+  filter:drop-shadow(0 3px 7px #bd6d4b65) saturate(1.12);
+}
+.bok-wheel-luxe-disc .bok-wheel-bulb{
+  transform-box:fill-box;transform-origin:center;
+  animation:bokWheelBulb 2.3s ease-in-out var(--lamp-phase,0s) infinite alternate;
+  filter:drop-shadow(0 0 2px #ffde76);
+}
+.bok-wheel-jewel-pointer{
+  position:absolute;z-index:10;top:-6px;left:50%;transform:translateX(-50%);
+  font:900 clamp(36px,5vw,50px)/1 Georgia,serif;
+  color:#fff2ba;-webkit-text-stroke:2px #b8723c;
+  text-shadow:0 3px 0 #b46c39,0 5px 8px #5c291a77,0 0 17px #fffad2;
+  filter:drop-shadow(0 3px 3px #753d25a8);
+}
+.bok-wheel-jewel-pointer:before{
+  content:'✦';position:absolute;left:45%;top:18%;font-size:.38em;
+  color:white;-webkit-text-stroke:0;transform:translateX(-50%);
+  text-shadow:0 0 8px white;
+}
+.bok-wheel-luxe-disc.is-spinning+.bok-wheel-jewel-pointer{
+  animation:bokWheelPointerTick .21s ease-in-out infinite alternate;
+}
+.bok-cabinet-sheet .bok-wheel-spins-counter{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;
+  margin:0 auto 10px;padding:9px 17px;border:1px solid #eac28f;border-radius:999px;
+  background:linear-gradient(120deg,#fffbf0,#ffebd7,#fffaf0);
+  color:#6c4031;box-shadow:0 3px 10px #ad6d3f25;
+  font-size:14px;font-weight:650;
+}
+.bok-wheel-spins-counter b{
+  min-width:28px;display:inline-grid;place-items:center;border-radius:99px;
+  padding:3px 8px;background:linear-gradient(#eeb1be,#ce7186);color:white;
+  box-shadow:0 2px 5px #9f5b6f55;font-size:17px;
+}
+.bok-wheel-spins-icon{font-size:21px}
+.bok-cabinet-sheet .bok-wheel-nothing-progress{
+  display:block;margin:6px auto 13px!important;color:#8a665c;font-size:12px;
+}
+.bok-cabinet-sheet .bok-wheel-nothing-progress b{color:#9d5f54}
+.bok-cabinet-sheet .bok-cab-wheel>.btn{
+  margin:10px auto 16px;max-width:440px;min-height:58px;
+  border-radius:99px;font-size:clamp(16px,3.5vw,21px);
+  font-weight:850;letter-spacing:.01em;border:2px solid #fff0cf;
+  background:linear-gradient(180deg,#f7c1c3,#d67d91 56%,#b75b72);
+  box-shadow:0 5px 0 #a8566e,0 11px 23px #a8566e66,inset 0 2px 1px #fff5f2;
+  text-shadow:0 1px 2px #8b4762;
+}
+.bok-cabinet-sheet .bok-cab-wheel>.btn:hover:not([disabled]){
+  box-shadow:0 6px 0 #a8566e,0 14px 26px #b7667766,inset 0 2px #fff5f2;
+}
+.bok-wheel-catalog{margin:17px auto;padding:12px;text-align:left;
+  border-radius:17px;border:1px solid #efd3be;background:#fffaf6;}
+.bok-wheel-catalog>summary{cursor:pointer;font-size:13px;font-weight:900;
+  color:#805342;list-style-position:inside;}
+.bok-wheel-catalog-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;margin-top:13px;}
+.bok-wheel-catalog-item{display:flex;align-items:center;gap:7px;min-width:0;
+  padding:9px 7px;border-radius:13px;border:1px solid #f1dfd2;
+  background:#fffefd;font-size:12px;font-weight:700;color:#745343;overflow-wrap:anywhere;}
+.bok-wheel-catalog-icon{font-size:26px;flex:0 0 auto;}
+.bok-cabinet-sheet .bok-wheel-history-heading{margin-top:20px}
+.bok-cabinet-sheet .bok-wheel-history-icon{font-size:22px;margin-right:9px}
+.bok-cabinet-sheet .bok-wheel-history-title{flex:1;font-weight:800;color:#724632}
+.bok-cabinet-sheet .bok-wheel-history-status{font-size:12px;font-weight:800;color:#996c51}
+.bok-wheel-bonus-note{margin:8px 0;font-weight:900;color:#b15a7b;}
+.bok-win-batchbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+  padding:12px;margin:10px 0;background:#fff1e5;border:1px solid #edcdb6;border-radius:14px;}
+.bok-win-selected-count{font-size:13px;font-weight:900;color:#854b32;margin-right:auto;}
+.bok-win-batchbar .btn{padding:9px 12px;font-size:12px}
+.bok-win-batchbar .btn-primary{background:linear-gradient(140deg,#df9567,#bc5e39);color:#fff}
+.bok-win-batch-message{margin:7px 0 12px!important;font-size:12px!important;}
+.bok-win-check{flex:none;align-self:center;width:20px;height:20px;
+  accent-color:#b55c49;cursor:pointer;}
+.bok-winner-search{width:100%;margin:8px 0 6px}
+.bok-winner-count{font-size:12px;font-weight:750;margin-bottom:7px}
+.bok-winner-list .prow[hidden]{display:none!important}
+.bok-secret-presets{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+.bok-secret-presets .btn{display:flex;gap:8px;align-items:center;min-height:46px}
+.bok-secret-presets img{width:34px;height:34px;object-fit:contain}
+@keyframes bokWheelHalo{to{transform:rotate(360deg)}}
+@keyframes bokWheelBulb{0%{opacity:.7}100%{opacity:1;filter:drop-shadow(0 0 5px #fff3a4)}}
+@keyframes bokWheelPointerTick{to{transform:translateX(-50%) translateY(2px) rotate(2deg)}}
+@media(max-width:650px){
+ .bok-cabinet-sheet .bok-wheel-luxe{width:min(100%,365px)!important}
+ .bok-wheel-jewel-pointer{top:-3px}
+ .bok-wheel-catalog-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .bok-win-batchbar .btn{font-size:11px;padding:8px}
+}
+@media(prefers-reduced-motion:reduce){
+ .bok-wheel-halo,.bok-wheel-luxe-disc .bok-wheel-bulb,
+ .bok-wheel-luxe-disc.is-spinning+.bok-wheel-jewel-pointer{animation:none!important}
+}
