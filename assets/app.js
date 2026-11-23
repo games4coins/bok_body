@@ -936,21 +936,32 @@
             button.disabled=true;button.textContent='🎡 Барабан вращается…';
             const wheel=wheelBox.querySelector('.bok-wheel-disc');
             const waitingLabel=wheelBox.querySelector('.bok-wheel-server-wait');
+            const pendingKey='bok-wheel-pending-v1';
+            let requestId=localStorage.getItem(pendingKey);
+            if(!requestId){
+              requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+
+                Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));
+              localStorage.setItem(pendingKey,requestId);
+            }
+            // Start GAS first, on the original click, before starting animation.
+            // Keep this same requestId when the network fails: the server owns the result.
+            const spinRequest=api.post('achSpin',{
+              vkAccessToken:window.BokVK.token(),requestId
+            }).catch(()=>({
+              ok:false,error:{code:'NETWORK',message:'Связь прервалась. Повторите попытку с тем же запросом.'}
+            }));
             const animation=bokStartWheelAnimation(wheel,data.prizes,bokWheelSoundEnabled());
-            // A slow GAS response must not make the wheel spin for 14+ seconds.
-            // After the short animation, explain that server confirmation remains pending.
+            // If GAS is still working when the short spin ends, park the wheel
+            // and show a clear waiting state instead of spinning indefinitely.
+            let serverAnswered=false;
             const pendingMessage=setTimeout(()=>{
-              if(waitingLabel&&button.disabled){
+              if(waitingLabel&&!serverAnswered){
                 waitingLabel.hidden=false;
                 button.textContent='⏳ Ожидаем подтверждение GAS…';
               }
             },2600);
-            const pendingKey='bok-wheel-pending-v1';
-            let requestId=localStorage.getItem(pendingKey);
-            if(!requestId){requestId=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'_'+Math.random().toString(36).slice(2)+'_'+Math.random().toString(36).slice(2));localStorage.setItem(pendingKey,requestId);}
-            let outcome;
-            try{outcome=await api.post('achSpin',{vkAccessToken:window.BokVK.token(),requestId});}
-            catch(e){outcome={ok:false,error:{message:'Связь прервалась. Повторите попытку: выигрыш не потеряется.'}};}
+            const outcome=await spinRequest;
+            serverAnswered=true;
             // A rejected request with NO_SPINS/NO_PRIZES has not created a win
             // for this requestId; do not leave a permanently pending button.
             if(outcome&&(outcome.ok||
