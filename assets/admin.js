@@ -456,17 +456,41 @@
         summary+(targets.length>3?'\\n… и ещё '+(targets.length-3):'')+
         '\\n\\nОперация изменит статусы призов в Google-таблице.'))return;
       saving=true;draw();let updated=0,errors=0;
-      for(const w of targets){
-        batchMessage.textContent='Выдача призов: '+(updated+errors+1)+' из '+targets.length+'…';
-        try{
-          const result=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
-          if(result){w.status='ВЫДАН';chosen.delete(idOf(w));updated++;}
-          else errors++;
-        }catch(error){errors++;console.error('BOK prize issue failed',error);}
+      batchMessage.textContent='Сохраняем '+targets.length+' призов одним запросом…';
+      let bulkResult=null;
+      try{
+        bulkResult=await api.post('adminAchWinBatch',{
+          password:A.pw,ids:targets.map(w=>idOf(w))});
+      }catch(error){
+        console.error('BOK bulk prize issue: network error',error);
+      }
+      if(bulkResult&&bulkResult.ok){
+        const success=new Set([...(bulkResult.updatedIds||[]),
+          ...(bulkResult.alreadyIds||[])].map(String));
+        targets.forEach(w=>{
+          if(success.has(idOf(w))){w.status='ВЫДАН';chosen.delete(idOf(w));}
+        });
+        updated=Number(bulkResult.updated)||0;
+        errors=(bulkResult.missingIds||[]).length;
+      }else if(bulkResult&&bulkResult.error&&bulkResult.error.code==='BAD_ACTION'){
+        // Backwards compatible with a GAS deployment that has not yet been
+        // upgraded. Existing single-prize action is safe and authenticated.
+        for(const w of targets){
+          batchMessage.textContent='Выдача призов: '+(updated+errors+1)+' из '+targets.length+'…';
+          try{
+            const result=await act('adminAchWin',{id:w.id,status:'ВЫДАН'});
+            if(result){w.status='ВЫДАН';chosen.delete(idOf(w));updated++;}
+            else errors++;
+          }catch(error){errors++;console.error('BOK prize issue failed',error);}
+        }
+      }else{
+        errors=targets.length;
+        toast('Не удалось подтвердить пакетную выдачу. Обновите журнал и проверьте статусы.','bad',7000);
       }
       saving=false;
       batchMessage.textContent='Отмечено выданными: '+updated+
-        (errors?' · Ошибок: '+errors+' — повторите оставшиеся.':' · готово, без перезагрузки.');
+        (errors?' · Не подтверждено: '+errors+' — проверьте статус.':
+          ' · готово, без перезагрузки.');
       draw();
     }},'✓ Отметить выданными');
     const batchBar=h('div',{class:'bok-win-batchbar'},
