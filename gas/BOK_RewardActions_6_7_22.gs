@@ -158,7 +158,8 @@ function bokEarlyState_(body){
 }
 /** Only Code.js admin routing after checkAdmin_ may call this. */
 function bokRewardAdminList_(){
-  return {ok:true,items:bokRewardConfigs_().map(function(r){
+  var enabled=PropertiesService.getScriptProperties().getProperty('BOK_EARLY_BOOKING_ENABLED')==='true';
+  return {ok:true,earlyBookingEnabled:enabled,items:bokRewardConfigs_().map(function(r){
     return {prizeId:String(r[0]),action:String(r[1]),parameter:String(r[2]||''),
       active:String(r[3]).toUpperCase()==='ДА'};
   })};
@@ -175,17 +176,16 @@ function bokAdminBackfillEarly_(body){
   return withLock_(function(){
     var wins=achRows_(achWins_()),grants=bokEarlyGrants_(),known={};
     achRows_(grants).forEach(function(r){known[String(r[0])]=true;});
-    var plans=[];
+    var plans=[],configById={};
+    bokRewardConfigs_().forEach(function(c){if(String(c[1])==='early_booking'&&String(c[3]).toUpperCase()==='ДА')configById[String(c[0])]=true;});
     wins.forEach(function(w){
       var id=String(w[0]),key=String(w[2]);
       if(!id||!key||String(w[5])==='ВЫДАН')return;
       // An explicit prize configuration selects which historic prize to migrate.
-      var rule=bokRewardConfigs_().filter(function(c){
-        return String(c[0])===String(w[3])&&String(c[1])==='early_booking'&&String(c[3]).toUpperCase()==='ДА';
-      })[0];
-      if(!rule||known['reward:'+id])return;
+      if(!configById[String(w[3])]||known['reward:'+id])return;
       plans.push({id:id,key:key,prizeId:String(w[3]),title:String(w[4])});
     });
+    if(!dry&&plans.length>100)return err_('BACKFILL_LIMIT','Более 100 записей: переносите отдельными партиями');
     if(!dry)plans.forEach(function(p){
       grants.appendRow(['reward:'+p.id,new Date(),p.key,p.id,'НЕТ','']);
       bokRewardLog_().appendRow([p.id,new Date(),p.key,p.prizeId,
