@@ -101,7 +101,12 @@ function bokApplyRewardForWin_(winId,key){
       var player=findPlayer_(key);
       if(!player)return err_('PLAYER_NOT_FOUND','Не удалось найти участника');
       var oldMiss=player.misses;
-      if(oldMiss){player.misses=0;savePlayer_(player);invalidate_();}
+      if(oldMiss){
+        player.misses=0;savePlayer_(player);
+        appendLedger_([ledgerRow_(player,OP.MISSSET,0,'автоматически',
+          'Сброс пропусков по призу '+winId,readSettings_().eventNumber)]);
+        noteOp_();invalidate_();
+      }
       result='Сброшено пропусков: '+oldMiss;
     }else if(rule.action==='unlock_achievement'){
       var current=achRows_(achAwards_()),earned={};
@@ -157,4 +162,40 @@ function bokRewardAdminList_(){
     return {prizeId:String(r[0]),action:String(r[1]),parameter:String(r[2]||''),
       active:String(r[3]).toUpperCase()==='ДА'};
   })};
+}
+
+/** Migration for historic, unissued early-booking wins. Admin endpoint ONLY.
+ * Default: dryRun. Never count a status ВЫДАН as unspent, and never apply
+ * historical actions other than the exact early_booking prize type.
+ */
+function bokAdminBackfillEarly_(body){
+  var dry=body&&body.apply===true?false:true;
+  if(!dry&&String(body.confirm||'')!=='ACTIVATE_EARLY_BACKFILL')
+    return err_('CONFIRM','Требуется подтверждение переноса');
+  return withLock_(function(){
+    var wins=achRows_(achWins_()),grants=bokEarlyGrants_(),known={};
+    achRows_(grants).forEach(function(r){known[String(r[0])]=true;});
+    var plans=[];
+    wins.forEach(function(w){
+      var id=String(w[0]),key=String(w[2]);
+      if(!id||!key||String(w[5])==='ВЫДАН')return;
+      // An explicit prize configuration selects which historic prize to migrate.
+      var rule=bokRewardConfigs_().filter(function(c){
+        return String(c[0])===String(w[3])&&String(c[1])==='early_booking'&&String(c[3]).toUpperCase()==='ДА';
+      })[0];
+      if(!rule||known['reward:'+id])return;
+      plans.push({id:id,key:key,prizeId:String(w[3]),title:String(w[4])});
+    });
+    if(!dry)plans.forEach(function(p){
+      grants.appendRow(['reward:'+p.id,new Date(),p.key,p.id,'НЕТ','']);
+      bokRewardLog_().appendRow([p.id,new Date(),p.key,p.prizeId,
+        'early_booking','Историческое право ранней брони']);
+    });
+    return {ok:true,dryRun:dry,count:plans.length,items:plans.slice(0,100)};
+  });
+}
+function bokAdminEarlySettings_(body){
+  if(typeof body.enabled!=='boolean')return err_('BAD_SETTING','Ожидается true или false');
+  PropertiesService.getScriptProperties().setProperty('BOK_EARLY_BOOKING_ENABLED',body.enabled?'true':'false');
+  return {ok:true,enabled:body.enabled};
 }
