@@ -15,7 +15,9 @@ const sh=n=>ss.getSheetByName(n)||ss.insertSheet(n);
 let player={key:'vk-test',name:'Test',misses:2};let resetOps=0;
 const c={ss_:()=>ss,achRows_:s=>s.data.slice(1),achWins_:()=>sh('BOK Выигрыши'),achSpins_:()=>{const x=sh('BOK Вращения');if(!x.getLastRow())x.appendRow(['ID','Date','Key','Amount','Reason','Who']);return x},achAwards_:()=>{const x=sh('BOK Ачивки');if(!x.getLastRow())x.appendRow(['ID','Date','Key','Badge','Event','From']);return x},withLock_:fn=>fn(),findPlayer_:key=>key==='vk-test'?player:null,savePlayer_:p=>{player=p},invalidate_:()=>{},readSettings_:()=>({eventNumber:234}),err_:(code,message)=>({ok:false,error:{code,message}}),PropertiesService:{getScriptProperties:()=>({getProperty:()=>null,setProperty:()=>{}})},ACH_DEFS:[['visits10','🎀','V','',10,'visits',1],['tickets5','🎟','T','',5,'tickets',1]],appendLedger_:()=>{resetOps++},ledgerRow_:()=>[],OP:{MISSSET:'MISSSET'},noteOp_:()=>{},giftCatalog_:()=>[],allGifts_:()=>[],ensureGiftsSheet_:()=>{},SHEET_GIFTS:'Подарки',Date,Number,Object,String,Logger:{log:()=>{}}};
 vm.createContext(c);
-vm.runInContext(fs.readFileSync(__dirname+'/BOK_RewardActions_6_7_22.gs','utf8'),c);
+const path=require('path');
+const candidates=[path.join(__dirname,'BOK_RewardActions_6_7_22.gs'),path.join(__dirname,'../GAS/BOK_RewardActions.js'),path.join(__dirname,'../gas/BOK_RewardActions_6_7_22.gs')];
+vm.runInContext(fs.readFileSync(candidates.find(fs.existsSync),'utf8'),c);
 const when=new Date('2026-11-24T20:00:00Z'),earlier=new Date('2026-11-23T20:00:00Z');
 function addWin(id,prize){if(!sh('BOK Выигрыши').getLastRow())sh('BOK Выигрыши').appendRow(['ID','Дата','Ключ','Приз','Название','Статус','Дата выдачи']);sh('BOK Выигрыши').appendRow([id,when,'vk-test',prize,'Prize','ОЖИДАЕТ',''])}
 function action(prize,kind,p=''){sh('BOK Действия призов').data[0]=['ID','Action','Parameter','Active','Since'];sh('BOK Действия призов').appendRow([prize,kind,p,'ДА',earlier]);}
