@@ -610,6 +610,8 @@
       if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
     }
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
+    const rewardRules=await act('adminRewardRules');
+    const rewardMap=new Map((rewardRules&&rewardRules.items||[]).map(r=>[String(r.prizeId),r]));
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
@@ -626,6 +628,13 @@
     const prizeWeight=h('input',{class:'input',type:'number',min:'0',value:'10',placeholder:'Вес'});
     const prizeStock=h('input',{class:'input',type:'number',min:'0',placeholder:'Остаток (пусто = без лимита)'});
     const active=h('input',{type:'checkbox',checked:true});
+    const rewardAction=h('select',{class:'input'},...[
+      ['none','Без автоматического действия'],['early_booking','🔑 Автобронь до старта'],
+      ['unlock_achievement','🏅 Разблокировать следующую ачивку'],
+      ['reset_misses','🔄 Обнулить пропуски'],['add_spins','🎡 Начислить вращения'],
+      ['grant_gift','🎁 Выдать подарок каталога']
+    ].map(([value,label])=>h('option',{value},label)));
+    const rewardParam=h('input',{class:'input',placeholder:'Параметр: вращения 1–20 или ID подарка'});
     const syncBtn=h('button',{class:'btn btn-soft',onclick:async()=>{
       const x=await act('adminAchSync',{dryRun:true});
       if(x)toast('Проверка: '+x.newAwards+' ачивок, '+x.newSpins+' вращений; восстановлений: '+x.repairedSpins);
@@ -653,9 +662,20 @@
       h('h3',null,'🎁 Каталог призов · вес выпадения'),
       h('p',{class:'hint'},'Шанс приза пропорционален его весу среди активных призов с остатком. Вес 0 отключает выпадение.'),
       ...(data.prizes||[]).map(p=>h('div',{class:'gift-item'},p.emoji+' '+p.title+' · вес '+p.weight+' · остаток '+(p.stock===null?'∞':p.stock)+(p.active?'':' · отключён'),
-        h('button',{class:'btn btn-soft btn-sm',onclick:()=>{prizeId.value=p.id;prizeTitle.value=p.title;prizeEmoji.value=p.emoji;prizeWeight.value=p.weight;prizeStock.value=p.stock===null?'':p.stock;active.checked=p.active;}},'Изменить'))),
+        h('button',{class:'btn btn-soft btn-sm',onclick:()=>{prizeId.value=p.id;prizeTitle.value=p.title;prizeEmoji.value=p.emoji;prizeWeight.value=p.weight;prizeStock.value=p.stock===null?'':p.stock;active.checked=p.active;
+          const r=rewardMap.get(String(p.id));rewardAction.value=r?r.action:'none';rewardParam.value=r?r.parameter||'':'';
+        }},'Изменить'))),
       h('h4',null,'Добавить / изменить приз'),prizeId,prizeTitle,prizeEmoji,prizeWeight,prizeStock,
       h('label',null,active,' Активен'),
+      h('h4',null,'⚙️ Автоматическое действие приза'),
+      h('p',{class:'hint'},'Работает после подтверждённого вращения. Действие применяется однократно по ID выигрыша. Для новой записи сначала сохраните приз, затем назначьте действие по его ID.'),
+      rewardAction,rewardParam,
+      h('button',{class:'btn btn-soft',onclick:async()=>{
+        const id=prizeId.value.trim();if(!id)return toast('Сначала выберите сохранённый приз','bad');
+        if(!confirm('Назначить действие '+rewardAction.value+' для приза '+id+'?'))return;
+        const r=await act('adminRewardRule',{prizeId:id,action:rewardAction.value,parameter:rewardParam.value});
+        if(r){toast('Действие сохранено. Исторические выигрыши не меняются.');achievementsView();}
+      }},'Сохранить действие приза'),
       h('div',{class:'bok-secret-presets'},
         ...[['rose','❔','Секретный приз №1'],['gold','❓','Секретный приз №2']].map(([variant,icon,title])=>
           h('button',{class:'btn btn-soft btn-sm',onclick:()=>{
