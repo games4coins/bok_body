@@ -697,7 +697,7 @@
         // Show the actual server error code to distinguish an obsolete
         // deployment (BAD_ACTION) from an unsupported rule (BAD_RULE).
         const r=await api.post('adminRewardRule',{
-          password:A.pw,prizeId:id,action:rewardAction.value,parameter:rewardParam.value
+          password:A.pw,prizeId:id,rewardAction:rewardAction.value,parameter:rewardParam.value
         });
         if(r&&r.ok){
           toast('Действие сохранено. Исторические выигрыши не меняются.');
@@ -706,7 +706,7 @@
           const e=r&&r.error||{};
           const code=String(e.code||'UNKNOWN');
           const help=code==='BAD_ACTION'
-            ?' — опубликованный Code.gs не содержит маршрут adminRewardRule. Опубликуйте новую версию GAS.'
+            ?' — сервер не распознал команду adminRewardRule; проверьте маршрут и адрес API.'
             :code==='BAD_RULE'
               ?' — проверьте BOK_RewardActions.gs и список BOK_REWARD_ALLOWED.'
               :'';
