@@ -1286,3 +1286,16 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
     grid-column:2;justify-self:start;
   }
 }
+
+/* BOK staged 6.7.22: authenticated one-time early booking action */
+.bok-cabinet-sheet .bok-early-booking-box:empty{display:none}
+.bok-cabinet-sheet .bok-early-booking-box{margin:12px 0}
+.bok-cabinet-sheet .bok-early-booking-activate{
+  display:flex;align-items:center;justify-content:center;
+  width:100%;min-height:46px;padding:11px 15px;
+  background:linear-gradient(120deg,#fff8e9,#f7ddba,#fff7ea);
+  color:#765038;font-weight:850;font-size:13px;
+  border:1px solid #cfa36d;border-radius:14px;
+  box-shadow:0 4px 12px rgba(160,102,61,.15);
+}
+.bok-cabinet-sheet .bok-early-booking-activate:hover{filter:brightness(1.035)}
