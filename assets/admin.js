@@ -612,6 +612,24 @@
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
     const rewardRules=await act('adminRewardRules');
     const rewardMap=new Map((rewardRules&&rewardRules.items||[]).map(r=>[String(r.prizeId),r]));
+    const earlyActive=!!(rewardRules&&rewardRules.earlyBookingEnabled);
+    const earlyControls=h('div',{class:'bok-early-admin-controls'},
+      h('h3',null,'🔑 Ранняя бронь до старта'),
+      h('p',{class:'hint'},'Разрешается только владельцам неизрасходованного права, в режиме паузы. Обычные лимиты и проверка VK ID сохраняются.'),
+      h('button',{class:'btn btn-soft',onclick:async()=>{
+        if(!confirm((earlyActive?'Выключить':'Включить')+' раннюю бронь в этом GAS?'))return;
+        const x=await act('adminEarlyBookingSettings',{enabled:!earlyActive});
+        if(x)achievementsView();
+      }},earlyActive?'🟢 Ранняя бронь включена — выключить':'⚪ Ранняя бронь выключена — включить'),
+      h('button',{class:'btn btn-soft',onclick:async()=>{
+        const p=await act('adminEarlyBackfill',{apply:false});
+        if(!p)return;
+        if(!p.count){toast('Старых невыданных прав не обнаружено');return;}
+        const names=(p.items||[]).slice(0,10).map(x=>x.key+' · '+x.title).join('\n');
+        if(!confirm('Будут выданы '+p.count+' исторических прав автоброни.\n'+names+'\nПродолжить?'))return;
+        const applied=await act('adminEarlyBackfill',{apply:true,confirm:'ACTIVATE_EARLY_BACKFILL'});
+        if(applied)toast('Перенесено прав: '+applied.count);
+      }},'🔍 Проверить и перенести старые автоброни'));
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
@@ -641,6 +659,7 @@
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
+      earlyControls,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
