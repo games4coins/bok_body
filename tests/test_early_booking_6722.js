@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');const vm=require('node:vm');const fs=require('node:fs');const path=require('node:path');
-const dir=fs.existsSync(path.join(__dirname,'../GAS/Code.js'))?path.join(__dirname,'../GAS'):path.join(__dirname);
-const code=fs.readFileSync(path.join(dir,fs.existsSync(path.join(dir,'Code.js'))?'Code.js':'Code_6_7_22_STAGING.js'),'utf8');
+const candidates=[path.join(__dirname,'../GAS/Code.js'),path.join(__dirname,'Code_6_7_22_STAGING.js'),path.join(__dirname,'../gas/STAGING_Code_6_7_22.js')];
+const code=fs.readFileSync(candidates.find(fs.existsSync),'utf8');
 let settings={paused:true,bookingOpen:false,ticketCount:20,maxPending:4,maxConfirmed:0,nameFormat:'full',confirmHours:4,eventNumber:250,utcOffset:3},enabled=true,bookings=[],grants=[{id:'reward:wheel:A'}],spent=[];
 const player={key:'k1',name:'Alice',url:'https://vk.com/id123',photo:'',frozen:false};
 const mock={
