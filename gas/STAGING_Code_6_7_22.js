@@ -1448,6 +1448,8 @@ function doPost(e) {
       if (action === 'adminAchPrize') return json_(achAdminPrize_(body));
       if (action === 'adminRewardRule') return json_(bokRewardAdminRules_(body));
       if (action === 'adminRewardRules') return json_(bokRewardAdminList_());
+      if (action === 'adminEarlyBookingSettings') return json_(bokAdminEarlySettings_(body));
+      if (action === 'adminEarlyBackfill') return json_(bokAdminBackfillEarly_(body));
       if (action === 'adminAchSpin') return json_(achAdminSpin_(body));
       if (action === 'adminAchAward') return json_(achAdminAward_(body));
       if (action === 'adminAchWin') return json_(achAdminWin_(body));
