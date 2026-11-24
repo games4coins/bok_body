@@ -14,9 +14,20 @@
   </main>
   <script src="config.js"></script>
   <script src="assets/qrcode.js?v=6.7.22-early-staging"></script>
-  <script src="assets/common.js?v=6.7.22-early-staging"></script>
+  <script src="assets/common.js?v=6.7.23-route-fix"></script>
   <script src="assets/vk-auth.js?v=6.7.22-early-staging"></script>
   <script src="assets/app.js?v=6.7.22-early-staging"></script>
-  <footer id="bok-version-footer" style="position:relative;z-index:1;text-align:center;padding:22px 12px 30px;font:12px/1.5 system-ui,sans-serif;opacity:.7">BOK Body · версия сайта 6.7.22-P2 · Бронирование<div style="font-size:11px">Оптимизация скорости и кабинета: 24.11.2026</div></footer>
+  <footer id="bok-version-footer" style="position:relative;z-index:1;margin:18px auto;max-width:880px;text-align:center;padding:18px 16px 28px;font:13px/1.55 system-ui,sans-serif;color:#746356">
+    <div style="font-weight:700">BOK Body · сайт 6.7.23 · Бронирование</div>
+    <div style="font-size:12px">Релиз 25.11.2026 · Исправление маршрутизации действий призов</div>
+    <details style="margin:10px auto 0;max-width:650px;text-align:left;border:1px solid #e6d9ce;border-radius:12px;padding:10px 14px;background:#fffaf6">
+      <summary style="cursor:pointer;font-weight:650">История версий и изменений</summary>
+      <div style="padding-top:8px;font-size:12px">
+        <p style="margin:6px 0"><strong>6.7.23 · 25.11.2026</strong> — Исправлен конфликт поля action в запросе сохранения действий призов; добавлена защита маршрута API. Серверное исправление требует отдельной публикации GAS.</p>
+        <p style="margin:6px 0"><strong>6.7.22 · 24.11.2026</strong> — Ранняя бронь и управление автоматическими действиями призов; диагностика ответов сервера.</p>
+        <p style="margin:6px 0"><strong>6.7.21</strong> — Оптимизация личного кабинета и загрузки данных; доработки вращений и учёта трёх «Ничего».</p>
+      </div>
+    </details>
+  </footer>
 </body>
 </html>
