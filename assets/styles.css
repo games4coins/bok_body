@@ -1299,3 +1299,7 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   box-shadow:0 4px 12px rgba(160,102,61,.15);
 }
 .bok-cabinet-sheet .bok-early-booking-activate:hover{filter:brightness(1.035)}
+
+.bok-early-admin-controls{margin:15px 0;padding:15px;border:1px solid #e9c7ad;border-radius:16px;background:linear-gradient(145deg,#fffaf5,#fcebdd)}
+.bok-early-admin-controls .btn{margin:5px 9px 5px 0}
+.bok-early-admin-controls h3{margin:0 0 8px}
