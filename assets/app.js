@@ -7,7 +7,7 @@
   const POLL_PEAK_MS = 8000;
   const POLL_MIN_MS = 8000;
   const POLL_MAX_MS = 45000;
-  const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false };
+  const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false, early: null };
   const UNCONF = ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'];
 
   // ───── Скелет страницы (строится один раз) ─────
@@ -48,7 +48,7 @@
   const tz = () => tzName(off());
   const myActive = () => S.mine.filter((b) => ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА', 'ПОДТВЕРЖДЕНА'].indexOf(b.status) >= 0);
   const myPendingCount = () => S.mine.filter((b) => UNCONF.indexOf(b.status) >= 0).reduce((s, b) => s + b.count, 0);
-  const canBook = () => S.st && S.st.open && !S.st.paused;
+  const canBook = () => S.st && ((S.st.open && !S.st.paused) || (S.st.paused && S.early && S.early.active));
   const list = (nums) => '№' + nums.join(', №');
   function fmtHours(x) { return Number.isInteger(x) ? x + ' ч' : Math.round(x * 60) + ' мин'; }
 
@@ -1071,6 +1071,18 @@
         cabStat('❌','Пропуски',p.miss,'misses'),
         cabStat('🏆','Победы',p.wins||0,'wins'),
         cabStat(p.frozen?'❄️':'🌷','Статус',p.frozen?'Заморожен':'Активен',p.frozen?'frozen':'active'));
+      const earlyBookingBox=h('div',{class:'bok-early-booking-box'});
+      if(authenticated&&S.st&&S.st.paused&&token){
+        api.post('earlyBookingState',{vkAccessToken:token}).then(state=>{
+          if(!state||!state.ok||!state.eligible)return;
+          fill(earlyBookingBox,h('button',{type:'button',class:'btn bok-early-booking-activate',onclick:()=>{
+            S.early={active:true,url:p.url};S.sel.clear();
+            closeModal();renderGrid();renderAction();
+            document.querySelector('.gridwrap')?.scrollIntoView({behavior:'smooth',block:'center'});
+            toast('Ранняя бронь активирована: выберите один номерок');
+          }},'🔑 Активировать автобронь · '+state.availableGrants+' доступно'));
+        }).catch(()=>{});
+      }
       const gifts=h('section',{class:'bok-cab-panel bok-cab-gifts'},
         h('h4',null,'🎁 Подарки эфиров'),
         h('div',{class:'gift-list'},(p.gifts||[]).length?(p.gifts||[]).map(g=>
@@ -1094,7 +1106,7 @@
         (authenticated&&freezeUI&&exchangeUI)?
           h('div',{class:'bok-cab-actions-row'},freezeUI,exchangeUI):
           (authenticated?freezeUI:null),(!authenticated||!freezeUI)?exchangeUI:null,
-        depositUI,achBox,authenticated?wheelDetails:null,gifts,
+        earlyBookingBox,depositUI,achBox,authenticated?wheelDetails:null,gifts,
         h('p',{class:'hint bok-cab-footer-note'},authenticated?
           'Действия с балансом подтверждены VK ID.':
           'Публичная карточка. Накопления и статус доступны для просмотра, но тестовый депозит, обмен и управление заморозкой требуют VK ID.'));
@@ -1178,7 +1190,8 @@
       if (!canBook()) { toast(S.st.paused ? (S.st.pauseMessage || 'Технический перерыв') : 'Приём броней закрыт', 'bad'); return; }
       const allowed = S.st.limits.pending - myPendingCount();
       if (allowed <= 0) { toast('У вас уже есть неподтверждённые номерки — дождитесь подтверждения, тогда можно будет взять ещё.', 'bad', 6500); return; }
-      if (S.sel.size >= allowed) { toast('Сейчас можно выбрать не больше ' + allowed + ' ' + (allowed === 1 ? 'номерка' : 'номерков') + '.', 'bad'); return; }
+      const effectiveLimit=S.st.paused&&S.early?Math.min(1,allowed):allowed;
+      if (S.sel.size >= effectiveLimit) { toast('Сейчас можно выбрать не больше ' + effectiveLimit + ' ' + (effectiveLimit === 1 ? 'номерка' : 'номерков') + '.', 'bad'); return; }
       S.sel.add(n);
     }
     renderGrid(); renderAction();
@@ -1286,6 +1299,17 @@
   function openBooking() {
     const nums = Array.from(S.sel).sort((a, b) => a - b);
     if (!nums.length) return;
+    if(S.st&&S.st.paused&&S.early&&S.early.active){
+      if(nums.length!==1)return toast('Автобронь действует только на один номерок','bad');
+      const url=S.early.url,token=window.BokVK&&window.BokVK.token&&window.BokVK.token();
+      if(!token)return toast('Для автоброни войдите через VK ID','bad');
+      if(!confirm('Использовать одно право ранней брони для номерка №'+nums[0]+'?'))return;
+      api.post('book',{clientId:CLIENT,vkUrl:url,vkAccessToken:token,numbers:nums}).then(r=>{
+        if(r&&r.ok){S.early=null;S.sel.clear();showSuccess(r);refresh();}
+        else toast((r&&r.error&&r.error.message)||'Автобронь не выполнена','bad');
+      }).catch(()=>toast('Сбой связи. Проверьте историю броней перед повтором','bad'));
+      return;
+    }
     const vkInput = h('input', {
       class: 'input', type: 'text', inputmode: 'url', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false',
       placeholder: 'vk.com/id12345 или vk.com/ваш_ник', value: store('nomerok_vk') || ''
