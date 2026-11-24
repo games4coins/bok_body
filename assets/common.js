@@ -223,7 +223,7 @@
       else r = await fetch(CFG.API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // без preflight-запроса CORS
-        body: JSON.stringify(Object.assign({ action }, payload))
+        body: JSON.stringify(Object.assign({}, payload, { action }))
       });
       const data = await r.json();
       if (data && data.now) skew = data.now - Date.now();
