@@ -106,7 +106,11 @@ function bokApplyRewardForWin_(winId,key){
     }else if(rule.action==='unlock_achievement'){
       var current=achRows_(achAwards_()),earned={};
       current.forEach(function(r){if(String(r[2])===String(key))earned[String(r[3])]=true;});
-      var next=ACH_DEFS.filter(function(d){return !earned[d[0]];})[0];
+      // Recover a crash after granting the badge but before the effect log:
+      // the same win must NEVER unlock a second badge on retry.
+      var prior=current.filter(function(r){return String(r[0]).indexOf(effectId+':')===0;})[0];
+      var next=prior?ACH_DEFS.filter(function(d){return d[0]===String(prior[3]);})[0]:
+        ACH_DEFS.filter(function(d){return d[6]>0&&!earned[d[0]];})[0];
       if(next){
         var awardId=effectId+':'+next[0];
         if(!current.some(function(r){return String(r[0])===awardId}))
