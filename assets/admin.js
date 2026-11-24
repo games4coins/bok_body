@@ -610,8 +610,10 @@
       if(requestSeq!==achViewSeq || A.tab!=='achievements')return;
     }
     if(!data){fill(host,h('h2',null,'🏆 Ачивки и барабан BOK'),h('p',null,'Не удалось загрузить данные. Проверьте подключение GAS.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'Повторить'));return;}
-    const rewardRules=await act('adminRewardRules');
-    const rewardMap=new Map((rewardRules&&rewardRules.items||[]).map(r=>[String(r.prizeId),r]));
+    // Legacy GAS may not yet expose rewards during staged installation.
+    const rewardRules=await api.post('adminRewardRules',{password:A.pw}).catch(()=>null);
+    const rewardReady=!!(rewardRules&&rewardRules.ok);
+    const rewardMap=new Map((rewardReady?rewardRules.items||[]:[]).map(r=>[String(r.prizeId),r]));
     const earlyActive=!!(rewardRules&&rewardRules.earlyBookingEnabled);
     const earlyControls=h('div',{class:'bok-early-admin-controls'},
       h('h3',null,'🔑 Ранняя бронь до старта'),
@@ -659,7 +661,7 @@
     }},'🔎 Проверить расчёт (без записи)');
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
-      earlyControls,
+      rewardReady?earlyControls:null,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
@@ -686,15 +688,15 @@
         }},'Изменить'))),
       h('h4',null,'Добавить / изменить приз'),prizeId,prizeTitle,prizeEmoji,prizeWeight,prizeStock,
       h('label',null,active,' Активен'),
-      h('h4',null,'⚙️ Автоматическое действие приза'),
-      h('p',{class:'hint'},'Работает после подтверждённого вращения. Действие применяется однократно по ID выигрыша. Для новой записи сначала сохраните приз, затем назначьте действие по его ID.'),
-      rewardAction,rewardParam,
-      h('button',{class:'btn btn-soft',onclick:async()=>{
+      rewardReady?h('h4',null,'⚙️ Автоматическое действие приза'):null,
+      rewardReady?h('p',{class:'hint'},'Работает после подтверждённого вращения. Действие применяется однократно по ID выигрыша. Для новой записи сначала сохраните приз, затем назначьте действие по его ID.'):null,
+      rewardReady?rewardAction:null,rewardReady?rewardParam:null,
+      rewardReady?h('button',{class:'btn btn-soft',onclick:async()=>{
         const id=prizeId.value.trim();if(!id)return toast('Сначала выберите сохранённый приз','bad');
         if(!confirm('Назначить действие '+rewardAction.value+' для приза '+id+'?'))return;
         const r=await act('adminRewardRule',{prizeId:id,action:rewardAction.value,parameter:rewardParam.value});
         if(r){toast('Действие сохранено. Исторические выигрыши не меняются.');achievementsView();}
-      }},'Сохранить действие приза'),
+      }},'Сохранить действие приза'):null,
       h('div',{class:'bok-secret-presets'},
         ...[['rose','❔','Секретный приз №1'],['gold','❓','Секретный приз №2']].map(([variant,icon,title])=>
           h('button',{class:'btn btn-soft btn-sm',onclick:()=>{
