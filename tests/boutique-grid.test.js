@@ -23,9 +23,9 @@ function findAll(node,fn,out=[]){if(Array.isArray(node)){node.forEach(x=>findAll
  if(fn(node))out.push(node);
  (node.children||[]).forEach(x=>findAll(x,fn,out));return out;}
 const quality={isLite:()=>false,set:()=>{}};
-const API=new Function('A','gridQuality','h','avatar','list','renderTab','renderTop','openTicket','blockSelected','openManual','openDepositFromGrid','setTimeout','clearTimeout',fragment+';return {gridView,gridFacesActive,stopGridFaces};')(
+const API=new Function('A','gridQuality','h','avatar','list','renderTab','renderTop','openTicket','blockSelected','openManual','openDepositFromGrid','bookingGridStyle','setTimeout','clearTimeout',fragment+';return {gridView,gridFacesActive,stopGridFaces};')(
  state,quality,make,(name,photo)=>make('avatar',{name,photo}),nums=>'№'+nums.join(', №'),
- ()=>{renders++;},()=>{},()=>{opened++;},()=>{blocked++;},()=>{manual++;},()=>{deposit++;},
+ ()=>{renders++;},()=>{},()=>{opened++;},()=>{blocked++;},()=>{manual++;},()=>{deposit++;},n=>({'--bok-grid-cols':String(n<=63?7:8)}),
  cb=>{clock=cb;return 1;},()=>{clock=null;});
 function tile(view,n){return findAll(view,x=>x.tag==='button'&&String(x.attrs.title||'').startsWith('№'+n+' ·'))[0];}
 let view=API.gridView();
