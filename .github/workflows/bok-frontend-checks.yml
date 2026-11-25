@@ -31,4 +31,6 @@ jobs:
           grep -Fq 'function ensureToken()' assets/vk-auth.js
           grep -Fq 'adminDepositConfirm' assets/admin.js
           grep -Fq 'adminUnlockBackfill' assets/admin.js
+          grep -Fq 'function systemDiagnosticsView()' assets/admin.js
+          grep -Fq "version: () => call('GET', 'version'" assets/common.js
           echo 'Frontend invariants OK'
