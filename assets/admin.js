@@ -1091,9 +1091,9 @@
 
   // Release diagnostics are read-only: never call prize/booking mutations.
   function systemDiagnosticsView() {
-    const EXPECTED='6.7.25';
+    const EXPECTED='6.7.26';
     const REQUIRED=['vkCabinetState','achSpin','adminRewardRule',
-      'adminUnlockBackfill','adminDepositConfirm','adminDepositCancel'];
+      'adminUnlockBackfill','adminDepositConfirm','adminDepositCancel','adminDepositAdjust'];
     const result=h('div',{class:'meta',role:'status'},'Проверка ещё не запускалась.');
     const check=h('button',{class:'btn btn-soft',type:'button',onclick:async()=>{
       check.disabled=true;
