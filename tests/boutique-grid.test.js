@@ -28,7 +28,7 @@ const API=new Function('A','h','avatar','list','renderTab','openTicket','blockSe
  cb=>{clock=cb;return 1;},()=>{clock=null;});
 function tile(view,n){return findAll(view,x=>x.tag==='button'&&String(x.attrs.title||'').startsWith('№'+n+' ·'))[0];}
 let view=API.gridView();
-assert.equal(findAll(view,x=>x.attrs.class&&x.attrs.class.includes('bok-admin-status-')).length,5);
+assert.equal(findAll(view,x=>x.tag==='button'&&x.attrs.class&&x.attrs.class.includes('bok-admin-status-')).length,5);
 const legend=findAll(view,x=>x.tag==='button'&&x.attrs['aria-label']&&x.attrs['aria-label'].includes('Подсветить: Ожидает'))[0];
 assert(legend);legend.attrs.onclick();view=API.gridView();assert.equal(state.gridHighlight,'p');
 assert(tile(view,1).attrs.class.includes('bok-admin-ticket-dimmed'));
