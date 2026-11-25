@@ -817,7 +817,16 @@
       buttons.push(h('button', { class: 'btn btn-soft btn-sm', onclick: () => act('adminRestore', { code: b.code }, 'Восстановлена с новым таймером') }, '♻ Восстановить'));
       buttons.push(h('button', { class: 'btn btn-ok btn-sm', onclick: () => act('adminConfirm', { code: b.code }, 'Подтверждена: ' + b.code) }, '✅ Подтвердить сразу'));
     } else if (b.status === 'ПОДТВЕРЖДЕНА') {
-      buttons.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmThen('Отменить подтверждённую бронь ' + b.code + '?', () => act('adminCancel', { code: b.code }, 'Отменена')) }, 'Отменить бронь'));
+      if(/ОПЛАЧЕНО ИЗ ДЕПОЗИТА/i.test(String(b.note||''))) {
+        buttons.push(h('button',{class:'btn btn-danger btn-sm',onclick:()=>confirmThen(
+          'Отменить бронь '+b.code+' и вернуть списанные средства на депозит участника?',
+          async()=>{const r=await act('adminDepositCancel',{code:b.code});
+            if(r){A.depositFetchedAt=0;A.depositBalances=null;toast('Возврат: '+r.refunded+' ₽');
+              if(r.state)setState(r.state);else pollOnce();}}
+        )},'↩ Отменить и вернуть депозит'));
+      }else{
+        buttons.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmThen('Отменить подтверждённую бронь ' + b.code + '?', () => act('adminCancel', { code: b.code }, 'Отменена')) }, 'Отменить бронь'));
+      }
     }
     buttons.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: async (e) => { const ok = await copyText(b.code); e.target.textContent = ok ? 'Скопировано ✓' : 'Ошибка'; } }, '📋 Код'));
     const whoName = b.vkUrl ? h('a', { href: b.vkUrl, target: '_blank', rel: 'noopener noreferrer' }, b.name) : h('span', null, b.name);
