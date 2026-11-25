@@ -460,9 +460,10 @@
         achievementsRequested=true;
         achCount.textContent='Загружаем…';
         const cacheKey='bok_ach_public_v6724_'+String(p.url||'');
+        const quietCache=!!(S.st&&S.st.paused&&S.lastKnownSpins===0);
         const cached=(()=>{
           try{const v=JSON.parse(sessionStorage.getItem(cacheKey)||'null');
-            return v&&Date.now()-v.at<((S.st&&S.st.paused)?5*60000:30000)?v.data:null;
+            return v&&Date.now()-v.at<(quietCache?5*60000:30000)?v.data:null;
           }catch(_){return null;}
         })();
         if(cached){showAchievementData(cached);return;}
@@ -954,6 +955,7 @@
       if(authenticated){
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
+          S.lastKnownSpins=Number(data.spins);
           const catalogReady=Array.isArray(data.prizes)&&data.prizes.some(p=>p&&p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0));
           // An unfinished server transaction MUST be retriable using the same
           // requestId even when the last available spin has been debited.
@@ -1001,6 +1003,9 @@
             if(waitingLabel)waitingLabel.hidden=true;
             await animation.done;
             if(outcome&&outcome.ok){
+              S.lastKnownSpins=Number(outcome.spins);
+              try{sessionStorage.removeItem('bok_ach_public_v6724_'+String(p.url||''));}catch(_){}
+              api.invalidateBalances();
               const real=(Array.isArray(data.prizes)?data.prizes:[]).find(p=>
                 String(p.id)===String(outcome.prize&&outcome.prize.id));
               const shown=Object.assign({},real||{},outcome.prize||{});
