@@ -8,7 +8,8 @@
   const A = {
     pw: '', st: null, tab: 'queue', filter: 'attention', q: '', sel: new Set(),
     players: null, rules: null, pq: '', known: null, draft: {}, sound: store('nomerok_sound') !== '0', poll: null,
-    depositBalances: null, depositFetchedAt: 0, depositFlight: null
+    depositBalances: null, depositFetchedAt: 0, depositFlight: null,
+    gridHighlight: null, gridFacesUntil: 0, gridFacesTimer: null
   };
   const EXPECTED_VERSION = 6;
   const NEEDS_CHECK = ['ОПЛАТА ЗАЯВЛЕНА', 'ОЖИДАЕТ'];
@@ -73,6 +74,8 @@
     store('nomerok_admin_pw', null);
     try { sessionStorage.removeItem('nomerok_admin_pw'); } catch (e) { /* ignore */ }
     clearTimeout(A.poll);
+    clearTimeout(A.gridFacesTimer);
+    A.gridFacesTimer=null;A.gridFacesUntil=0;A.gridHighlight=null;
     A.poll=null;
     renderLogin();
   }
@@ -843,44 +846,87 @@
   function confirmThen(text, fn) { if (window.confirm(text)) fn(); }
 
   // ───── Сетка и ручные операции ─────
+  // UI-only state: neither filtering nor face reveal mutates any reservation.
+  const GRID_FACE_MS = 6000;
+  const GRID_STATUSES = {
+    f: { label: 'Свободно', tile: 't-free' },
+    p: { label: 'Ожидает', tile: 't-pend' },
+    a: { label: 'Оплата заявлена', tile: 't-paid' },
+    t: { label: 'Подтверждено', tile: 't-taken' },
+    b: { label: 'Заблокировано', tile: 't-block' }
+  };
+  function gridFacesActive() { return A.gridFacesUntil > Date.now(); }
+  function stopGridFaces(render) {
+    clearTimeout(A.gridFacesTimer);
+    A.gridFacesTimer = null;
+    A.gridFacesUntil = 0;
+    if (render && A.tab === 'grid' && A.st) renderTab();
+  }
+  function revealGridFaces() {
+    clearTimeout(A.gridFacesTimer);
+    A.gridFacesUntil = Date.now() + GRID_FACE_MS;
+    A.gridFacesTimer = setTimeout(() => {
+      A.gridFacesTimer = null;
+      A.gridFacesUntil = 0;
+      if (A.tab === 'grid' && A.st) renderTab();
+    }, GRID_FACE_MS);
+    renderTab();
+  }
   function gridView() {
     const st = A.st;
-    const cls = { f: 't-free', p: 't-pend', a: 't-paid', t: 't-taken', b: 't-block' };
     const counts = { f: 0, p: 0, a: 0, t: 0, b: 0 };
-    (st.tickets || []).forEach(t => { if (counts[t.s] !== undefined) counts[t.s]++; });
+    const bookings = new Map(st.bookings.map(b => [String(b.code), b]));
+    st.tickets.forEach(t => { if (Object.prototype.hasOwnProperty.call(counts, t.s)) counts[t.s]++; });
+    const facesOn = gridFacesActive();
+    const highlight = A.gridHighlight;
+    const occupied = state => state === 'p' || state === 'a' || state === 't';
     const tiles = st.tickets.map(t => {
-      const on = A.sel.has(t.n);
-      const isFree = t.s === 'f';
-      const labels = { f: 'свободен', p: 'ждёт подтверждения', a: 'оплата заявлена',
-        t: 'подтверждён', b: 'заблокирован' };
-      return h('button', {
+      const on = A.sel.has(t.n), isFree = t.s === 'f';
+      const booked = occupied(t.s) && bookings.get(String(t.code));
+      const showFace = facesOn && !!booked;
+      const filtered = highlight !== null && t.s !== highlight;
+      const label = GRID_STATUSES[t.s] ? GRID_STATUSES[t.s].label.toLowerCase() : 'неизвестен';
+      const attrs = {
         type: 'button',
-        class: 'tile bok-admin-ticket ' + (isFree && on ? 't-sel' : cls[t.s]),
-        'aria-label': 'Номерок ' + t.n + ' — ' + (on ? 'выбран' : labels[t.s] || t.s),
+        class: 'tile bok-admin-ticket ' + (isFree && on ? 't-sel' : GRID_STATUSES[t.s] ? GRID_STATUSES[t.s].tile : '') +
+          (showFace ? ' bok-admin-ticket-face' : '') +
+          (filtered ? ' bok-admin-ticket-dimmed' : '') +
+          (highlight === t.s ? ' bok-admin-ticket-spotlight' : ''),
+        'aria-label': 'Номерок ' + t.n + ' — ' + (on ? 'выбран' : label) +
+          (showFace ? ', ' + String(booked.name || 'участник') + '. Нажмите снова, чтобы открыть бронь' : ''),
         'aria-pressed': isFree ? String(on) : null,
-        title: '№' + t.n + ' · ' + (on ? 'выбран' : labels[t.s] || t.s),
+        title: '№' + t.n + ' · ' + (showFace ? String(booked.name || 'Участник') : label),
         onclick: () => {
           if (isFree) {
             if (on) A.sel.delete(t.n); else A.sel.add(t.n);
             renderTab();
+          } else if (occupied(t.s) && !gridFacesActive()) {
+            // First tap briefly reveals occupants; next tap opens original booking.
+            revealGridFaces();
           } else openTicket(t);
         }
-      }, h('span', { class: 'bok-admin-ticket-num' }, String(t.n)));
+      };
+      return h('button', attrs,
+        showFace ? h('span', { class: 'bok-admin-ticket-face-image', 'aria-hidden': 'true' },
+          avatar(booked.name || 'Участник', booked.photo || '', 64)) : null,
+        h('span', { class: 'bok-admin-ticket-num' }, String(t.n)));
     });
     const nums = Array.from(A.sel).sort((a, b) => a - b);
     const all = st.tickets.length;
-    const statuses = [
-      ['f', 'Свободно', 't-free'],
-      ['p', 'Ожидает', 't-pend'],
-      ['a', 'Оплата заявлена', 't-paid'],
-      ['t', 'Подтверждено', 't-taken'],
-      ['b', 'Заблокировано', 't-block']
-    ];
-    const legendItems = statuses.map(([state, label, tileClass]) =>
-      h('div', { class: 'bok-admin-status bok-admin-status-' + state },
-        h('span', { class: 'bok-admin-status-mark ' + tileClass, 'aria-hidden': 'true' }),
-        h('span', { class: 'bok-admin-status-name' }, label),
-        h('strong', { class: 'bok-admin-status-count num' }, String(counts[state]))));
+    const legendItems = Object.keys(GRID_STATUSES).map(state => {
+      const item = GRID_STATUSES[state], active = highlight === state;
+      return h('button', {
+        type: 'button',
+        class: 'bok-admin-status bok-admin-status-' + state +
+          (active ? ' is-active' : '') + (highlight && !active ? ' is-muted' : ''),
+        'aria-pressed': String(active),
+        'aria-label': (active ? 'Снять подсветку: ' : 'Подсветить: ') + item.label + ', ' + counts[state] + ' номерков',
+        onclick: () => { A.gridHighlight = active ? null : state; renderTab(); }
+      },
+        h('span', { class: 'bok-admin-status-mark ' + item.tile, 'aria-hidden': 'true' }),
+        h('span', { class: 'bok-admin-status-name' }, item.label),
+        h('strong', { class: 'bok-admin-status-count num' }, String(counts[state])));
+    });
     const controls = nums.length ? h('div', {
       class: 'actionbar bok-admin-actionbar', role: 'region',
       'aria-label': 'Действия с выбранными номерками'
@@ -895,7 +941,7 @@
         h('button', { type: 'button', class: 'btn btn-soft btn-sm bok-admin-block', onclick: blockSelected }, 'Заблокировать'),
         h('button', { type: 'button', class: 'btn btn-primary btn-sm bok-admin-manual', onclick: openManual }, 'Назначить вручную'),
         h('button', { type: 'button', class: 'btn btn-soft btn-sm bok-admin-deposit', onclick: openDepositFromGrid }, '💳 Из депозита'))) : null;
-    return h('div', { class: 'bok-admin-grid-page' },
+    return h('div', { class: 'bok-admin-grid-page bok-boutique-page' },
       h('section', { class: 'card bok-admin-grid-card' },
         h('header', { class: 'bok-admin-grid-heading' },
           h('div', null,
@@ -904,13 +950,24 @@
           h('div', { class: 'bok-admin-grid-total' },
             h('b', { class: 'num' }, String(all)),
             h('small', null, 'номерков'))),
-        h('p', { class: 'bok-admin-grid-hint' }, 'Выберите свободные номерки. Занятый номерок откроет сведения о брони.'),
-        h('div', { class: 'grid bok-admin-grid', role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
-        h('section', { class: 'bok-admin-legend', 'aria-label': 'Легенда статусов бронирования' },
+        h('p', { class: 'bok-admin-grid-hint' },
+          'Нажмите на свободные номерки для выбора. На занятый — чтобы показать участников; повторный тап откроет бронь.'),
+        h('section', { class: 'bok-admin-legend bok-boutique-legend', 'aria-label': 'Интерактивная легенда статусов' },
           h('div', { class: 'bok-admin-legend-heading' },
             h('h3', null, 'Статусы бронирования'),
             h('span', null, 'Всего ' + all)),
-          h('div', { class: 'bok-admin-statuses' }, legendItems)),
+          h('div', { class: 'bok-admin-statuses' }, legendItems),
+          h('p', { class: 'bok-boutique-legend-note' },
+            highlight === null ? 'Нажмите на статус, чтобы подсветить соответствующие номерки.' :
+            'Подсвечено: ' + GRID_STATUSES[highlight].label + '. Повторное нажатие снимет выделение.')),
+        h('div', { class: 'bok-boutique-toolbar' },
+          h('span', { class: 'bok-boutique-toolbar-label' }, facesOn ? 'Режим аватарок · 6 секунд' : 'Участники бронирования'),
+          facesOn
+            ? h('button', { type: 'button', class: 'bok-boutique-face-toggle is-active', onclick: () => stopGridFaces(true) },
+              'Вернуться к номерам')
+            : h('span', { class: 'bok-boutique-face-description' }, 'Нажмите на занятую ячейку')),
+        h('div', { class: 'grid bok-admin-grid bok-boutique-grid' + (facesOn ? ' is-faces' : ''),
+          role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
         controls));
   }
   async function openDepositFromGrid() {
