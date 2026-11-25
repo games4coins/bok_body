@@ -1478,3 +1478,95 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 @media(prefers-reduced-motion:reduce){
  .bok-boutique-grid .bok-admin-ticket,.bok-boutique-legend .bok-admin-status{transition:none}
 }
+
+
+/* BOK 6.7.29: one Boutique Board across public booking & admin. */
+.bok-public-grid-card{min-width:0;overflow:visible;border:1px solid #e7d2bf;
+  background:linear-gradient(146deg,#fffbf7,#f9efe4 78%,#fffbf6);box-shadow:0 8px 26px #71432716}
+.bok-public-grid-card>h2{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.025em;
+  color:#62412e;font-size:clamp(23px,3.5vw,30px);margin:0 0 7px}
+.bok-public-grid-card>.bok-admin-grid-hint{font-size:13px;margin:0 0 12px;color:#846953}
+.bok-public-grid{grid-template-columns:repeat(6,minmax(0,1fr));min-width:0;gap:7px}
+.bok-public-grid .bok-admin-ticket{min-width:0;aspect-ratio:1/1;border-radius:13px;
+  font-weight:850;letter-spacing:-.02em;box-shadow:inset 0 1px 0 #fff9,0 3px 9px #6f4b2722}
+.bok-public-grid .bok-admin-ticket-face{position:relative;isolation:isolate;overflow:hidden}
+.bok-public-grid .bok-admin-ticket:focus-visible{outline:3px solid #b85b2d;outline-offset:2px;z-index:4}
+.bok-public-grid .bok-admin-ticket.t-mine:not(.t-sel){box-shadow:0 0 0 2px #cd7a43,0 3px 9px #6f4b2722}
+.bok-public-grid-card .bok-boutique-legend{margin:6px 0 12px}
+.bok-public-grid-card .bok-admin-statuses{grid-template-columns:repeat(5,minmax(0,1fr))}
+.bok-public-grid-card .bok-boutique-toolbar{margin:8px 0 10px}
+.bok-public-actionbar{min-width:0;max-width:100%;border-color:#e3bea2;
+  background:linear-gradient(135deg,#fffbf7f5,#f9e9ddf5)}
+.bok-public-actionbar>.sel{flex:1;min-width:0}
+.bok-public-actionbar .btn{white-space:normal;overflow-wrap:anywhere;text-align:center;min-height:43px}
+.bok-grid-mode-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;
+  margin:10px 0;padding:9px 10px;border:1px solid #eddfd1;border-radius:13px;background:#fffaf6cc}
+.bok-grid-mode-strip>span{font-size:11px;font-weight:750;color:#765844}
+.bok-grid-mode-options{display:inline-flex;align-items:center;gap:4px;border-radius:10px;padding:3px;background:#eee1d6}
+.bok-grid-mode-option{appearance:none;min-height:32px;max-width:100%;padding:6px 9px;
+  border:1px solid transparent;background:transparent;border-radius:8px;color:#8a6a54;
+  font-size:11px;font-weight:800;line-height:1.1;cursor:pointer}
+.bok-grid-mode-option.is-active{color:#663d27;border-color:#e4c6a8;
+  background:#fffaf5;box-shadow:0 1px 5px #75523518}
+.bok-grid-mode-option:focus-visible{outline:2px solid #d27949;outline-offset:2px}
+@media(max-width:960px){
+ .bok-public-grid-card .bok-admin-statuses{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+ .bok-public-grid-card{padding:13px}
+ .bok-public-grid-card .bok-admin-statuses{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .bok-public-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+ .bok-public-grid .bok-admin-ticket{border-radius:11px;font-size:clamp(13px,4vw,17px)}
+ .bok-public-grid-card .bok-boutique-legend{padding:10px}
+ .bok-public-actionbar{position:fixed;left:max(8px,env(safe-area-inset-left));
+   right:max(8px,env(safe-area-inset-right));bottom:calc(8px + env(safe-area-inset-bottom));
+   margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px;padding:10px;
+   border-radius:17px;z-index:65;box-shadow:0 8px 27px #663d282e}
+ .bok-public-actionbar .sel{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px}
+ .bok-public-actionbar .sel b{font-size:13px}
+ .bok-public-actionbar .sel span{font-size:12px}
+ .bok-public-actionbar>div:last-child{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);
+    gap:7px!important;min-width:0;width:100%;flex:none!important}
+ .bok-public-actionbar .btn{width:100%;padding:9px 6px;min-width:0;font-size:12px;min-height:43px}
+ .bok-public-grid-card{padding-bottom:20px}
+}
+@media(max-width:355px){
+ .bok-public-grid{gap:4px}
+ .bok-public-grid .bok-admin-ticket{border-radius:9px;font-size:13px}
+ .bok-grid-mode-strip{flex-wrap:wrap}
+}
+/* Low-power mode: explicitly eliminate costly blur, shadows, animations and
+   image tiles; preserve contrast, outlines and status meaning. */
+.bok-grid-lite body{background:#f7f1ea;background-attachment:scroll}
+.bok-grid-lite .gridwrap.is-covered .grid{filter:none}
+.bok-grid-lite .bok-boutique-page .bok-admin-grid-card,
+.bok-grid-lite .bok-public-grid-card{background:#fffcf8!important;box-shadow:none!important}
+.bok-grid-lite .bok-boutique-grid .bok-admin-ticket,
+.bok-grid-lite .bok-public-grid .bok-admin-ticket{
+  background:#f6f4ee;box-shadow:none!important;filter:none!important;
+  transform:none!important;transition:none!important;border-radius:9px}
+.bok-grid-lite .bok-boutique-grid .t-free,
+.bok-grid-lite .bok-public-grid .t-free{background:#e1efe3;color:#32654c;border-color:#b7d9c4}
+.bok-grid-lite .bok-boutique-grid .t-pend,
+.bok-grid-lite .bok-public-grid .t-pend{background:#fff0ca;color:#76541b;border-color:#e1bd72}
+.bok-grid-lite .bok-boutique-grid .t-paid,
+.bok-grid-lite .bok-public-grid .t-paid{background:#e3ebff;color:#365488;border-color:#b6caed}
+.bok-grid-lite .bok-boutique-grid .t-taken,
+.bok-grid-lite .bok-public-grid .t-taken{background:#e9dfd6;color:#80604a;border-color:#cdb5a3}
+.bok-grid-lite .bok-boutique-grid .t-block,
+.bok-grid-lite .bok-public-grid .t-block{background:#e0d8d1;color:#84746c;border-color:#cbbfb6}
+.bok-grid-lite .bok-boutique-grid .t-sel,
+.bok-grid-lite .bok-public-grid .t-sel{background:#ce5b25;color:#fff;border-color:#aa451b}
+.bok-grid-lite .bok-admin-ticket-dimmed{opacity:.38;filter:none}
+.bok-grid-lite .bok-boutique-legend,
+.bok-grid-lite .bok-public-grid-card .bok-boutique-legend{background:#f9f1ea;box-shadow:none}
+.bok-grid-lite .bok-boutique-legend .bok-admin-status{background:#fff;box-shadow:none;transition:none}
+.bok-grid-lite .bok-boutique-legend .bok-admin-status.is-active{box-shadow:none}
+.bok-grid-lite .bok-admin-actionbar,.bok-grid-lite .bok-public-actionbar{
+ background:#fffaf5;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
+.bok-grid-lite .hero{box-shadow:none;background:#bd5728}
+.bok-grid-lite .hero:after{display:none}
+.bok-grid-lite .tile:hover{transform:none;box-shadow:none}
+.bok-grid-lite .bok-admin-ticket-face-image{display:none!important}
+.bok-grid-lite .bok-boutique-toolbar{display:none}
+.bok-grid-lite .bok-grid-mode-option{transition:none}
