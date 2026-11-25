@@ -610,5 +610,25 @@
     }
   });
 
-  global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api, gridQuality };
+  // BOK 6.7.33: single compact layout policy for participant and admin grids.
+  // 63 places = exactly 7 columns × 9 rows; other counts avoid giant tiles
+  // and excessively long grids. CSS scales the cells down on narrow screens.
+  function bookingGridColumns(total) {
+    const n=Math.max(0,Math.floor(Number(total)||0));
+    if(n<=1)return 1;
+    if(n<=4)return 2;
+    if(n<=9)return 3;
+    if(n<=16)return 4;
+    if(n<=25)return 5;
+    if(n<=36)return 6;
+    if(n<=63)return 7;
+    if(n<=80)return 8;
+    if(n<=99)return 9;
+    return Math.min(12,Math.max(10,Math.ceil(Math.sqrt(n))));
+  }
+  function bookingGridStyle(total) {
+    return {'--bok-grid-cols': String(bookingGridColumns(total))};
+  }
+
+  global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api, gridQuality, bookingGridColumns, bookingGridStyle };
 })(window);
