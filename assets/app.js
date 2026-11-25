@@ -1328,13 +1328,14 @@
     ]);
   }
 
-  function openBooking() {
+  async function openBooking() {
     const nums = Array.from(S.sel).sort((a, b) => a - b);
     if (!nums.length) return;
     if(S.st&&S.st.paused&&S.early&&S.early.active){
       if(nums.length!==1)return toast('Автобронь действует только на один номерок','bad');
-      const url=S.early.url,token=window.BokVK&&window.BokVK.token&&window.BokVK.token();
-      if(!token)return toast('Для автоброни войдите через VK ID','bad');
+      const url=S.early.url;
+      const token=window.BokVK&&window.BokVK.ensureToken?await window.BokVK.ensureToken():'';
+      if(!token)return toast('Сессия VK ID истекла. Откройте кабинет и обновите вход.','bad');
       if(!confirm('Использовать одно право ранней брони для номерка №'+nums[0]+'?'))return;
       api.post('book',{clientId:CLIENT,vkUrl:url,vkAccessToken:token,numbers:nums}).then(r=>{
         if(r&&r.ok){S.early=null;S.sel.clear();showSuccess(r);refresh();}
