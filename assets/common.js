@@ -302,6 +302,7 @@
   }
   const api = {
     state: () => call('GET', 'state', { action: 'state' }),
+    version: () => call('GET', 'version', { action: 'version' }),
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
     balances: balancesCached,
     invalidateBalances: clearBalancesCache,
