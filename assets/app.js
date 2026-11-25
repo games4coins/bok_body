@@ -1,13 +1,13 @@
 /* Номерок — публичная страница бронирования. */
 (function () {
   'use strict';
-  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO } = Nomerok;
+  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO, gridQuality } = Nomerok;
 
   const CLIENT = clientId();
   const POLL_PEAK_MS = 8000;
   const POLL_MIN_MS = 8000;
   const POLL_MAX_MS = 45000;
-  const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false, early: null };
+  const S = { st: null, mine: [], quiet: null, sel: new Set(), search: '', loaded: false, early: null, gridHighlight: null, gridFacesUntil: 0, gridFacesTimer: null };
   const UNCONF = ['ОЖИДАЕТ', 'ОПЛАТА ЗАЯВЛЕНА'];
 
   // ───── Скелет страницы (строится один раз) ─────
@@ -15,16 +15,18 @@
   const bannerEl = h('div');
   const stepsEl = h('details', { class: 'card', style: { marginTop: '20px' } });
   const mineEl = h('div');
-  const gridEl = h('div', { class: 'grid', role: 'group', 'aria-label': 'Номерки' });
+  const gridEl = h('div', { class: 'grid bok-public-grid bok-boutique-grid', role: 'group', 'aria-label': 'Номерки' });
   const coverEl = h('div', { class: 'soldout hidden' });          // «Все места забронированы…» поверх сетки
   const waitEl = h('div');                                         // «Идёт подтверждение…» над сеткой
   const gridWrap = h('div', { class: 'gridwrap' }, gridEl, coverEl);
-  const legendEl = h('div', { class: 'legend' });
-  const actionEl = h('div', { class: 'actionbar hidden' });
-  const gridCard = h('section', { class: 'card' },
+  const legendEl = h('section', { class: 'bok-admin-legend bok-boutique-legend bok-public-legend', 'aria-label':'Интерактивная легенда статусов' });
+  const modeEl = h('div',{class:'bok-grid-mode-strip'});
+  const facesEl = h('div',{class:'bok-boutique-toolbar'});
+  const actionEl = h('div', { class: 'actionbar bok-public-actionbar hidden' });
+  const gridCard = h('section', { class: 'card bok-public-grid-card bok-boutique-page' },
     h('h2', null, 'Выберите свои номерки'),
-    h('p', { class: 'lead' }, 'Нажмите на свободные номерки — они подсветятся. Затем нажмите «Забронировать».'),
-    waitEl, gridWrap, legendEl, actionEl);
+    h('p', { class: 'bok-admin-grid-hint' }, 'Нажмите на свободные номерки — они подсветятся. Затем нажмите «Забронировать».'),
+    modeEl, legendEl, facesEl, waitEl, gridWrap, actionEl);
   const countChip = h('span', { class: 'count-chip' }, '0');
   const searchEl = h('input', {
     class: 'input', type: 'search', placeholder: 'Найти имя или номерок', autocomplete: 'off',
@@ -150,36 +152,112 @@
       timer, note, actions.length ? h('div', { class: 'row-actions' }, actions) : null);
   }
 
-  function renderGrid() {
-    const st = S.st;
-    // выбранные, но уже занятые другими — убираем
-    const lost = [];
-    S.sel.forEach((n) => { if (st.tickets[n - 1] !== 'f') { S.sel.delete(n); lost.push(n); } });
-    if (lost.length) toast('Номерок ' + list(lost) + ' только что заняли', 'bad');
-
-    const mine = new Set();
-    myActive().forEach((b) => b.numbers.forEach((n) => mine.add(n)));
-    const tiles = st.tickets.map((t, i) => {
-      const n = i + 1, ring = mine.has(n) ? ' t-mine' : '';
-      if (t === 'f') {
-        const on = S.sel.has(n);
-        return h('button', {
-          class: 'tile ' + (on ? 't-sel' : 't-free'), 'aria-pressed': on ? 'true' : 'false',
-          'aria-label': 'Номерок ' + n + (on ? ', выбран' : ', свободен'), onclick: () => toggle(n)
-        }, n);
-      }
-      const map = { p: ['t-pend', 'ждёт подтверждения'], t: ['t-taken', 'занят'], b: ['t-block', 'недоступен'] }[t] || ['t-taken', 'занят'];
-      return h('button', { class: 'tile ' + map[0] + ring, disabled: true, 'aria-label': 'Номерок ' + n + ', ' + map[1], title: map[1] }, n);
-    });
-    fill(gridEl, ...tiles);
-    fill(legendEl, 
-      legend('var(--free-bg)', 'var(--free-line)', 'свободен'),
-      legend('linear-gradient(135deg,#e0722f,#bf4a16)', 'transparent', 'ваш выбор'),
-      legend('var(--pend-bg)', 'var(--pend-line)', 'ждёт подтверждения'),
-      legend('var(--taken-bg)', 'transparent', 'занят'));
+  // Read-only visualization of already public participant and ticket information.
+  // Never requests new account data; hidden participant photos stay hidden.
+  const GRID_FACE_MS=6000;
+  const GRID_LABELS={
+    f:['Свободно','t-free'],p:['Ожидает','t-pend'],
+    a:['Оплата заявлена','t-paid'],t:['Подтверждено','t-taken'],
+    b:['Заблокировано','t-block']
+  };
+  const gridFacesActive=()=>!gridQuality.isLite()&&S.gridFacesUntil>Date.now();
+  function stopGridFaces(redraw){
+    clearTimeout(S.gridFacesTimer);S.gridFacesTimer=null;S.gridFacesUntil=0;
+    if(redraw&&S.st)renderGrid();
   }
-  function legend(bg, border, text) {
-    return h('span', null, h('i', { style: { background: bg, borderColor: border } }), text);
+  function revealGridFaces(){
+    if(gridQuality.isLite())return;
+    clearTimeout(S.gridFacesTimer);
+    S.gridFacesUntil=Date.now()+GRID_FACE_MS;
+    S.gridFacesTimer=setTimeout(()=>{S.gridFacesUntil=0;S.gridFacesTimer=null;if(S.st)renderGrid();},GRID_FACE_MS);
+    renderGrid();
+  }
+  function renderGridMode(){
+    const lite=gridQuality.isLite();
+    fill(modeEl,
+      h('span',null,'Оформление сетки'),
+      h('div',{class:'bok-grid-mode-options',role:'group','aria-label':'Качество оформления'},
+        h('button',{type:'button',class:'bok-grid-mode-option'+(!lite?' is-active':''),'aria-pressed':String(!lite),
+          onclick:()=>{gridQuality.set('premium');renderGrid();}},'✦ Премиум'),
+        h('button',{type:'button',class:'bok-grid-mode-option'+(lite?' is-active':''),'aria-pressed':String(lite),
+          onclick:()=>{gridQuality.set('lite');stopGridFaces(false);renderGrid();}},'◈ Упрощённый')));
+  }
+  function renderGrid(){
+    const st=S.st;
+    const lost=[];
+    S.sel.forEach(n=>{if(st.tickets[n-1]!=='f'){S.sel.delete(n);lost.push(n);}});
+    if(lost.length)toast('Номерок '+list(lost)+' только что заняли','bad');
+    const mine=new Set();
+    myActive().forEach(b=>b.numbers.forEach(n=>mine.add(n)));
+    const faceMap=new Map();
+    if(!gridQuality.isLite()&&gridFacesActive()){
+      (st.players||[]).forEach(p=>(p.items||[]).forEach(it=>{
+        const n=Number(it[0]);
+        if(Number.isInteger(n))faceMap.set(n,p);
+      }));
+    }
+    const counts={f:0,p:0,a:0,t:0,b:0};
+    st.tickets.forEach(t=>{if(counts[t]!==undefined)counts[t]++;});
+    const facesOn=gridFacesActive(),highlight=S.gridHighlight;
+    const occupied=t=>t==='p'||t==='a'||t==='t';
+    const tiles=st.tickets.map((t,i)=>{
+      const n=i+1,selected=S.sel.has(n),label=GRID_LABELS[t]||['Занят','t-taken'];
+      const participant=facesOn&&occupied(t)?faceMap.get(n):null;
+      const isFace=!!participant;
+      return h('button',{
+        type:'button',
+        class:'tile bok-admin-ticket '+(t==='f'&&selected?'t-sel':label[1])+
+          (mine.has(n)?' t-mine':'')+
+          (isFace?' bok-admin-ticket-face':'')+
+          (highlight!==null&&t!==highlight?' bok-admin-ticket-dimmed':'')+
+          (highlight===t?' bok-admin-ticket-spotlight':''),
+        'aria-label':'Номерок '+n+', '+(selected?'выбран':label[0].toLowerCase())+
+          (isFace?', '+String(participant.name||'участник'):''),
+        'aria-pressed':t==='f'?String(selected):null,
+        title:'№'+n+' · '+(isFace?String(participant.name||'Участник'):label[0]),
+        onclick:()=>{
+          if(t==='f'){toggle(n);return;}
+          if(occupied(t)){
+            if(gridQuality.isLite()){const owner=(st.players||[]).find(p=>(p.items||[]).some(it=>Number(it[0])===n));if(owner)openCabinet(owner.url||owner.name);return;}
+            if(!gridFacesActive()){revealGridFaces();return;}
+            const owner=faceMap.get(n);
+            if(owner)openCabinet(owner.url||owner.name);
+          }
+        }
+      },
+        isFace?h('span',{class:'bok-admin-ticket-face-image','aria-hidden':'true'},
+          avatar(participant.name||'Участник',participant.photo||'',64)):null,
+        h('span',{class:'bok-admin-ticket-num'},String(n)));
+    });
+    fill(gridEl,...tiles);
+    const statuses=Object.keys(GRID_LABELS);
+    const showStatus=(k)=>{
+      const active=highlight===k,label=GRID_LABELS[k];
+      return h('button',{type:'button',
+        class:'bok-admin-status bok-admin-status-'+k+(active?' is-active':'')+(highlight&&!active?' is-muted':''),
+        'aria-pressed':String(active),
+        'aria-label':(active?'Снять подсветку: ':'Подсветить: ')+label[0]+', '+counts[k]+' номерков',
+        onclick:()=>{S.gridHighlight=active?null:k;renderGrid();}
+      },
+      h('span',{class:'bok-admin-status-mark '+label[1],'aria-hidden':'true'}),
+      h('span',{class:'bok-admin-status-name'},label[0]),
+      h('strong',{class:'bok-admin-status-count num'},String(counts[k])));
+    };
+    fill(legendEl,
+      h('div',{class:'bok-admin-legend-heading'},h('h3',null,'Статусы бронирования'),
+        h('span',null,'Всего '+st.tickets.length)),
+      h('div',{class:'bok-admin-statuses'},statuses.map(showStatus)),
+      h('p',{class:'bok-boutique-legend-note'},highlight===null?
+        'Нажмите на статус для подсветки номерков.':
+        'Подсвечено: '+GRID_LABELS[highlight][0]+'. Повторное нажатие отменит подсветку.'));
+    fill(facesEl,
+      h('span',{class:'bok-boutique-toolbar-label'},gridQuality.isLite()?'Быстрый режим без фото':
+        facesOn?'Режим аватарок · 6 секунд':'Участники бронирования'),
+      facesOn?h('button',{type:'button',class:'bok-boutique-face-toggle is-active',
+        onclick:()=>stopGridFaces(true)},'Вернуться к номерам'):
+        h('span',{class:'bok-boutique-face-description'},gridQuality.isLite()?
+          'Минимум эффектов':'Нажмите на занятый номерок'));
+    renderGridMode();
   }
 
   /** Первое предложение (или первая строка) выводится крупно, остальное — подписью. */
