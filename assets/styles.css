@@ -1303,3 +1303,91 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .bok-early-admin-controls{margin:15px 0;padding:15px;border:1px solid #e9c7ad;border-radius:16px;background:linear-gradient(145deg,#fffaf5,#fcebdd)}
 .bok-early-admin-controls .btn{margin:5px 9px 5px 0}
 .bok-early-admin-controls h3{margin:0 0 8px}
+
+
+/* BOK 6.7.27 — premium ADMIN ticket grid; the customer grid is unchanged. */
+.bok-admin-grid-page{min-width:0}
+.bok-admin-grid-card{overflow:visible;min-width:0;background:linear-gradient(157deg,#fffdfb 0%,#fff9f4 60%,#fff 100%);border:1px solid #ecd9c7}
+.bok-admin-grid-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin:0 0 9px}
+.bok-admin-grid-heading h2{font-size:clamp(21px,3.3vw,27px);line-height:1.1;margin:4px 0 0;letter-spacing:-.025em;color:#4b3024}
+.bok-admin-grid-eyebrow{display:block;color:#aa764f;font-size:10px;letter-spacing:.16em;font-weight:850}
+.bok-admin-grid-total{flex:none;min-width:65px;display:grid;text-align:right;gap:0;color:#9d5732;line-height:1.1}
+.bok-admin-grid-total b{font-size:23px}
+.bok-admin-grid-total small{font-size:10px;letter-spacing:.04em;font-weight:700;color:#a78872}
+.bok-admin-grid-hint{margin:0 0 18px;color:#867165;font-size:13px;line-height:1.45}
+.bok-admin-grid{grid-template-columns:repeat(8,minmax(0,1fr));gap:9px;min-width:0}
+.bok-admin-grid .bok-admin-ticket{
+  min-width:0;min-height:0;aspect-ratio:1;border-radius:17px;position:relative;overflow:hidden;
+  font-weight:800;font-size:clamp(15px,2.15vw,19px);letter-spacing:-.025em;
+  box-shadow:inset 0 1px 0 #ffffffbd,0 3px 8px #4930240b;
+  transition:transform .16s ease,box-shadow .16s ease,background .16s ease;
+}
+.bok-admin-grid .bok-admin-ticket-num{position:relative;z-index:1}
+.bok-admin-grid .t-free{background:linear-gradient(148deg,#f1faf4,#def0e5);border-color:#c7e4d3;color:#347758}
+.bok-admin-grid .t-pend{background:linear-gradient(148deg,#fff9e9,#ffedc9);border:1.5px solid #e6c886;color:#99641b}
+.bok-admin-grid .t-paid{background:linear-gradient(148deg,#f1f4ff,#dce7ff);border:1.5px solid #b9c9ea;color:#4361a8}
+.bok-admin-grid .t-taken{background:linear-gradient(148deg,#f0e9e2,#e7ddd3);border:1.5px solid #e3d4c6;color:#9c8878}
+.bok-admin-grid .t-block{background:repeating-linear-gradient(135deg,#efe8e0 0,#efe8e0 8px,#e3d9cf 8px,#e3d9cf 15px);border:1.5px solid #dccdbf;color:#a08d7e}
+.bok-admin-grid .t-sel{
+  background:linear-gradient(145deg,#f39846 0%,#d65e24 47%,#ac421c 100%);
+  border:1.5px solid #c75624;color:#fff;
+  box-shadow:0 7px 18px #b9502880,inset 0 1px 0 #ffffff7a;transform:none;
+}
+.bok-admin-grid .t-sel:after{content:'✓';position:absolute;top:3px;right:5px;font-size:10px;color:#fff8e4;line-height:1}
+.bok-admin-grid .bok-admin-ticket:focus-visible{outline:3px solid #e7a966;outline-offset:2px;z-index:2}
+@media(hover:hover){
+ .bok-admin-grid .bok-admin-ticket:hover{transform:translateY(-2px);box-shadow:0 8px 18px #6c432026,inset 0 1px 0 #ffffffd9}
+ .bok-admin-grid .t-sel:hover{box-shadow:0 8px 22px #b9502880}
+}
+.bok-admin-legend{margin:20px 0 0;padding:15px;border:1px solid #ead8c6;border-radius:18px;background:linear-gradient(130deg,#fffaf6,#f9efe5)}
+.bok-admin-legend-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px}
+.bok-admin-legend-heading h3{font-size:14px;font-weight:850;color:#654538;letter-spacing:-.01em;margin:0}
+.bok-admin-legend-heading>span{font-size:11px;font-weight:750;color:#a48772}
+.bok-admin-statuses{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.bok-admin-status{min-width:0;display:grid;grid-template-columns:18px minmax(0,1fr);gap:4px 7px;align-content:center;align-items:center;border:1px solid #ebddd2;border-radius:12px;background:#ffffffc9;padding:9px 8px}
+.bok-admin-status-mark{width:16px;height:16px;border-radius:6px;border:1px solid #d9cdbf;grid-row:span 2;box-shadow:inset 0 1px 0 #fff9}
+.bok-admin-status-mark.t-free{background:#dcefe3;border-color:#aed7bf}
+.bok-admin-status-mark.t-pend{background:#fff0c8;border-color:#e0c17f}
+.bok-admin-status-mark.t-paid{background:#dae6ff;border-color:#b1c4ea}
+.bok-admin-status-mark.t-taken{background:#e7dcd2;border-color:#d6c6b6}
+.bok-admin-status-mark.t-block{background:repeating-linear-gradient(135deg,#ede5db 0,#ede5db 4px,#d9ccbf 4px,#d9ccbf 8px);border-color:#cdbba8}
+.bok-admin-status-name{font-size:10px;line-height:1.22;color:#7d6657;font-weight:680;overflow-wrap:anywhere}
+.bok-admin-status-count{font-size:17px;line-height:1.1;color:#53372c}
+.bok-admin-actionbar{min-width:0;max-width:100%;gap:12px;padding:12px 14px;border-radius:20px;border:1px solid #ead2bc;background:#fffcf7f5;box-shadow:0 12px 36px #70411f33;isolation:isolate}
+.bok-admin-selection{min-width:0;flex:1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:1px 9px;align-items:center}
+.bok-admin-selection-caption{font-size:11px;color:#9d755e;font-weight:750;letter-spacing:.015em}
+.bok-admin-selection>strong{font-size:21px;color:#a54721}
+.bok-admin-selection-numbers{grid-column:1/-1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#775d4c}
+.bok-admin-action-buttons{min-width:0;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+.bok-admin-action-buttons .btn{min-width:0;min-height:42px;padding:9px 12px;font-size:12px;white-space:normal;line-height:1.2;text-align:center}
+.bok-admin-action-buttons .bok-admin-manual{box-shadow:0 5px 15px #b94c2b30}
+@media(max-width:900px){.bok-admin-grid{grid-template-columns:repeat(7,minmax(0,1fr))}.bok-admin-statuses{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){
+ .bok-admin-grid{grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}
+ .bok-admin-grid .bok-admin-ticket{border-radius:13px;font-size:clamp(14px,4.1vw,18px)}
+ .bok-admin-legend{padding:12px}
+ .bok-admin-statuses{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .bok-admin-grid-page .bok-admin-actionbar{
+   position:fixed;left:max(8px,env(safe-area-inset-left));right:max(8px,env(safe-area-inset-right));
+   bottom:calc(8px + env(safe-area-inset-bottom));width:auto;max-width:none;
+   margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:9px;padding:11px;
+   z-index:65;border-radius:20px;background:#fffaf6f8;
+ }
+ .bok-admin-selection{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:5px 9px;align-items:center}
+ .bok-admin-selection>strong{font-size:18px}
+ .bok-admin-selection-numbers{grid-column:auto;text-align:right;font-size:11px}
+ .bok-admin-action-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .bok-admin-action-buttons .btn{width:100%;min-height:43px;padding:8px 7px;font-size:12px;white-space:normal;overflow-wrap:anywhere}
+ .bok-admin-action-buttons .bok-admin-manual{grid-column:1}
+ .bok-admin-action-buttons .bok-admin-deposit{grid-column:2}
+ .bok-admin-grid-page{padding-bottom:calc(175px + env(safe-area-inset-bottom))}
+ .bok-admin-grid-card{padding:14px}
+ .bok-admin-grid-hint{font-size:12px;margin-bottom:14px}
+}
+@media(max-width:350px){
+ .bok-admin-grid{gap:5px}
+ .bok-admin-grid .bok-admin-ticket{border-radius:11px;font-size:13px}
+ .bok-admin-action-buttons .btn{font-size:11px}
+ .bok-admin-selection-caption{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.bok-admin-grid .bok-admin-ticket{transition:none}}
