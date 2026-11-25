@@ -22,9 +22,10 @@ function findAll(node,fn,out=[]){if(Array.isArray(node)){node.forEach(x=>findAll
  if(!node||typeof node!=='object')return out;
  if(fn(node))out.push(node);
  (node.children||[]).forEach(x=>findAll(x,fn,out));return out;}
-const API=new Function('A','h','avatar','list','renderTab','openTicket','blockSelected','openManual','openDepositFromGrid','setTimeout','clearTimeout',fragment+';return {gridView,gridFacesActive,stopGridFaces};')(
- state,make,(name,photo)=>make('avatar',{name,photo}),nums=>'№'+nums.join(', №'),
- ()=>{renders++;},()=>{opened++;},()=>{blocked++;},()=>{manual++;},()=>{deposit++;},
+const quality={isLite:()=>false,set:()=>{}};
+const API=new Function('A','gridQuality','h','avatar','list','renderTab','renderTop','openTicket','blockSelected','openManual','openDepositFromGrid','setTimeout','clearTimeout',fragment+';return {gridView,gridFacesActive,stopGridFaces};')(
+ state,quality,make,(name,photo)=>make('avatar',{name,photo}),nums=>'№'+nums.join(', №'),
+ ()=>{renders++;},()=>{},()=>{opened++;},()=>{blocked++;},()=>{manual++;},()=>{deposit++;},
  cb=>{clock=cb;return 1;},()=>{clock=null;});
 function tile(view,n){return findAll(view,x=>x.tag==='button'&&String(x.attrs.title||'').startsWith('№'+n+' ·'))[0];}
 let view=API.gridView();
