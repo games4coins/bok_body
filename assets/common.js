@@ -220,11 +220,20 @@
     try {
       let r;
       if (method === 'GET') r = await fetch(CFG.API_URL + '?' + new URLSearchParams(payload || {}));
-      else r = await fetch(CFG.API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // без preflight-запроса CORS
-        body: JSON.stringify(Object.assign({}, payload, { action }))
-      });
+      else {
+        // Refresh expiring VK credentials for private operations, but NEVER use
+        // a saved display name as proof of authentication.
+        let safePayload=payload||{};
+        if(Object.prototype.hasOwnProperty.call(safePayload,'vkAccessToken') && window.BokVK&&window.BokVK.ensureToken){
+          const updated=await window.BokVK.ensureToken();
+          safePayload=Object.assign({},safePayload,{vkAccessToken:updated||''});
+        }
+        r=await fetch(CFG.API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // без preflight
+          body: JSON.stringify(Object.assign({},safePayload,{action}))
+        });
+      }
       const data = await r.json();
       if (data && data.now) skew = data.now - Date.now();
       return data;
@@ -236,14 +245,25 @@
   }
   // Public, read-only balances: small in-tab cache and in-flight deduplication.
   // Private VK identity, bookings and spins are NEVER cached here.
-  let balancesCache=null,balancesUntil=0,balancesFlight=null;
+  let balancesCache=null,balancesUntil=0,balancesFlight=null,sitePaused=false;
+  const BALANCE_SESSION_KEY='bok_public_balances_6724';
+  const setPausedCache=paused=>{sitePaused=!!paused;};
+  try{
+    const saved=JSON.parse(sessionStorage.getItem(BALANCE_SESSION_KEY)||'null');
+    if(saved&&saved.at&&Date.now()-saved.at<120000&&saved.data&&saved.data.ok){
+      balancesCache=saved.data;balancesUntil=saved.at+120000;
+    }
+  }catch(_){};
   const clearBalancesCache=()=>{balancesCache=null;balancesUntil=0;};
   const balancesCached=()=>{
     const now=Date.now();
     if(balancesCache&&now<balancesUntil)return Promise.resolve(balancesCache);
     if(balancesFlight)return balancesFlight;
     balancesFlight=call('GET','balances',{action:'balances'}).then(result=>{
-      if(result&&result.ok){balancesCache=result;balancesUntil=Date.now()+12000;}
+      if(result&&result.ok){
+          balancesCache=result;balancesUntil=Date.now()+(sitePaused?120000:12000);
+          if(sitePaused)try{sessionStorage.setItem(BALANCE_SESSION_KEY,JSON.stringify({at:Date.now(),data:result}));}catch(_){}
+        }
       return result;
     }).finally(()=>{balancesFlight=null;});
     return balancesFlight;
@@ -253,6 +273,7 @@
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
     balances: balancesCached,
     invalidateBalances: clearBalancesCache,
+    setPausedCache,
     players: () => call('GET', 'players', { action: 'players' }),
     post: (action, body) => call('POST', action, body)
   };
