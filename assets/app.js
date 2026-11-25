@@ -280,14 +280,18 @@
   // Нельзя выдавать его за подтверждение владения аккаунтом или давать операции с балансом.
   async function openCabinet(target, publicMode=false) {
     const identity=window.BokVK&&window.BokVK.profile();
-    if(!identity && !publicMode) {
+    // A cached public profile is not a login: ensure the VK access token is
+    // valid or refreshable before presenting owner-only controls.
+    const verifiedToken=identity&&window.BokVK&&window.BokVK.ensureToken
+      ?await window.BokVK.ensureToken():'';
+    if((!identity||!verifiedToken) && !publicMode) {
       const content=h('div',null,
-        h('p',{class:'lead'},'Войдите через ВКонтакте, чтобы открыть свой кабинет.'),
+        h('p',{class:'lead'},'Выберите способ входа в кабинет.'),
         h('div',{class:'cab-vk-login'}),
-        h('p',{class:'hint'},'Вход сохраняется на этом устройстве до ручного выхода.'),
+        h('p',{class:'hint'},'Сессия VK ID сохраняется на этом устройстве и автоматически продлевается, пока VK разрешает обновление токена.'),
         h('p',{class:'hint'},'Тестовый депозит и действия с балансом доступны только после подтверждённого входа через VK ID.'),
-        h('button',{class:'btn btn-soft btn-block',onclick:()=>{closeModal();openCabinet(target,true);}},'Найти участника без VK ID'));
-      openModal([h('h3',null,'🔐 Кабинет ВОК — вход через VK ID'),content]);
+        h('button',{class:'btn btn-soft btn-block',onclick:()=>{closeModal();openCabinet(target,true);}},'👤 Войти без авторизации'));
+      openModal([h('h3',null,'🔐 Кабинет ВОК · Войти через VK ID или без авторизации'),content]);
       const error=h('p',{class:'msg err',role:'alert'});content.appendChild(error);
       if(!window.BokVK){error.textContent='Модуль VK ID недоступен';return;}
       window.BokVK.mount(content.querySelector('.cab-vk-login'),()=>{closeModal();openCabinet();},
@@ -299,7 +303,7 @@
     cabinetSheet.classList.add('bok-cabinet-sheet');
     // Independent requests in parallel: the VK check no longer waits for the
     // whole public players list. Never cache a verified VK identity.
-    const tokenAtOpen=identity&&window.BokVK&&window.BokVK.token&&window.BokVK.token();
+    const tokenAtOpen=verifiedToken;
     const [r,verifiedSession]=await Promise.all([
       api.balances(),
       tokenAtOpen?api.post('vkCabinetState',{vkAccessToken:tokenAtOpen}):Promise.resolve(null)
@@ -449,10 +453,17 @@
         if(achievementsRequested)return;
         achievementsRequested=true;
         achCount.textContent='Загружаем…';
+        const cacheKey='bok_ach_public_v6724_'+String(p.url||'');
+        const cached=(()=>{
+          try{const v=JSON.parse(sessionStorage.getItem(cacheKey)||'null');
+            return v&&Date.now()-v.at<((S.st&&S.st.paused)?5*60000:30000)?v.data:null;
+          }catch(_){return null;}
+        })();
+        if(cached){showAchievementData(cached);return;}
         api.post('achRich',{url:p.url}).then(data=>{
           if(data&&data.ok&&Array.isArray(data.achievements))return data;
           return api.post('achPublic',{url:p.url});
-        }).then(showAchievementData).catch(()=>{
+        }).then(data=>{try{sessionStorage.setItem(cacheKey,JSON.stringify({at:Date.now(),data}));}catch(_){}showAchievementData(data);}).catch(()=>{
           fill(achBody,h('p',{class:'hint'},'Не удалось загрузить. Закройте и откройте раздел ещё раз.'));
           achCount.textContent='—';
           achievementsRequested=false;
@@ -1091,7 +1102,11 @@
             h('span',{class:'bok-cab-gift-status'},g.received?'✅ Получен '+(g.receivedAt||''):'📦 Ожидает выдачи')))
           :h('p',{class:'hint'},'Подарков пока нет')));
       fill(box,
-        h('button',{class:'btn btn-ghost btn-sm bok-cab-change',onclick:()=>showSearch(true)},'← Сменить участника'),
+        h('button',{class:'btn btn-ghost btn-sm bok-cab-change',onclick:()=>{
+          if(identity && !confirm('Сменить пользователя? Вход VK ID на этом устройстве будет завершён.'))return;
+          if(identity&&window.BokVK)window.BokVK.logout();
+          closeModal();openCabinet(null,!identity);
+        }},'← Сменить пользователя'),
         h('div',{class:'cab-profile'},
           h('div',{class:'bok-cab-avatar'},avatar(p.name,p.photo,112)),
           h('div',{class:'bok-cab-profile-copy'},
@@ -1149,7 +1164,7 @@
     else if(known)select(known);
     else showSearch(false);
 
-    if(identity)box.appendChild(h('button',{class:'btn btn-ghost btn-sm',style:{marginTop:'14px'},onclick:()=>{window.BokVK.logout();closeModal();openCabinet();}},'Выйти из VK ID'));
+
   }
 
   function renderPlayers() {
