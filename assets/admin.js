@@ -1,7 +1,7 @@
 /* Номерок — админка. Работает с телефона. */
 (function () {
   'use strict';
-  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, beep, unlockAudio, DEMO, gridQuality } = Nomerok;
+  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, beep, unlockAudio, DEMO, gridQuality, bookingGridStyle } = Nomerok;
 
   const POLL_MS = 10000;
   const root = document.getElementById('app');
@@ -975,7 +975,7 @@
               'Вернуться к номерам')
             : h('span', { class: 'bok-boutique-face-description' }, gridQuality.isLite()?'Нажмите для открытия брони':'Нажмите на занятую ячейку')),
         h('div', { class: 'grid bok-admin-grid bok-boutique-grid' + (facesOn ? ' is-faces' : ''),
-          role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
+          style: bookingGridStyle(st.tickets.length), role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
         controls));
   }
   async function openDepositFromGrid() {
