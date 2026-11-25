@@ -1089,6 +1089,43 @@
       h('h3',null,'Текст для поста ВК'),copyPreview,h('button',{class:'btn btn-soft btn-block',onclick:()=>{if(!current)return toast('Выберите номерок','bad');copyText(postText());toast('Текст скопирован');}},'📋 Скопировать поздравление'));
   }
 
+  // Release diagnostics are read-only: never call prize/booking mutations.
+  function systemDiagnosticsView() {
+    const EXPECTED='6.7.25';
+    const REQUIRED=['vkCabinetState','achSpin','adminRewardRule',
+      'adminUnlockBackfill','adminDepositConfirm','adminDepositCancel'];
+    const result=h('div',{class:'meta',role:'status'},'Проверка ещё не запускалась.');
+    const check=h('button',{class:'btn btn-soft',type:'button',onclick:async()=>{
+      check.disabled=true;
+      fill(result,h('p',{class:'hint'},'Сверяем опубликованный GAS…'));
+      const start=performance.now();
+      const res=await api.version();
+      const duration=Math.round(performance.now()-start);
+      check.disabled=false;
+      if(!res||!res.ok){
+        fill(result,h('div',{class:'msg err'},
+          'Не удалось получить версию опубликованного GAS · '+duration+' мс. ',
+          String(res&&res.error&&res.error.message||'Проверьте соединение.')));
+        return;
+      }
+      const missing=REQUIRED.filter(k=>!Array.isArray(res.features)||!res.features.includes(k));
+      const current=String(res.apiVersion||'не указана');
+      const versionOk=current===EXPECTED&&missing.length===0;
+      fill(result,
+        h('p',null,'Сайт: ',h('b',null,EXPECTED),' · Опубликованный GAS: ',h('b',null,current)),
+        h('p',null,'Ответ сервера: ',h('b',null,duration+' мс'),' · Отметка релиза: ',String(res.release||'нет')),
+        h('div',{class:versionOk?'msg':'msg err'},versionOk?
+          '✅ Заявленные серверные функции соответствуют релизу. Это проверка маршрутов по метаданным, а не тест операций.':
+          '⚠ Несовпадение версии или перечня функций. Проверьте публикацию существующего /exec.'),
+        missing.length?h('p',{class:'meta'},'Отсутствуют в списке функций: '+missing.join(', ')):null);
+    }},'🔍 Проверить опубликованный GAS');
+    return h('section',{class:'card',style:{marginBottom:'20px'}},
+      h('h2',null,'🩺 Диагностика BOK Body'),
+      h('p',{class:'lead'},'Безопасная проверка: версия GAS, заявленные функции и время ответа. Не изменяет номерки, депозиты, ачивки или выигрыши.'),
+      check,result,
+      h('p',{class:'hint'},'Отметка версии сообщает, какой код отвечает на /exec; не подтверждает фактическую работу отдельных операций или права VK.'));
+  }
+
   function settingsView() {
     const byKey = {};
     A.st.form.forEach((f) => { byKey[f.key] = f; });
@@ -1100,7 +1137,7 @@
       saveBtn.disabled = false;
       if (r) renderTab();
     } }, 'Сохранить настройки');
-    return h('div', null, h('section', { class: 'card' },
+    return h('div', null, systemDiagnosticsView(), h('section', { class: 'card' },
       h('div', { class: 'set-group' }, h('h3', null, 'Параметры эфира и бронирования'), A.st.form.map((f) => control(f))),
       saveBtn,
       h('p', { class: 'note-foot' }, 'Время тихих часов и дедлайны считаются в часовом поясе организатора. Изменения часов на подтверждение действуют на новые брони.')),
