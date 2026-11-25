@@ -646,6 +646,15 @@
         const applied=await act('adminEarlyBackfill',{apply:true,confirm:'ACTIVATE_EARLY_BACKFILL'});
         if(applied)toast('Перенесено прав: '+applied.count);
       }},'🔍 Проверить и перенести старые автоброни'));
+    const unlockBackfillButton=h('button',{class:'btn btn-soft',onclick:async()=>{
+      const p=await act('adminUnlockBackfill',{apply:false});
+      if(!p)return;
+      if(!p.count){toast('Исторических ачивок для переноса не найдено');return;}
+      const names=(p.items||[]).slice(0,15).map(x=>x.key+' · '+x.title+' → '+(x.achievement||'Все открыты')).join('\n');
+      if(!confirm('Будут обработаны '+p.count+' исторических выигрышей с действием «Разблокировка ачивки».\n'+names+'\nПеренести сейчас?'))return;
+      const result=await act('adminUnlockBackfill',{apply:true,confirm:'ACTIVATE_UNLOCK_BACKFILL'});
+      if(result){api.invalidateBalances();toast('Обработано выигрышей: '+result.count);achievementsView();}
+    }},'🏅 Проверить и перенести старые разблокировки ачивок');
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
@@ -676,6 +685,7 @@
     fill(host,h('h2',null,'🏆 Достижения и барабан'),
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
       rewardReady?earlyControls:null,
+      rewardReady?unlockBackfillButton:null,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
