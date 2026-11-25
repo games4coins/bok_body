@@ -20,6 +20,7 @@ jobs:
           node --check config.js
           node tests/vk-session.test.js
           node tests/boutique-grid.test.js
+          node tests/public-boutique-grid.test.js
       - name: Check release and routing invariants
         run: |
           set -euo pipefail
@@ -37,6 +38,8 @@ jobs:
           grep -Fq 'grid-template-columns:repeat(2,minmax(0,1fr))' assets/styles.css
           grep -Fq 'bok-admin-grid-page .bok-admin-actionbar' assets/styles.css
           grep -Fq '6.7.28' admin.html
+          grep -Fq 'bok-public-grid' assets/app.js
+          grep -Fq 'bok_grid_mode_v1' assets/common.js
           grep -Fq 'bok-boutique-grid' assets/styles.css
           grep -Fq 'GRID_FACE_MS = 6000' assets/admin.js
           grep -Fq 'function systemDiagnosticsView()' assets/admin.js
