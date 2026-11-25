@@ -582,5 +582,33 @@
   }
   global.BokPlayerSearch = Object.freeze({ slug: bokSearchSlug, normalize: bokSearchNorm, filter: bokSearchPlayers });
 
-  global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api };
+  // Shared lightweight/premium UI preference. Stored locally, never sent to GAS.
+  // Low mode avoids avatar images inside ticket grids, filters and transitions.
+  const BOK_GRID_MODE_KEY='bok_grid_mode_v1';
+  function initialGridMode(){
+    const saved=store(BOK_GRID_MODE_KEY);
+    if(saved==='lite'||saved==='premium')return saved;
+    let constrained=false;
+    try{
+      constrained=!!((navigator.connection&&navigator.connection.saveData)||
+        (window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches));
+    }catch(_){}
+    return constrained?'lite':'premium';
+  }
+  let bokGridMode=initialGridMode();
+  function applyGridMode(){document.documentElement.classList.toggle('bok-grid-lite',bokGridMode==='lite');}
+  applyGridMode();
+  const gridQuality=Object.freeze({
+    get:()=>bokGridMode,
+    isLite:()=>bokGridMode==='lite',
+    set:(mode)=>{
+      if(mode!=='premium'&&mode!=='lite')return bokGridMode;
+      bokGridMode=mode;
+      store(BOK_GRID_MODE_KEY,mode);
+      applyGridMode();
+      return bokGridMode;
+    }
+  });
+
+  global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api, gridQuality };
 })(window);
