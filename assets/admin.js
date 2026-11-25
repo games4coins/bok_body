@@ -7,7 +7,8 @@
   const root = document.getElementById('app');
   const A = {
     pw: '', st: null, tab: 'queue', filter: 'attention', q: '', sel: new Set(),
-    players: null, rules: null, pq: '', known: null, draft: {}, sound: store('nomerok_sound') !== '0', poll: null
+    players: null, rules: null, pq: '', known: null, draft: {}, sound: store('nomerok_sound') !== '0', poll: null,
+    depositBalances: null, depositFetchedAt: 0, depositFlight: null
   };
   const EXPECTED_VERSION = 6;
   const NEEDS_CHECK = ['ОПЛАТА ЗАЯВЛЕНА', 'ОЖИДАЕТ'];
@@ -195,7 +196,20 @@
 
   function renderTab() {
     if (!A.st) return;
-    if (A.tab === 'queue') fill(contentEl, queueView());
+    if (A.tab === 'queue') {
+      fill(contentEl, queueView());
+      // Only one background admin query; avoid re-fetching on each booking poll.
+      if(!A.depositFlight && Date.now()-A.depositFetchedAt>60000){
+        A.depositFetchedAt=Date.now();
+        A.depositFlight=act('adminDepositList').then(r=>{
+          if(r){
+            A.depositBalances=new Map((r.players||[]).filter(p=>Number(p.balance)>0)
+              .map(p=>[String(p.key),Number(p.balance)]));
+            if(A.tab==='queue'&&A.st)fill(contentEl,queueView());
+          }
+        }).finally(()=>{A.depositFlight=null;});
+      }
+    }
     else if (A.tab === 'grid') fill(contentEl, gridView());
     else if (A.tab === 'players') fill(contentEl, playersView());
     else if (A.tab === 'winner') fill(contentEl, winnerView());
@@ -773,6 +787,20 @@
     const buttons = [];
     if (b.status === 'ОЖИДАЕТ' || b.status === 'ОПЛАТА ЗАЯВЛЕНА') {
       buttons.push(h('button', { class: 'btn btn-ok btn-sm', onclick: () => act('adminConfirm', { code: b.code }, 'Подтверждена: ' + b.code) }, '✅ Подтвердить'));
+      const depositAvailable=A.depositBalances&&A.depositBalances.get(String(b.key))||0;
+      if(depositAvailable>0 && !/ОПЛАЧЕНО ИЗ ДЕПОЗИТА/i.test(String(b.note||''))){
+        const priceMatch=String(A.st&&A.st.event&&A.st.event.priceText||'').match(/(\d[\d\s]*)/);
+        const expectedPrice=priceMatch?Number(priceMatch[1].replace(/\s/g,''))*b.numbers.length:0;
+        if(expectedPrice>0 && depositAvailable>=expectedPrice)
+          buttons.push(h('button',{class:'btn btn-soft btn-sm',onclick:async()=>{
+            if(!confirm('Подтвердить бронь '+b.code+' за счёт депозита?\nСписать '+expectedPrice+' ₽ с баланса '+depositAvailable+' ₽?'))return;
+            const r=await act('adminDepositConfirm',{code:b.code});
+            if(r){A.depositFetchedAt=0;A.depositBalances=null;
+              toast('Бронь оплачена из депозита: '+r.amount+' ₽');
+              if(r.state)setState(r.state);else pollOnce();
+            }
+          }},'💳 Подтвердить за счёт депозита'));
+      }
       buttons.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: () => act('adminExtend', { code: b.code, hours: 1 }, '+1 час') }, '+1 ч'));
       buttons.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmThen('Отменить бронь ' + b.code + '?', () => act('adminCancel', { code: b.code }, 'Отменена')) }, 'Отменить'));
     } else if (b.status === 'ИСТЕКЛА' || b.status === 'ОТМЕНЕНА') {
