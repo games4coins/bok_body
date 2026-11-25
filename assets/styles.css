@@ -1570,3 +1570,44 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
 .bok-grid-lite .bok-admin-ticket-face-image{display:none!important}
 .bok-grid-lite .bok-boutique-toolbar{display:none}
 .bok-grid-lite .bok-grid-mode-option{transition:none}
+
+/* 6.7.30 — компактная интерактивная легенда на странице бронирования.
+   Одна горизонтальная полоса; на узких экранах прокрутка внутри неё. */
+.bok-public-grid-card .bok-public-legend{
+  margin:8px 0 10px;
+  padding:6px;
+  border-radius:13px;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-legend-heading,
+.bok-public-grid-card .bok-public-legend .bok-boutique-legend-note{display:none}
+.bok-public-grid-card .bok-public-legend .bok-admin-statuses{
+  display:flex;
+  flex-wrap:nowrap;
+  gap:5px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:thin;
+  overscroll-behavior-x:contain;
+  padding:2px;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-status{
+  flex:1 0 auto;
+  min-width:0;
+  min-height:34px;
+  display:inline-flex;
+  flex-direction:row;
+  justify-content:center;
+  align-items:center;
+  gap:5px;
+  padding:6px 8px;
+  border-radius:10px;
+  white-space:nowrap;
+  line-height:1.1;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-status-name{font-size:11px}
+.bok-public-grid-card .bok-public-legend .bok-admin-status-count{font:800 13px/1.1 system-ui,sans-serif}
+@media(max-width:700px){
+  .bok-public-grid-card .bok-public-legend{padding:4px;margin:6px 0 8px}
+  .bok-public-grid-card .bok-public-legend .bok-admin-status{flex:0 0 auto;min-height:34px;padding:6px 9px}
+}
