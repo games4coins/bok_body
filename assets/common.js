@@ -627,7 +627,9 @@
     return Math.min(12,Math.max(10,Math.ceil(Math.sqrt(n))));
   }
   function bookingGridStyle(total) {
-    return {'--bok-grid-cols': String(bookingGridColumns(total))};
+    const cols=bookingGridColumns(total);
+    // Computed pixel cap avoids CSS multiplication unsupported by older phones.
+    return {'--bok-grid-cols':String(cols),'--bok-grid-max-width':(cols*42+(cols-1)*5)+'px'};
   }
 
   global.Nomerok = { CFG, DEMO, h, fill, timerSpan, tickTimer, timerNodes, svg, qrSvg, safeUrl, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, clientId, store, copyText, toast, beep, unlockAudio, avatarColor, api, gridQuality, bookingGridColumns, bookingGridStyle };
