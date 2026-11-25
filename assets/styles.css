@@ -1391,3 +1391,90 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
  .bok-admin-selection-caption{font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.bok-admin-grid .bok-admin-ticket{transition:none}}
+
+
+/* BOK 6.7.28 · Boutique Board Hybrid: client-independent admin-only visuals. */
+.bok-boutique-page .bok-admin-grid-card{
+  border:1px solid #e6cfb9;
+  background:radial-gradient(140% 100% at 100% 0%,#fffbf5 0%,transparent 65%),
+             linear-gradient(145deg,#fffaf5,#f9eee3 75%,#fff9f4);
+  box-shadow:0 12px 40px #6a382214,inset 0 1px 0 #fff;
+}
+.bok-boutique-page .bok-admin-grid-heading{padding-bottom:6px}
+.bok-boutique-page .bok-admin-grid-heading h2{font-family:Georgia,"Times New Roman",serif;font-size:clamp(25px,4vw,32px);font-weight:700;letter-spacing:-.035em;color:#57372b}
+.bok-boutique-page .bok-admin-grid-eyebrow{color:#af865e;letter-spacing:.19em}
+.bok-boutique-page .bok-admin-grid-total b{color:#ad5f37;font-family:Georgia,"Times New Roman",serif}
+.bok-boutique-legend{margin:12px 0 15px;padding:13px;border:1px solid #e4cbb6;box-shadow:inset 0 1px 0 #fff9,0 6px 18px #613b2211;background:linear-gradient(133deg,#fffaf5,#f6e9dc)}
+.bok-boutique-legend .bok-admin-statuses{gap:6px}
+.bok-boutique-legend .bok-admin-status{cursor:pointer;appearance:none;text-align:left;min-height:64px;
+  transition:opacity .18s ease,transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+  border:1px solid #e5d4c6;background:linear-gradient(145deg,#fffdf9,#fbf1e7);
+  box-shadow:inset 0 1px 0 #fff}
+.bok-boutique-legend .bok-admin-status:hover{border-color:#c9996e}
+.bok-boutique-legend .bok-admin-status.is-active{
+  background:linear-gradient(145deg,#fffdf7,#fce8d6);
+  border:2px solid #c87540;box-shadow:0 0 0 2px #f6d4b8,0 4px 13px #94572e22;
+}
+.bok-boutique-legend .bok-admin-status.is-muted{opacity:.60}
+.bok-boutique-legend .bok-admin-status:focus-visible{outline:3px solid #b95d2d;outline-offset:2px}
+.bok-boutique-legend .bok-admin-status-name{font-size:11px}
+.bok-boutique-legend .bok-admin-status-count{font-family:Georgia,"Times New Roman",serif;font-size:20px}
+.bok-boutique-legend-note{font-size:11px;font-weight:650;color:#9b755b;margin:11px 2px 0;line-height:1.4}
+.bok-boutique-toolbar{display:flex;align-items:center;justify-content:space-between;
+  gap:8px;margin:0 0 11px;min-height:32px}
+.bok-boutique-toolbar-label{font-size:12px;font-weight:850;color:#6b4736}
+.bok-boutique-face-description{font-size:11px;color:#aa856c;text-align:right}
+.bok-boutique-face-toggle{appearance:none;border:1px solid #cb875b;border-radius:999px;
+  background:linear-gradient(145deg,#ffe9d6,#f2caab);padding:6px 12px;
+  color:#874823;font-size:11px;font-weight:850;min-height:32px}
+.bok-boutique-face-toggle:focus-visible{outline:3px solid #d4874e;outline-offset:2px}
+.bok-boutique-grid{gap:8px}
+.bok-boutique-grid .bok-admin-ticket{border-radius:16px;box-shadow:inset 0 2px 1px #ffffffba,0 3px 8px #71472c20,0 1px 1px #56322125}
+.bok-boutique-grid .t-free{background:linear-gradient(145deg,#f5f7ed,#dee9d9);border-color:#cbd8bc;color:#554d3c}
+.bok-boutique-grid .t-pend{background:linear-gradient(145deg,#fff8e9,#f7dcaa);border-color:#e5c385;color:#845a26}
+.bok-boutique-grid .t-paid{background:linear-gradient(145deg,#f2f5ff,#ccdaf8);border-color:#bbcae9;color:#3a5279}
+.bok-boutique-grid .t-taken{background:linear-gradient(145deg,#f6eae2,#e5c9b9);border-color:#d9b8a3;color:#785441}
+.bok-boutique-grid .t-block{background:repeating-linear-gradient(135deg,#f6e9e6,#f6e9e6 7px,#e8d5d0 7px,#e8d5d0 13px);border-color:#d6c1b8;color:#98776c}
+.bok-boutique-grid .t-sel{background:linear-gradient(145deg,#ffad55,#df6c24 55%,#ad491b);border-color:#bd5527;color:#fff;
+  box-shadow:inset 0 2px 0 #ffffff77,0 6px 16px #ba5e3180}
+.bok-boutique-grid .bok-admin-ticket-dimmed{opacity:.28;filter:saturate(.35);box-shadow:none}
+.bok-boutique-grid .bok-admin-ticket-spotlight:not(.t-sel){border-color:#bd8a47;box-shadow:0 0 0 2px #d9af7d,0 3px 13px #7e4e2d2e}
+.bok-boutique-grid .bok-admin-ticket-face{isolation:isolate;border-color:#e5c9ab;overflow:hidden;background:#d9bda5}
+.bok-boutique-grid .bok-admin-ticket-face-image{position:absolute;inset:0;z-index:0;display:block;overflow:hidden;
+  background:linear-gradient(135deg,#d3ae99,#a77765);pointer-events:none}
+.bok-boutique-grid .bok-admin-ticket-face-image .avatar,
+.bok-boutique-grid .bok-admin-ticket-face-image .avatar-img{
+  position:absolute!important;inset:0!important;display:block!important;width:100%!important;height:100%!important;
+  max-width:none!important;max-height:none!important;min-width:0!important;min-height:0!important;
+  border-radius:0!important;object-fit:cover!important;object-position:center!important;
+  border:0!important;margin:0!important;padding:0!important;
+}
+.bok-boutique-grid .bok-admin-ticket-face-image .avatar:not(img){display:grid!important;place-items:center!important;
+  font-size:clamp(17px,4.8vw,27px)!important;color:#fff}
+.bok-boutique-grid .bok-admin-ticket-face:before{content:"";position:absolute;inset:35% 0 0;z-index:1;pointer-events:none;
+  background:linear-gradient(transparent,#2a1719b5)}
+.bok-boutique-grid .bok-admin-ticket-face .bok-admin-ticket-num{
+  position:absolute;z-index:2;bottom:3px;left:50%;transform:translateX(-50%);
+  font-size:clamp(16px,4.6vw,24px);line-height:1.15;font-weight:850;color:#fff;
+  text-shadow:0 1px 5px #26130ecc,0 2px 8px #26130e}
+.bok-boutique-grid .bok-admin-ticket-face.t-sel{border-color:#ffb46d}
+.bok-boutique-page .bok-admin-actionbar{border-color:#e1bda2;
+  background:linear-gradient(135deg,#fff9f4fa,#f9e8daf8);
+  box-shadow:0 10px 35px #65412835,0 1px 1px #fff inset}
+.bok-boutique-page .bok-admin-action-buttons .bok-admin-deposit{
+  background:linear-gradient(135deg,#ea923f,#d76023);color:white;border-color:#c15c21;
+  box-shadow:0 5px 15px #bc592a30}
+@media(max-width:700px){
+ .bok-boutique-legend{margin-top:9px;padding:10px}
+ .bok-boutique-legend .bok-admin-status{min-height:58px;padding:8px}
+ .bok-boutique-grid{gap:7px}
+ .bok-boutique-grid .bok-admin-ticket{border-radius:12px}
+ .bok-boutique-page .bok-admin-grid-card{padding:12px}
+ .bok-boutique-page .bok-admin-actionbar{border-radius:19px}
+}
+@media(hover:none){
+ .bok-boutique-grid .bok-admin-ticket:active{transform:scale(.97)}
+}
+@media(prefers-reduced-motion:reduce){
+ .bok-boutique-grid .bok-admin-ticket,.bok-boutique-legend .bok-admin-status{transition:none}
+}
