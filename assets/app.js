@@ -178,9 +178,9 @@
       h('span',null,'Оформление сетки'),
       h('div',{class:'bok-grid-mode-options',role:'group','aria-label':'Качество оформления'},
         h('button',{type:'button',class:'bok-grid-mode-option'+(!lite?' is-active':''),'aria-pressed':String(!lite),
-          onclick:()=>{gridQuality.set('premium');renderGrid();}},'✦ Премиум'),
+          onclick:()=>{gridQuality.set('premium');renderGrid();renderPlayers();}},'✦ Премиум'),
         h('button',{type:'button',class:'bok-grid-mode-option'+(lite?' is-active':''),'aria-pressed':String(lite),
-          onclick:()=>{gridQuality.set('lite');stopGridFaces(false);renderGrid();}},'◈ Упрощённый')));
+          onclick:()=>{gridQuality.set('lite');stopGridFaces(false);renderGrid();renderPlayers();}},'◈ Упрощённый')));
   }
   function renderGrid(){
     const st=S.st;
@@ -1277,7 +1277,7 @@
       const l = norm(p.name).charAt(0).toUpperCase();
       if (l !== letter) { letter = l; out.push(h('div', { class: 'letter' }, l)); }
       out.push(h('button', { class: 'prow participant-row', type: 'button', onclick: () => openCabinet(p.url || p.name), title: 'Открыть кабинет участника' },
-        avatar(p.name, p.photo),
+        avatar(p.name, gridQuality.isLite()?'':p.photo),
         h('div', { class: 'pname' }, h('b', null, p.name),
           h('div', { class: 'chips' }, p.items.map((it) => h('span', { class: 'chip' + (it[1] ? '' : ' pend') }, '№' + it[0])), marks(p)))));
     });
