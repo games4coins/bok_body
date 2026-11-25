@@ -1,7 +1,7 @@
 /* Номерок — админка. Работает с телефона. */
 (function () {
   'use strict';
-  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, beep, unlockAudio, DEMO } = Nomerok;
+  const { h, fill, api, avatar, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, beep, unlockAudio, DEMO, gridQuality } = Nomerok;
 
   const POLL_MS = 10000;
   const root = document.getElementById('app');
@@ -171,6 +171,7 @@
       h('span', { class: 'grow' }),
       h('button', { class: 'tab', title: 'Заморозить / возобновить бронирование', onclick: () => setPause(!st.paused) }, st.paused ? '▶ Возобновить' : '⏸ Перерыв'),
       h('button', { class: 'tab', title: 'Звуковой сигнал', onclick: toggleSound }, A.sound ? '🔔 Звук' : '🔕 Звук'),
+      h('button', {class:'tab bok-grid-mode-top', type:'button',onclick:()=>{gridQuality.set(gridQuality.isLite()?'premium':'lite');stopGridFaces(false);renderTop();if(A.tab==='grid')renderTab();}},gridQuality.isLite()?'◈ Упрощённый':'✦ Премиум'),
       h('button', { class: 'tab', onclick: logout }, 'Выйти'));
     const warns = (st.warnings || []).slice();
     if (st.version !== EXPECTED_VERSION) warns.unshift('Версия сервера (Apps Script) ' + (st.version || 'старая') + ', а сайт рассчитан на ' + EXPECTED_VERSION + '. Вставьте свежие Code.gs, TimeLogic.gs и Players.gs, запустите init и создайте НОВУЮ версию развёртывания — иначе часть функций работает неверно.');
@@ -855,7 +856,7 @@
     t: { label: 'Подтверждено', tile: 't-taken' },
     b: { label: 'Заблокировано', tile: 't-block' }
   };
-  function gridFacesActive() { return A.gridFacesUntil > Date.now(); }
+  function gridFacesActive() { return !gridQuality.isLite() && A.gridFacesUntil > Date.now(); }
   function stopGridFaces(render) {
     clearTimeout(A.gridFacesTimer);
     A.gridFacesTimer = null;
@@ -883,7 +884,7 @@
     const tiles = st.tickets.map(t => {
       const on = A.sel.has(t.n), isFree = t.s === 'f';
       const booked = occupied(t.s) && bookings.get(String(t.code));
-      const showFace = facesOn && !!booked;
+      const showFace = !gridQuality.isLite() && facesOn && !!booked;
       const filtered = highlight !== null && t.s !== highlight;
       const label = GRID_STATUSES[t.s] ? GRID_STATUSES[t.s].label.toLowerCase() : 'неизвестен';
       const attrs = {
@@ -900,7 +901,7 @@
           if (isFree) {
             if (on) A.sel.delete(t.n); else A.sel.add(t.n);
             renderTab();
-          } else if (occupied(t.s) && !gridFacesActive()) {
+          } else if (occupied(t.s) && !gridQuality.isLite() && !gridFacesActive()) {
             // First tap briefly reveals occupants; next tap opens original booking.
             revealGridFaces();
           } else openTicket(t);
@@ -951,7 +952,7 @@
             h('b', { class: 'num' }, String(all)),
             h('small', null, 'номерков'))),
         h('p', { class: 'bok-admin-grid-hint' },
-          'Нажмите на свободные номерки для выбора. На занятый — чтобы показать участников; повторный тап откроет бронь.'),
+          gridQuality.isLite()?'Выберите свободные номерки. Нажмите на занятый, чтобы открыть бронь.':'Выберите свободные номерки. Нажмите на занятый, чтобы на 6 секунд показать аватарки; повторный тап откроет бронь.'),
         h('section', { class: 'bok-admin-legend bok-boutique-legend', 'aria-label': 'Интерактивная легенда статусов' },
           h('div', { class: 'bok-admin-legend-heading' },
             h('h3', null, 'Статусы бронирования'),
@@ -960,12 +961,19 @@
           h('p', { class: 'bok-boutique-legend-note' },
             highlight === null ? 'Нажмите на статус, чтобы подсветить соответствующие номерки.' :
             'Подсвечено: ' + GRID_STATUSES[highlight].label + '. Повторное нажатие снимет выделение.')),
+        h('div', { class: 'bok-grid-mode-strip' },
+          h('span', null, 'Оформление сетки'),
+          h('div', { class:'bok-grid-mode-options', role:'group', 'aria-label':'Качество оформления' },
+            h('button',{type:'button',class:'bok-grid-mode-option'+(!gridQuality.isLite()?' is-active':''),'aria-pressed':String(!gridQuality.isLite()),
+              onclick:()=>{gridQuality.set('premium');renderTop();renderTab();}},'✦ Премиум'),
+            h('button',{type:'button',class:'bok-grid-mode-option'+(gridQuality.isLite()?' is-active':''),'aria-pressed':String(gridQuality.isLite()),
+              onclick:()=>{gridQuality.set('lite');stopGridFaces(false);renderTop();renderTab();}},'◈ Упрощённый'))),
         h('div', { class: 'bok-boutique-toolbar' },
-          h('span', { class: 'bok-boutique-toolbar-label' }, facesOn ? 'Режим аватарок · 6 секунд' : 'Участники бронирования'),
+          h('span', { class: 'bok-boutique-toolbar-label' }, gridQuality.isLite() ? 'Быстрый режим без аватарок' : facesOn ? 'Режим аватарок · 6 секунд' : 'Участники бронирования'),
           facesOn
             ? h('button', { type: 'button', class: 'bok-boutique-face-toggle is-active', onclick: () => stopGridFaces(true) },
               'Вернуться к номерам')
-            : h('span', { class: 'bok-boutique-face-description' }, 'Нажмите на занятую ячейку')),
+            : h('span', { class: 'bok-boutique-face-description' }, gridQuality.isLite()?'Нажмите для открытия брони':'Нажмите на занятую ячейку')),
         h('div', { class: 'grid bok-admin-grid bok-boutique-grid' + (facesOn ? ' is-faces' : ''),
           role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
         controls));
