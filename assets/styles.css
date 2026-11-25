@@ -1651,12 +1651,13 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
    A 63-ticket event is always 7 columns × 9 rows, on mobile and desktop. */
 .bok-public-grid.bok-boutique-grid,
 .bok-admin-grid.bok-boutique-grid{
-  --bok-grid-tile:46px;
+  --bok-grid-tile:42px;
   --bok-grid-gap:6px;
   display:grid;
   grid-template-columns:repeat(var(--bok-grid-cols,7),minmax(0,1fr));
   gap:var(--bok-grid-gap);
-  width:min(100%,calc(var(--bok-grid-cols,7) * var(--bok-grid-tile) + (var(--bok-grid-cols,7) - 1) * var(--bok-grid-gap)));
+  width:100%;
+  max-width:var(--bok-grid-max-width,324px);
   max-width:100%;
   margin-inline:auto;
   align-content:start;
