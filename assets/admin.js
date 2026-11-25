@@ -846,29 +846,72 @@
   function gridView() {
     const st = A.st;
     const cls = { f: 't-free', p: 't-pend', a: 't-paid', t: 't-taken', b: 't-block' };
-    const tiles = st.tickets.map((t) => {
+    const counts = { f: 0, p: 0, a: 0, t: 0, b: 0 };
+    (st.tickets || []).forEach(t => { if (counts[t.s] !== undefined) counts[t.s]++; });
+    const tiles = st.tickets.map(t => {
       const on = A.sel.has(t.n);
+      const isFree = t.s === 'f';
+      const labels = { f: 'свободен', p: 'ждёт подтверждения', a: 'оплата заявлена',
+        t: 'подтверждён', b: 'заблокирован' };
       return h('button', {
-        class: 'tile ' + (t.s === 'f' && on ? 't-sel' : cls[t.s]), 'aria-label': 'Номерок ' + t.n,
-        onclick: () => { if (t.s === 'f') { if (on) A.sel.delete(t.n); else A.sel.add(t.n); renderTab(); } else openTicket(t); }
-      }, t.n);
+        type: 'button',
+        class: 'tile bok-admin-ticket ' + (isFree && on ? 't-sel' : cls[t.s]),
+        'aria-label': 'Номерок ' + t.n + ' — ' + (on ? 'выбран' : labels[t.s] || t.s),
+        'aria-pressed': isFree ? String(on) : null,
+        title: '№' + t.n + ' · ' + (on ? 'выбран' : labels[t.s] || t.s),
+        onclick: () => {
+          if (isFree) {
+            if (on) A.sel.delete(t.n); else A.sel.add(t.n);
+            renderTab();
+          } else openTicket(t);
+        }
+      }, h('span', { class: 'bok-admin-ticket-num' }, String(t.n)));
     });
     const nums = Array.from(A.sel).sort((a, b) => a - b);
-    return h('div', null,
-      h('section', { class: 'card' },
-        h('h2', null, 'Сетка номерков'),
-        h('p', { class: 'lead' }, 'Нажмите на свободные номерки, затем «Назначить вручную» или «Заблокировать». Нажмите на занятый — увидите, чей он.'),
-        h('div', { class: 'grid' }, tiles),
-        h('div', { class: 'legend' },
-          legend('var(--free-bg)', 'свободен'), legend('var(--pend-bg)', 'ждёт подтверждения'), legend('var(--paid-bg)', 'оплата заявлена'),
-          legend('var(--taken-bg)', 'подтверждён'), legend('#e3dbd2', 'заблокирован')),
-        nums.length ? h('div', { class: 'actionbar' },
-          h('div', { class: 'sel' }, h('b', null, 'Выбрано: ' + nums.length), h('span', null, list(nums))),
-          h('div', { style: { display: 'flex', gap: '8px', flex: 'none', flexWrap: 'wrap', justifyContent: 'flex-end' } },
-            h('button', { class: 'btn btn-ghost btn-sm', onclick: () => { A.sel.clear(); renderTab(); } }, 'Сбросить'),
-            h('button', { class: 'btn btn-soft btn-sm', onclick: blockSelected }, 'Заблокировать'),
-            h('button', { class: 'btn btn-primary btn-sm', onclick: openManual }, 'Назначить вручную'),
-            h('button', { class: 'btn btn-primary btn-sm', onclick: openDepositFromGrid }, '💳 Списать с баланса'))) : null));
+    const all = st.tickets.length;
+    const statuses = [
+      ['f', 'Свободно', 't-free'],
+      ['p', 'Ожидает', 't-pend'],
+      ['a', 'Оплата заявлена', 't-paid'],
+      ['t', 'Подтверждено', 't-taken'],
+      ['b', 'Заблокировано', 't-block']
+    ];
+    const legendItems = statuses.map(([state, label, tileClass]) =>
+      h('div', { class: 'bok-admin-status bok-admin-status-' + state },
+        h('span', { class: 'bok-admin-status-mark ' + tileClass, 'aria-hidden': 'true' }),
+        h('span', { class: 'bok-admin-status-name' }, label),
+        h('strong', { class: 'bok-admin-status-count num' }, String(counts[state]))));
+    const controls = nums.length ? h('div', {
+      class: 'actionbar bok-admin-actionbar', role: 'region',
+      'aria-label': 'Действия с выбранными номерками'
+    },
+      h('div', { class: 'bok-admin-selection' },
+        h('span', { class: 'bok-admin-selection-caption' }, 'Выбрано номерков'),
+        h('strong', { class: 'num' }, String(nums.length)),
+        h('span', { class: 'bok-admin-selection-numbers' }, list(nums))),
+      h('div', { class: 'bok-admin-action-buttons' },
+        h('button', { type: 'button', class: 'btn btn-ghost btn-sm bok-admin-reset',
+          onclick: () => { A.sel.clear(); renderTab(); } }, 'Сбросить'),
+        h('button', { type: 'button', class: 'btn btn-soft btn-sm bok-admin-block', onclick: blockSelected }, 'Заблокировать'),
+        h('button', { type: 'button', class: 'btn btn-primary btn-sm bok-admin-manual', onclick: openManual }, 'Назначить вручную'),
+        h('button', { type: 'button', class: 'btn btn-soft btn-sm bok-admin-deposit', onclick: openDepositFromGrid }, '💳 Из депозита'))) : null;
+    return h('div', { class: 'bok-admin-grid-page' },
+      h('section', { class: 'card bok-admin-grid-card' },
+        h('header', { class: 'bok-admin-grid-heading' },
+          h('div', null,
+            h('span', { class: 'bok-admin-grid-eyebrow' }, 'BOK BODY · ЭФИР №' + st.event.number),
+            h('h2', null, 'Сетка номерков')),
+          h('div', { class: 'bok-admin-grid-total' },
+            h('b', { class: 'num' }, String(all)),
+            h('small', null, 'номерков'))),
+        h('p', { class: 'bok-admin-grid-hint' }, 'Выберите свободные номерки. Занятый номерок откроет сведения о брони.'),
+        h('div', { class: 'grid bok-admin-grid', role: 'group', 'aria-label': 'Номерки эфира' }, tiles),
+        h('section', { class: 'bok-admin-legend', 'aria-label': 'Легенда статусов бронирования' },
+          h('div', { class: 'bok-admin-legend-heading' },
+            h('h3', null, 'Статусы бронирования'),
+            h('span', null, 'Всего ' + all)),
+          h('div', { class: 'bok-admin-statuses' }, legendItems)),
+        controls));
   }
   async function openDepositFromGrid() {
     const nums=Array.from(A.sel).sort((a,b)=>a-b);
