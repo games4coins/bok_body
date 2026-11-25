@@ -1292,7 +1292,7 @@
   function depositsView() {
     const body=h('div'),search=h('input',{class:'input',type:'search',placeholder:'Поиск участника'});
     const positive=h('input',{type:'checkbox',checked:true});
-    let accounts=[],selected=null,playerDirectory=[];
+    let accounts=[],selected=null,playerDirectory=[],pendingAdjust=null;
     const newId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
     const refresh=async()=>{const [r,p]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);if(p)playerDirectory=p.players||[];if(r){accounts=r.players||[];draw();}};
     function draw(){
@@ -1305,6 +1305,32 @@
       const key=h('select',{class:'input'},h('option',{value:''},'— Выберите участника —'),...playerDirectory.map(p=>h('option',{value:p.key,selected:!!current&&p.key===current.key},p.name)));
       key.addEventListener('change',()=>{selected=accounts.find(p=>p.key===key.value)||playerDirectory.find(p=>p.key===key.value)||null;draw();});
       const amount=h('input',{class:'input',type:'number',min:'1',placeholder:'Сумма пополнения, ₽'});
+      const adjustment=h('input',{class:'input',type:'number',step:'1',placeholder:'Например: −250 или 500'});
+      const adjustmentNote=h('input',{class:'input',maxlength:'300',placeholder:'Причина корректировки (обязательно)'});
+      const adjustBtn=h('button',{class:'btn btn-soft btn-block',onclick:async()=>{
+        const owner=key.value.trim(),delta=Number(adjustment.value),reason=adjustmentNote.value.trim();
+        const account=accounts.find(p=>String(p.key)===owner);
+        const currentBalance=account?Number(account.balance)||0:0;
+        if(!owner)return toast('Выберите участника','bad');
+        if(!adjustment.value||!Number.isInteger(delta)||delta===0||Math.abs(delta)>100000)
+          return toast('Введите целую сумму от −100000 до +100000 ₽ (кроме нуля)','bad');
+        if(reason.length<3)return toast('Укажите причину корректировки (минимум 3 символа)','bad');
+        if(currentBalance+delta<0)return toast('Нельзя уменьшить баланс ниже нуля. Сейчас: '+currentBalance+' ₽','bad');
+        const fingerprint=owner+'|'+delta+'|'+reason;
+        if(!pendingAdjust||pendingAdjust.fingerprint!==fingerprint)
+          pendingAdjust={fingerprint,requestId:'adjust-'+newId()};
+        if(!confirm('Участник: '+(account&&account.name||owner)+'\\nБаланс: '+currentBalance+' ₽\\nИзменение: '+(delta>0?'+':'')+delta+' ₽\\nПосле: '+(currentBalance+delta)+' ₽\\nПричина: '+reason+'\\n\\nЗаписать корректировку?'))return;
+        adjustBtn.disabled=true;
+        const r=await act('adminDepositAdjust',{key:owner,amount:delta,requestId:pendingAdjust.requestId,note:reason});
+        adjustBtn.disabled=false;
+        if(r){
+          pendingAdjust=null;
+          accounts=r.players||[];
+          selected=accounts.find(p=>p.key===owner);
+          A.depositFetchedAt=0;A.depositBalances=null;
+          draw();toast('Корректировка записана. Остаток: '+r.balance+' ₽');
+        }else toast('Если ответ сервера потерян, повторите с теми же данными — ID операции сохранён.','bad');
+      }},'✏ Скорректировать баланс (+/−)');
       const nums=h('input',{class:'input',placeholder:'Номерки через запятую: 2, 8, 15'});
       const note=h('input',{class:'input',placeholder:'Комментарий'});
       const vkId=h('input',{class:'input',inputmode:'numeric',placeholder:'Числовой VK ID, например 55560074'});
@@ -1332,7 +1358,7 @@
       fill(body,h('div',{class:'gift-add-row'},search,h('label',null,positive,'Только с остатком')),
         h('div',null,...cards),
         h('h3',null,current?current.name+' · '+(current.balance||0)+' ₽':'Операции с условным балансом'),
-        key,amount,note,credit,nums,book,h('h4',null,'Привязка старых VK-профилей'),h('p',{class:'hint'},'Выберите участника и введите его числовой VK ID. Старая ссылка и история останутся без изменений. Не связывайте по одному только имени.'),vkId,linkBtn,h('h4',null,'История'),...history);
+        key,amount,note,credit,h('h4',null,'Ручная корректировка депозита'),h('p',{class:'hint'},'Для уменьшения введите отрицательную сумму, например −250. Остаток не может быть меньше 0 ₽. Каждая корректировка записывается в историю с причиной.'),adjustment,adjustmentNote,adjustBtn,nums,book,h('h4',null,'Привязка старых VK-профилей'),h('p',{class:'hint'},'Выберите участника и введите его числовой VK ID. Старая ссылка и история останутся без изменений. Не связывайте по одному только имени.'),vkId,linkBtn,h('h4',null,'История'),...history);
     }
     const migration=h('div',{class:'card',style:{marginTop:'16px'}});
     let migrationOffset=0;
