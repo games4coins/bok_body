@@ -1,7 +1,7 @@
 /* Номерок — публичная страница бронирования. */
 (function () {
   'use strict';
-  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO, gridQuality } = Nomerok;
+  const { h, fill, api, nowMs, tzName, fmtDT, fmtLeft, fmtMin, timerNodes, tickTimer, clientId, store, copyText, toast, avatar, qrSvg, safeUrl, DEMO, gridQuality, bookingGridStyle } = Nomerok;
 
   const CLIENT = clientId();
   const POLL_PEAK_MS = 8000;
@@ -229,6 +229,7 @@
           avatar(participant.name||'Участник',participant.photo||'',64)):null,
         h('span',{class:'bok-admin-ticket-num'},String(n)));
     });
+    Object.assign(gridEl.style,bookingGridStyle(st.tickets.length));
     fill(gridEl,...tiles);
     const statuses=Object.keys(GRID_LABELS);
     const showStatus=(k)=>{
