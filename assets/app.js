@@ -240,7 +240,7 @@
         onclick:()=>{S.gridHighlight=active?null:k;renderGrid();}
       },
       h('span',{class:'bok-admin-status-mark '+label[1],'aria-hidden':'true'}),
-      h('span',{class:'bok-admin-status-name'},label[0]),
+      h('span',{class:'bok-admin-status-name'},({f:'Своб.',p:'Ждёт',a:'Опл.',t:'Подтв.',b:'Блок'})[k]),
       h('strong',{class:'bok-admin-status-count num'},String(counts[k])));
     };
     fill(legendEl,
