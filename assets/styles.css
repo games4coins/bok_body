@@ -1644,3 +1644,59 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-public-grid-card .bok-public-legend .bok-admin-status-name{font-size:9px}
   .bok-public-grid-card .bok-public-legend .bok-admin-status-count{font-size:10px}
 }
+
+
+/* BOK Body 6.7.33 — compact responsive ticket boards.
+   The shared --bok-grid-cols is calculated only from the ticket count.
+   A 63-ticket event is always 7 columns × 9 rows, on mobile and desktop. */
+.bok-public-grid.bok-boutique-grid,
+.bok-admin-grid.bok-boutique-grid{
+  --bok-grid-tile:46px;
+  --bok-grid-gap:6px;
+  display:grid;
+  grid-template-columns:repeat(var(--bok-grid-cols,7),minmax(0,1fr));
+  gap:var(--bok-grid-gap);
+  width:min(100%,calc(var(--bok-grid-cols,7) * var(--bok-grid-tile) + (var(--bok-grid-cols,7) - 1) * var(--bok-grid-gap)));
+  max-width:100%;
+  margin-inline:auto;
+  align-content:start;
+  justify-content:center;
+}
+.bok-public-grid.bok-boutique-grid .bok-admin-ticket,
+.bok-admin-grid.bok-boutique-grid .bok-admin-ticket{
+  width:100%;
+  min-width:0;
+  aspect-ratio:1;
+  font-size:clamp(12px,1.6vw,17px);
+  border-radius:11px;
+}
+@media(max-width:1100px){
+  .bok-public-grid.bok-boutique-grid,
+  .bok-admin-grid.bok-boutique-grid{
+    --bok-grid-tile:44px;
+    --bok-grid-gap:5px;
+  }
+}
+@media(max-height:800px) and (min-width:701px){
+  .bok-public-grid.bok-boutique-grid,
+  .bok-admin-grid.bok-boutique-grid{--bok-grid-tile:40px;--bok-grid-gap:5px}
+}
+@media(max-width:700px){
+  .bok-public-grid.bok-boutique-grid,
+  .bok-admin-grid.bok-boutique-grid{
+    --bok-grid-tile:46px;
+    --bok-grid-gap:5px;
+  }
+  .bok-public-grid.bok-boutique-grid .bok-admin-ticket,
+  .bok-admin-grid.bok-boutique-grid .bok-admin-ticket{
+    font-size:clamp(12px,3.6vw,16px);
+    border-radius:10px;
+  }
+}
+@media(max-width:360px){
+  .bok-public-grid.bok-boutique-grid,
+  .bok-admin-grid.bok-boutique-grid{--bok-grid-gap:4px}
+  .bok-public-grid.bok-boutique-grid .bok-admin-ticket,
+  .bok-admin-grid.bok-boutique-grid .bok-admin-ticket{border-radius:8px}
+}
+/* Fewer tickets do not stretch to fill a wide laptop content column. */
