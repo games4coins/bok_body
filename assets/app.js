@@ -956,6 +956,7 @@
         const loadWheel=()=>api.post('achPrivate',{vkAccessToken:window.BokVK.token()}).then(data=>{
           if(!data||!data.ok){fill(wheelBox,h('p',{class:'hint'},'Барабан станет доступен после обновления сервера.'));return;}
           S.lastKnownSpins=Number(data.spins);
+          if(api.setQuietCabinet)api.setQuietCabinet(S.lastKnownSpins===0);
           const catalogReady=Array.isArray(data.prizes)&&data.prizes.some(p=>p&&p.active!==false&&Number(p.weight)>0&&(p.stock==null||Number(p.stock)>0));
           // An unfinished server transaction MUST be retriable using the same
           // requestId even when the last available spin has been debited.
@@ -1004,6 +1005,7 @@
             await animation.done;
             if(outcome&&outcome.ok){
               S.lastKnownSpins=Number(outcome.spins);
+              if(api.setQuietCabinet)api.setQuietCabinet(S.lastKnownSpins===0);
               try{sessionStorage.removeItem('bok_ach_public_v6724_'+String(p.url||''));}catch(_){}
               api.invalidateBalances();
               const real=(Array.isArray(data.prizes)?data.prizes:[]).find(p=>
@@ -1116,6 +1118,9 @@
         h('button',{class:'btn btn-ghost btn-sm bok-cab-change',onclick:()=>{
           if(identity && !confirm('Сменить пользователя? Вход VK ID на этом устройстве будет завершён.'))return;
           if(identity&&window.BokVK)window.BokVK.logout();
+          if(api.clearPrivateCabinet)api.clearPrivateCabinet();
+          S.lastKnownSpins=null;
+          if(api.setQuietCabinet)api.setQuietCabinet(false);
           closeModal();openCabinet(null,!identity);
         }},'← Сменить пользователя'),
         h('div',{class:'cab-profile'},
