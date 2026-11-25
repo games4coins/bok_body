@@ -287,15 +287,21 @@
     if((!identity||!verifiedToken) && !publicMode) {
       const content=h('div',null,
         h('p',{class:'lead'},'Выберите способ входа в кабинет.'),
+        h('button',{class:'btn btn-primary btn-block bok-vk-login-start',type:'button'},'🔐 Войти через VK ID'),
+        h('button',{class:'btn btn-soft btn-block',type:'button',onclick:()=>{closeModal();openCabinet(target,true);}},'👤 Войти без авторизации'),
         h('div',{class:'cab-vk-login'}),
         h('p',{class:'hint'},'Сессия VK ID сохраняется на этом устройстве и автоматически продлевается, пока VK разрешает обновление токена.'),
-        h('p',{class:'hint'},'Тестовый депозит и действия с балансом доступны только после подтверждённого входа через VK ID.'),
-        h('button',{class:'btn btn-soft btn-block',onclick:()=>{closeModal();openCabinet(target,true);}},'👤 Войти без авторизации'));
+        h('p',{class:'hint'},'Без авторизации доступен просмотр публичных данных. Депозит, заморозка и вращения требуют VK ID.'));
       openModal([h('h3',null,'🔐 Кабинет ВОК · Войти через VK ID или без авторизации'),content]);
       const error=h('p',{class:'msg err',role:'alert'});content.appendChild(error);
       if(!window.BokVK){error.textContent='Модуль VK ID недоступен';return;}
-      window.BokVK.mount(content.querySelector('.cab-vk-login'),()=>{closeModal();openCabinet();},
-        e=>{error.textContent='Ошибка входа VK ID: '+(e&&e.message||'повторите вход');});
+      const start=content.querySelector('.bok-vk-login-start');
+      start.addEventListener('click',()=>{
+        start.disabled=true;start.textContent='Подключаем VK ID…';
+        window.BokVK.mount(content.querySelector('.cab-vk-login'),()=>{closeModal();openCabinet();},
+          e=>{error.textContent='Ошибка входа VK ID: '+(e&&e.message||'повторите вход');
+            start.disabled=false;start.textContent='🔐 Повторить вход через VK ID';});
+      });
       return;
     }
     const box=h('div',{class:'bok-cab-body'},h('p',{class:'lead'},'Загружаем публичные данные…'));
