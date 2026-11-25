@@ -229,7 +229,7 @@
           avatar(participant.name||'Участник',participant.photo||'',64)):null,
         h('span',{class:'bok-admin-ticket-num'},String(n)));
     });
-    Object.assign(gridEl.style,bookingGridStyle(st.tickets.length));
+    gridEl.style.cssText=bookingGridStyle(st.tickets.length);
     fill(gridEl,...tiles);
     const statuses=Object.keys(GRID_LABELS);
     const showStatus=(k)=>{
