@@ -1221,6 +1221,7 @@
       const [st, mine] = await Promise.all([api.state(), api.mine(CLIENT)]);
       if (st && st.ok) {
         S.st = st;
+        if(api.setPausedCache)api.setPausedCache(st.paused);
         if (mine && mine.ok) { S.mine = mine.bookings; S.quiet = mine.quiet || null; }
         S.loaded = true;
         renderAll();
