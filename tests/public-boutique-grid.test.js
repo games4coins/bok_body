@@ -7,18 +7,18 @@ const fragment=text.slice(start,end);
 const make=(tag,attrs,...children)=>({tag,attrs:attrs||{},children:children.flat(Infinity).filter(x=>x!==null&&x!==undefined)});
 const S={st:{tickets:['f','p','t','b','f'],players:[{name:'Публичная участница',photo:'public-avatar',items:[[2,0],[3,1]]}]},
  sel:new Set(),gridHighlight:null,gridFacesUntil:0,gridFacesTimer:null};
-const elements={grid:{},legend:{},mode:{},faces:{}};
+const elements={grid:{style:{}},legend:{},mode:{},faces:{}};
 let avatarCalls=0,opened=0,selected=0,playerRenders=0,scheduled=null;
 const q={mode:'premium',isLite(){return this.mode==='lite'},set(v){this.mode=v}};
 const funcs=new Function('S','gridQuality','h','fill','gridEl','legendEl','modeEl','facesEl',
-  'myActive','toast','list','avatar','openCabinet','toggle','renderPlayers','setTimeout','clearTimeout',
+  'myActive','toast','list','avatar','openCabinet','toggle','renderPlayers','bookingGridStyle','setTimeout','clearTimeout',
   fragment+';return {renderGrid,gridFacesActive,stopGridFaces};')(
     S,q,make,(el,...children)=>{el.children=children.flat(Infinity).filter(Boolean)},
     elements.grid,elements.legend,elements.mode,elements.faces,
     ()=>[],()=>{},nums=>'№'+nums.join(', №'),
     (name,photo)=>{avatarCalls++;return make('avatar',{name,photo});},
     ()=>{opened++;},()=>{selected++;},()=>{playerRenders++;},
-    cb=>{scheduled=cb;return 1},()=>{scheduled=null});
+    n=>({'--bok-grid-cols':String(n<=63?7:8)}),cb=>{scheduled=cb;return 1},()=>{scheduled=null});
 function nodes(children,fn,result=[]){for(const c of children||[]){
  if(!c||typeof c!=='object')continue;
  if(fn(c))result.push(c);
