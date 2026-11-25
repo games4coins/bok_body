@@ -1,0 +1,33 @@
+name: BOK frontend checks
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check frontend JavaScript syntax
+        run: |
+          set -euo pipefail
+          find assets -type f -name '*.js' -print0 | xargs -0 -r -n1 node --check
+          node --check config.js
+      - name: Check 6.7.24 release and routing invariants
+        run: |
+          set -euo pipefail
+          grep -Fq '6.7.24' index.html
+          grep -Fq '6.7.24' admin.html
+          grep -Fq 'История версий и изменений' index.html
+          grep -Fq 'История версий и изменений' admin.html
+          grep -Fq 'rewardAction:rewardAction.value' assets/admin.js
+          grep -Fq 'Object.assign({},safePayload,{action})' assets/common.js
+          grep -Fq 'function ensureToken()' assets/vk-auth.js
+          grep -Fq 'adminDepositConfirm' assets/admin.js
+          grep -Fq 'adminUnlockBackfill' assets/admin.js
+          echo 'Frontend invariants OK'
