@@ -247,7 +247,14 @@
   // Private VK identity, bookings and spins are NEVER cached here.
   let balancesCache=null,balancesUntil=0,balancesFlight=null,sitePaused=false;
   const BALANCE_SESSION_KEY='bok_public_balances_6724';
-  const setPausedCache=paused=>{sitePaused=!!paused;};
+  const setPausedCache=paused=>{
+    sitePaused=!!paused;
+    if(!sitePaused){
+      // Never keep the long pause TTL when booking resumes.
+      balancesUntil=Math.min(balancesUntil,Date.now()+12000);
+      try{sessionStorage.removeItem(BALANCE_SESSION_KEY);}catch(_){}
+    }
+  };
   try{
     const saved=JSON.parse(sessionStorage.getItem(BALANCE_SESSION_KEY)||'null');
     if(saved&&saved.at&&Date.now()-saved.at<120000&&saved.data&&saved.data.ok){
@@ -268,14 +275,41 @@
     }).finally(()=>{balancesFlight=null;});
     return balancesFlight;
   };
+  // Session-memory only: no private VK responses persisted to browser storage.
+  // Every protected mutation still goes to GAS for owner/server verification.
+  let privateCabinet=null,privateToken='',privateUntil=0,quietZeroSpins=false;
+  const clearPrivateCabinet=()=>{privateCabinet=null;privateToken='';privateUntil=0;};
+  const setQuietCabinet=zero=>{quietZeroSpins=!!zero;};
+  async function privateAwarePost(action,body){
+    if(action==='vkCabinetState'&&body&&body.vkAccessToken){
+      const token=window.BokVK&&window.BokVK.ensureToken
+        ?await window.BokVK.ensureToken():String(body.vkAccessToken||'');
+      if(token&&privateCabinet&&privateToken===token&&Date.now()<privateUntil)
+        return privateCabinet;
+      const res=await call('POST',action,Object.assign({},body,{vkAccessToken:token}));
+      if(res&&res.ok&&res.verified&&token){
+        privateCabinet=res;privateToken=token;
+        privateUntil=Date.now()+(sitePaused&&quietZeroSpins?120000:30000);
+      }
+      return res;
+    }
+    const res=await call('POST',action,body);
+    if(res&&res.ok&&/^(vkCabinetFreeze|achSpin|book|adminDepositConfirm|adminDepositCancel)$/.test(action)){
+      clearPrivateCabinet();
+      clearBalancesCache();
+    }
+    return res;
+  }
   const api = {
     state: () => call('GET', 'state', { action: 'state' }),
     mine: (client) => call('GET', 'mine', { action: 'mine', client }),
     balances: balancesCached,
     invalidateBalances: clearBalancesCache,
     setPausedCache,
+    setQuietCabinet,
+    clearPrivateCabinet,
     players: () => call('GET', 'players', { action: 'players' }),
-    post: (action, body) => call('POST', action, body)
+    post: privateAwarePost
   };
 
   // ───── Демо-режим: работает без сервера, чтобы можно было посмотреть вёрстку ─────
