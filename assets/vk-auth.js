@@ -79,6 +79,12 @@ async function mount(container,onSuccess,onError){
  }catch(e){onError(e);}
 }
 function logout(){
+ // Explicit switch-user action revokes the VK ID SDK session when supported.
+ // Local credentials are removed immediately even if VK is unreachable.
+ try{
+  if(global.VKIDSDK&&global.VKIDSDK.Auth&&typeof global.VKIDSDK.Auth.logout==='function')
+   Promise.resolve(global.VKIDSDK.Auth.logout()).catch(()=>{});
+ }catch(_){}
  current=null;session=null;refreshFlight=null;
  try{localStorage.removeItem(PROFILE_KEY);localStorage.removeItem(SESSION_KEY);sessionStorage.removeItem(OLD_SESSION_KEY);}catch(_){}
 }
