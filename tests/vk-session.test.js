@@ -8,7 +8,7 @@ const assert=require('node:assert/strict');
   localStorage.setItem('bok_vkid_profile_54907336_v1',JSON.stringify({id:'123',name:'Test',url:'https://vk.com/id123'}));
   localStorage.setItem('bok_vkid_persistent_session_54907336_v2',JSON.stringify({userId:'123',accessToken:'expired',refreshToken:'secret',deviceId:'device',expiresAt:Date.now()-50000}));
   let calls=0;
-  const win={VKIDSDK:{Config:{init:()=>{}},ConfigResponseMode:{Callback:'callback'},ConfigSource:{LOWCODE:'lowcode'},Auth:{refreshToken:async(r,d)=>{
+  const win={VKIDSDK:{OneTap:function(){},Config:{init:()=>{}},ConfigResponseMode:{Callback:'callback'},ConfigSource:{LOWCODE:'lowcode'},Auth:{refreshToken:async(r,d)=>{
     calls++;assert.equal(r,'secret');assert.equal(d,'device');
     return {access_token:'renewed',refresh_token:'rotated',expires_in:600};
   }}}};
