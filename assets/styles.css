@@ -1611,3 +1611,36 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-public-grid-card .bok-public-legend{padding:4px;margin:6px 0 8px}
   .bok-public-grid-card .bok-public-legend .bok-admin-status{flex:0 0 auto;min-height:34px;padding:6px 9px}
 }
+
+
+/* BOK 6.7.31 — five genuinely compact public legend pills in one line. */
+.bok-public-grid-card .bok-public-legend{padding:4px;margin:6px 0 8px;min-width:0}
+.bok-public-grid-card .bok-public-legend .bok-admin-statuses{
+  display:flex;flex-wrap:nowrap;gap:3px;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;padding:1px;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-statuses::-webkit-scrollbar{display:none}
+.bok-public-grid-card .bok-public-legend .bok-admin-status{
+  flex:1 1 0;min-width:0;min-height:30px;max-width:none;
+  padding:5px 3px;gap:3px;border-radius:8px;
+  justify-content:center;white-space:nowrap;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-status-mark{
+  flex:0 0 9px;width:9px;height:9px;border-radius:50%;grid-row:auto;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-status-name{
+  flex:0 1 auto;min-width:0;font-size:clamp(9px,2.65vw,11px);letter-spacing:-.025em;
+}
+.bok-public-grid-card .bok-public-legend .bok-admin-status-count{
+  flex:0 0 auto;font:800 clamp(10px,2.75vw,12px)/1 system-ui,sans-serif;
+}
+@media(max-width:700px){
+  .bok-public-grid-card .bok-public-legend .bok-admin-status{
+    flex:1 1 0;min-height:30px;padding:4px 2px;gap:2px;
+  }
+}
+@media(max-width:340px){
+  .bok-public-grid-card .bok-public-legend .bok-admin-status-mark{display:none}
+  .bok-public-grid-card .bok-public-legend .bok-admin-status-name{font-size:9px}
+  .bok-public-grid-card .bok-public-legend .bok-admin-status-count{font-size:10px}
+}
