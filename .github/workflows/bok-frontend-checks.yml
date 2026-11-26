@@ -23,6 +23,7 @@ jobs:
           node tests/public-boutique-grid.test.js
           node tests/grid-quality.test.js
           node tests/responsive-booking-grid.test.js
+          node tests/archive-achievements-backlog.test.js
       - name: Check release and routing invariants
         run: |
           set -euo pipefail
@@ -41,7 +42,8 @@ jobs:
           grep -Fq 'bok-admin-grid-page .bok-admin-actionbar' assets/styles.css
           grep -Fq '6.7.29' admin.html
           grep -Fq '6.7.33' index.html
-          grep -Fq '6.7.33' admin.html
+          grep -Fq '6.7.34' admin.html
+          grep -Fq 'achApply' assets/admin.js
           grep -Fq 'bookingGridStyle' assets/app.js
           grep -Fq 'bookingGridStyle' assets/admin.js
           grep -Fq "f:'Своб.',p:'Ждёт',a:'Опл.',t:'Подтв.',b:'Блок'" assets/app.js
