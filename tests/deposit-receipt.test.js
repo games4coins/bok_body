@@ -22,7 +22,7 @@ assert.equal(receipt.filename({numbers:[1],amount:250,balance:0,booking:'B/123'}
 for(const marker of ['showDepositReceipt({key:b.key','showDepositReceipt({key:picker.value','showDepositReceipt({key:owner']){
   assert(admin.includes(marker),'Missing deposit receipt integration: '+marker);
 }
-assert(html.includes('assets/deposit-receipt.js?v=6.7.35-deposit-receipts'));
+assert(html.includes('assets/deposit-receipt.js?v=6.7.36-receipt-history'));
 assert(html.indexOf('assets/deposit-receipt.js')<html.indexOf('assets/admin.js'));
 assert(admin.includes('String(op.booking)===String(opts.booking)'));
 assert(admin.includes("String(op.type)==='СПИСАНИЕ'"));
@@ -55,3 +55,34 @@ console.log('Deposit PNG receipts: validation, ledger linkage, 3 flows, script o
   assert(joined.includes('15750')||joined.includes('15 750')||joined.includes('15 750'));
   console.log('Deposit PNG canvas: all 63 numbers visible, dynamic height PASS');
 })().catch(e=>{console.error(e);process.exitCode=1;});
+
+const snapshots=[
+ {id:'newer-refund',date:'2026-11-29T09:00:00Z',type:'ВОЗВРАТ',amount:250,event:'235',numbers:'1',booking:'B1'},
+ {id:'newer-credit',date:'2026-11-28T09:00:00Z',type:'ПОПОЛНЕНИЕ',amount:500,event:'',numbers:'',booking:''},
+ {id:'old-debit',date:'2026-11-20T10:00:00Z',type:'СПИСАНИЕ',amount:-250,event:'234',numbers:'1, 4',booking:'B1'},
+ {id:'old-credit',date:'2026-11-10T10:00:00Z',type:'ПОПОЛНЕНИЕ',amount:1000,event:'',numbers:'',booking:''}
+];
+const historical=receipt.fromLedger({name:'Мария',balance:1500,history:snapshots},snapshots[2],{photo:'https://vk.com/example.jpg'});
+assert.equal(historical.event,'234');
+assert.equal(historical.booking,'B1');
+assert.equal(historical.amount,250);
+assert.equal(historical.balance,750,'Historical balance is after old debit, not current balance');
+assert.equal(historical.refunded,true,'Later refund must mark old receipt cancelled');
+assert.equal(historical.date.toISOString(),'2026-11-20T10:00:00.000Z');
+assert.deepEqual(Array.from(historical.numbers),[1,4]);
+const zeroCurrent=receipt.fromLedger({name:'Анна',balance:0,history:[
+{id:'second',type:'СПИСАНИЕ',amount:-250,event:'234',numbers:'2',booking:'BB'},
+{id:'first',type:'СПИСАНИЕ',amount:-500,event:'233',numbers:'3',booking:'AA'}
+]}, {id:'first',type:'СПИСАНИЕ',amount:-500,event:'233',numbers:'3',booking:'AA'});
+assert.equal(zeroCurrent.balance,250,'Zero-current-account can still reconstruct old balance');
+assert.equal(zeroCurrent.refunded,false);
+assert.throws(()=>receipt.fromLedger({name:'Х',balance:0,history:[]},
+{id:'unknown',type:'СПИСАНИЕ',amount:-250,numbers:'1',booking:'B'}));
+assert(admin.includes('🧾 Архив чеков депозитных броней'));
+assert(admin.includes('operationId:op.id'));
+assert(admin.includes('receipt.fromLedger(account,ledger'));
+assert(admin.includes('navigator.canShare({files:[file]})'));
+assert(admin.includes('🧾 Чек PNG'));
+assert(!src.includes('BODY  /  МАСТЕРСКАЯ ВОК'));
+assert(src.includes("text(ctx,'МАСТЕРСКАЯ ВОК'"));
+console.log('Receipt history: old event, old balance, refund, zero balance, share and archive PASS');
