@@ -1297,6 +1297,67 @@
     const err = h('div', { class: 'msg err' });
     const previewEl = h('div', null);
     const btn = h('button', { class: 'btn btn-primary btn-block', style: { marginTop: '6px' } }, 'Проверить итоги');
+    let achBusy = false, achPreview = null;
+    const achInfo = h('div',{class:'bok-ach-close-preflight','aria-live':'polite'});
+    const achCheck = h('button',{class:'btn btn-soft btn-block',type:'button'},'🔎 Проверить старые начисления ачивок');
+    const achApply = h('button',{class:'btn btn-primary btn-block hidden',type:'button'},'🏅 Начислить проверенные ачивки');
+    const achCount = x => Number(x.newAwards||0)+Number(x.repairedSpins||0);
+    function showAch(x) {
+      const n=Number(x.newAwards||0),spins=Number(x.newSpins||0),repair=Number(x.repairedSpins||0);
+      achApply.classList.toggle('hidden',n+repair===0);
+      fill(achInfo,h('b',null,n+repair?'⚠ Есть исторические начисления':'✅ Исторические начисления в порядке'),
+        h('p',{class:'hint'},'Новых ачивок: '+n+' · вращений за них: '+spins+
+          ' · восстановить вращений: '+repair),
+        n+repair?h('p',{class:'hint'},'Начисления относятся к старым архивам. Текущий эфир не будет завершён автоматически.'):null,
+        n?h('div',{class:'bok-ach-close-items'},(x.awards||[]).slice(0,8).map(a=>
+          h('div',{class:'bok-ach-close-item'},String(a.key||'—')+' · '+String(a.id||'—')+' · архив №'+String(a.event||'—'))),
+          n>8?h('div',{class:'hint'},'Показаны первые 8 из '+n):null):null);
+    }
+    async function checkAch() {
+      if(achBusy)return;
+      achBusy=true;achCheck.disabled=true;achApply.disabled=true;
+      fill(achInfo,h('p',{class:'hint'},'Проверяем старые архивы без записи…'));
+      try {
+        const x=await api.post('adminAchSync',{password:A.pw,dryRun:true});
+        if(!x||!x.ok)throw Error(x&&x.error&&x.error.message||'GAS не ответил');
+        achPreview=x;showAch(x);
+      }catch(e){
+        achPreview=null;achApply.classList.add('hidden');
+        fill(achInfo,h('p',{class:'msg err'},'Проверка не удалась: '+String(e.message||e)));
+      }finally{achBusy=false;achCheck.disabled=false;achApply.disabled=false;}
+    }
+    achCheck.addEventListener('click',checkAch);
+    achApply.addEventListener('click',async()=>{
+      if(achBusy||!achPreview||!achCount(achPreview))return;
+      const old=achPreview;
+      if(!window.confirm('Начислить достижения из СТАРЫХ архивов?\\nНовых ачивок: '+old.newAwards+
+        '\\nВращений за них: '+old.newSpins+'\\nВосстановить вращений: '+old.repairedSpins+
+        '\\n\\nТекущий эфир останется открытым.'))return;
+      achBusy=true;achCheck.disabled=true;achApply.disabled=true;btn.disabled=true;
+      fill(achInfo,h('p',{class:'hint'},'Проверяем и синхронизируем старые начисления…'));
+      try{
+        // Fresh preflight, then authorized idempotent reconciliation under GAS lock.
+        const verified=await api.post('adminAchSync',{password:A.pw,dryRun:true});
+        if(!verified||!verified.ok)throw Error(verified&&verified.error&&verified.error.message||'Проверка GAS не удалась');
+        if(verified.newAwards!==old.newAwards||verified.newSpins!==old.newSpins||verified.repairedSpins!==old.repairedSpins){
+          achPreview=verified;showAch(verified);
+          toast('Начисления изменились. Проверьте и подтвердите новый список.','bad',8000);
+          return;
+        }
+        const applied=await api.post('adminAchSync',{password:A.pw,dryRun:false});
+        if(!applied||!applied.ok)throw Error(applied&&applied.error&&applied.error.message||'Нет результата GAS');
+        api.invalidateBalances();
+        achPreview=null;reset();
+        const after=await api.post('adminAchSync',{password:A.pw,dryRun:true});
+        if(!after||!after.ok)throw Error('Не удалось проверить оставшиеся начисления');
+        achPreview=after;showAch(after);
+        toast('Исторические ачивки обработаны. Заново проверьте итоги эфира.');
+      }catch(e){
+        achPreview=null;achApply.classList.add('hidden');
+        fill(achInfo,h('p',{class:'msg err'},'Результат начисления не подтверждён: '+String(e.message||e)+
+          '. Сначала повторите проверку; повторная выдача защищена сервером.'));
+      }finally{achBusy=false;achCheck.disabled=false;achApply.disabled=false;refreshBtn();}
+    });
     let checked = false;
 
     const body = () => ({ password: A.pw, winners: noWinner ? [] : Array.from(win), newNumber: numInput.value, newDate: dateInput.value, force: force.checked });
@@ -1364,7 +1425,14 @@
         return;
       }
       const r = await api.post('adminArchive', body());
-      if (!r.ok) { err.textContent = r.error.message; btn.disabled = false; return; }
+      if (!r.ok) {
+        err.textContent = r.error.message;
+        if(r.error&&r.error.code==='ACH_BACKLOG'){
+          reset(); await checkAch();
+          err.textContent='Есть начисления по прошлым архивам. Проверьте их ниже, затем заново проверьте итоги эфира.';
+        }
+        refreshBtn();return;
+      }
       A.players = null;
       setState(r); closeModal(); renderTab();
       const a = r.archive;
@@ -1384,7 +1452,7 @@
         h('label', { class: 'sw', style: { marginTop: '8px' } }, noBox, 'Без победителя')),
       h('div', { class: 'field' }, h('label', null, 'Номер следующего эфира'), numInput),
       h('div', { class: 'field' }, h('label', null, 'Дата и время следующего эфира'), dateInput),
-      previewEl, err, btn]);
+      achCheck, achInfo, achApply, previewEl, err, btn]);
   }
 
   // ───── Игроки ─────
