@@ -3,7 +3,7 @@
  */
 (function (global) {
   'use strict';
-  const W=900, H=1160;
+  const W=900, BASE_H=1160;
   const money = n => (Number(n)||0).toLocaleString('ru-RU')+' ₽';
   const cleanNums = values => [...new Set((Array.isArray(values)?values:String(values||'').split(/[,;\s]+/)).map(Number).filter(n=>Number.isInteger(n)&&n>0))].sort((a,b)=>a-b);
   const short = (value, max) => {
@@ -58,12 +58,18 @@
   }
   async function render(raw) {
     const d=validate(raw);
-    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-    const ctx=canvas.getContext('2d');
+    const canvas=document.createElement('canvas');canvas.width=W;canvas.height=BASE_H;
+    let ctx=canvas.getContext('2d');
     if(!ctx)throw new Error('Canvas недоступен');
+    // Expand the image for large bookings: no booked number may be dropped.
+    const fontSize=d.numbers.length>20?23:d.numbers.length>10?28:33;
+    const lineHeight=fontSize+14;
+    const lines=wrap(ctx,d.numbers.map(n=>'№'+n).join(', '),730,fontSize);
+    const H=BASE_H+Math.max(0,lines.length-2)*lineHeight;
+    if(H!==BASE_H){canvas.height=H;ctx=canvas.getContext('2d');}
     const dark='#33291f', muted='#817565', gold='#b48a4b', paper='#fffcf6';
     ctx.fillStyle='#ece4d8';ctx.fillRect(0,0,W,H);
-    rounded(ctx,25,25,850,1110,32);ctx.fillStyle=paper;ctx.fill();
+    rounded(ctx,25,25,850,H-50,32);ctx.fillStyle=paper;ctx.fill();
     ctx.lineWidth=2;ctx.strokeStyle='#d6bea0';ctx.stroke();
     rounded(ctx,43,43,814,118,24);ctx.fillStyle=dark;ctx.fill();
     text(ctx,'BOK',80,119,63,'#f2dbb4','800');
@@ -94,9 +100,8 @@
     text(ctx,'ЭФИР № '+d.event,252,502,23,gold,'800');
     ctx.strokeStyle='#e9dccc';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(80,562);ctx.lineTo(820,562);ctx.stroke();
     text(ctx,'ВАШИ НОМЕРКИ',80,615,23,muted,'700');
-    const lines=wrap(ctx,d.numbers.map(n=>'№'+n).join(', '),730,33).slice(0,3);
-    lines.forEach((line,i)=>text(ctx,line,80,666+i*47,33,dark,'700'));
-    const top=Math.max(736,666+lines.length*47+2);
+    lines.forEach((line,i)=>text(ctx,line,80,666+i*lineHeight,fontSize,dark,'700'));
+    const top=Math.max(736,666+lines.length*lineHeight+2);
     rounded(ctx,70,top,760,182,22);ctx.fillStyle='#f5eee3';ctx.fill();
     text(ctx,'СПИСАНО С БАЛАНСА',99,top+53,21,muted,'700');
     text(ctx,'− '+money(d.amount),800,top+58,43,dark,'800','right');
@@ -108,9 +113,9 @@
     const when=Number.isNaN(d.date.getTime())?new Date():d.date;
     const formatted=when.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
     text(ctx,'СФОРМИРОВАНО: '+formatted,80,infoY+32,18,muted,'500');
-    ctx.beginPath();ctx.moveTo(80,1046);ctx.lineTo(820,1046);ctx.strokeStyle='#d6bea0';ctx.stroke();
-    text(ctx,'УДАЧИ НА ЭФИРЕ! 🍀',450,1086,30,gold,'800','center');
-    text(ctx,'Спасибо за поддержку мастерской BOK Body',450,1113,17,muted,'500','center');
+    ctx.beginPath();ctx.moveTo(80,H-114);ctx.lineTo(820,H-114);ctx.strokeStyle='#d6bea0';ctx.stroke();
+    text(ctx,'УДАЧИ НА ЭФИРЕ! 🍀',450,H-74,30,gold,'800','center');
+    text(ctx,'Спасибо за поддержку мастерской BOK Body',450,H-47,17,muted,'500','center');
     return canvas;
   }
   function filename(raw) {
