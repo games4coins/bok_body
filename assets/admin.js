@@ -857,9 +857,10 @@
             }
           }
           // Fallback: make both assets available, then open VK. Attaching is manual.
-          const copied=await copyText(post);
           download.click();
+          // Open from the original tap before awaiting clipboard permissions.
           window.open('https://vk.com/feed','_blank','noopener,noreferrer');
+          const copied=await copyText(post);
           toast(copied?'PNG скачан, текст скопирован. Прикрепите чек в посте ВК.':
             'PNG скачан. Скопируйте текст и прикрепите чек в ВК.',null,9500);
         }catch(e){
