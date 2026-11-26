@@ -6,21 +6,22 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="theme-color" content="#2a211c">
   <title>Номерок — админка</title>
-  <link rel="stylesheet" href="assets/styles.css?v=6.7.35-deposit-receipts">
+  <link rel="stylesheet" href="assets/styles.css?v=6.7.36-receipt-history">
 </head>
 <body>
   <div id="demo"></div>
   <div id="app"></div>
   <script src="config.js"></script>
-  <script src="assets/common.js?v=6.7.35-deposit-receipts"></script>
-  <script src="assets/deposit-receipt.js?v=6.7.35-deposit-receipts"></script>
-  <script src="assets/admin.js?v=6.7.35-deposit-receipts"></script>
+  <script src="assets/common.js?v=6.7.36-receipt-history"></script>
+  <script src="assets/deposit-receipt.js?v=6.7.36-receipt-history"></script>
+  <script src="assets/admin.js?v=6.7.36-receipt-history"></script>
   <footer id="bok-version-footer" style="position:relative;z-index:1;margin:18px auto;max-width:880px;text-align:center;padding:18px 16px 28px;font:13px/1.55 system-ui,sans-serif;color:#746356">
-    <div style="font-weight:700">BOK Body · сайт 6.7.35 · Админка</div>
-    <div style="font-size:12px">Релиз 27.11.2026 · Премиум-чек для бронирования с тестового баланса</div>
+    <div style="font-weight:700">BOK Body · сайт 6.7.36 · Админка</div>
+    <div style="font-size:12px">Релиз 27.11.2026 · Архив чеков и отправка в ВК</div>
     <details style="margin:10px auto 0;max-width:650px;text-align:left;border:1px solid #e6d9ce;border-radius:12px;padding:10px 14px;background:#fffaf6">
       <summary style="cursor:pointer;font-weight:650">История версий и изменений</summary>
       <div style="padding-top:8px;font-size:12px">
+        <p style="margin:6px 0"><strong>6.7.36 · 27.11.2026</strong> — Изменена шапка PNG-чека на «Мастерская ВОК». Добавлены повторная генерация из истории всех депозитных списаний, включая старые эфиры и нулевые текущие балансы, поиск и пагинация. В чеке восстановлен остаток именно на дату первоначального списания; при возврате чек помечается как отменённый. Кнопка «Отправить в ВК» вызывает системную передачу изображения и текста на совместимых устройствах, иначе открывает ВК после скачивания. Автоматической публикации в стену нет; GAS не изменялся.</p>
         <p style="margin:6px 0"><strong>6.7.35 · 27.11.2026</strong> — Премиальный PNG-чек «Донат с тестового баланса ВОК» после успешного списания во всех трёх сценариях: бронь из сетки, бронь из раздела депозитов и подтверждение ожидающей брони за счёт депозита. Аватарка или инициалы, номерки, сумма списания, остаток, код брони, пожелание удачи. Скачать изображение, открыть на телефоне или скопировать текст. GAS без изменений.</p>
         <p style="margin:6px 0"><strong>6.7.34 · 26.11.2026</strong> — Исправлен сценарий блокировки завершения эфира из-за ранее не начисленных ачивок: в окне закрытия доступен предпросмотр исторических начислений и отдельная подтверждаемая синхронизация с повторной серверной проверкой. После начисления итоги закрытия необходимо проверить заново. Идентификаторы начислений защищают от повторной выдачи, GAS не изменялся.</p>
         <p style="margin:6px 0"><strong>6.7.33 · 26.11.2026</strong> — Адаптивная компактная раскладка номерков на странице бронирования и в админке. Для 63 номерков — ровно 7 столбцов × 9 рядов; для другого количества — автоматический выбор оптимальной сетки. Уменьшены размеры ячеек на ноутбуках и при небольшой высоте экрана; мобильная адаптация сохранена. GAS и правила бронирования не изменялись.</p>
