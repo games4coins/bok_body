@@ -30,3 +30,28 @@ assert(admin.includes("receipt.render(data)"));
 assert(admin.includes("canvas.toDataURL('image/png')"));
 assert(admin.includes("r.state)setState(r.state)"));
 console.log('Deposit PNG receipts: validation, ledger linkage, 3 flows, script order PASS');
+
+(async()=>{
+  const drawn=[];
+  const ctx={
+    beginPath(){},moveTo(){},arcTo(){},closePath(){},fill(){},stroke(){},
+    fillRect(){},lineTo(){},save(){},restore(){},clip(){},
+    measureText(s){return {width:String(s).length*13};},
+    fillText(s){drawn.push(String(s));},
+    createLinearGradient(){return {addColorStop(){}};}
+  };
+  const fakeCanvas={width:0,height:0,getContext(){return ctx;},toDataURL(){return 'data:image/png;base64,AA==';}};
+  const simulated={};
+  vm.runInNewContext(src,{window:simulated,document:{createElement:()=>fakeCanvas},
+    Date,Number,String,Set,Array,Error});
+  const nums=Array.from({length:63},(_,i)=>i+1);
+  const rendered=await simulated.BokDepositReceipt.render({
+    name:'Тестовый участник',numbers:nums,amount:15750,balance:2000,booking:'CHK63',event:235
+  });
+  assert.equal(rendered,fakeCanvas);
+  assert(rendered.height>1160,'Long receipts must extend beyond the base height');
+  const joined=drawn.join(' ');
+  for(const n of nums)assert(joined.includes('№'+n),'Missing ticket '+n);
+  assert(joined.includes('15750')||joined.includes('15 750')||joined.includes('15 750'));
+  console.log('Deposit PNG canvas: all 63 numbers visible, dynamic height PASS');
+})().catch(e=>{console.error(e);process.exitCode=1;});
