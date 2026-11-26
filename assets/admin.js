@@ -1561,7 +1561,38 @@
   function depositsView() {
     const body=h('div'),search=h('input',{class:'input',type:'search',placeholder:'Поиск участника'});
     const positive=h('input',{type:'checkbox',checked:true});
-    let accounts=[],selected=null,playerDirectory=[],pendingAdjust=null;
+    let accounts=[],selected=null,playerDirectory=[],pendingAdjust=null,receiptLimit=25;
+    const receiptSearch=h('input',{class:'input',type:'search',placeholder:'Поиск чека: участник, номер брони, эфира или номерок'});
+    const receiptList=h('div',{class:'bok-deposit-receipt-history'});
+    const receiptCount=h('p',{class:'hint'});
+    const receiptMore=h('button',{class:'btn btn-soft btn-block',type:'button',onclick:()=>{
+      receiptLimit+=25;renderReceipts();
+    }},'Показать ещё 25 чеков');
+    function renderReceipts(){
+      const filter=norm(receiptSearch.value).trim();
+      const all=[];
+      accounts.forEach(p=>(p.history||[]).forEach(op=>{
+        if(String(op.type)!=='СПИСАНИЕ'||Number(op.amount)>=0||!op.booking||!op.numbers)return;
+        if(filter&&!norm([p.name,p.key,op.booking,op.event,op.numbers,op.id].join(' ')).includes(filter))return;
+        all.push({p,op});
+      }));
+      all.sort((x,y)=>Date.parse(y.op.date||0)-Date.parse(x.op.date||0));
+      receiptCount.textContent='Депозитных броней: '+all.length+' · показано '+Math.min(all.length,receiptLimit);
+      fill(receiptList,...all.slice(0,receiptLimit).map(({p,op})=>{
+        const refunded=(p.history||[]).some(x=>String(x.type)==='ВОЗВРАТ'&&String(x.booking)===String(op.booking));
+        return h('div',{class:'gift-item-row bok-deposit-receipt-history-item'},
+          h('div',null,h('b',null,String(p.name)+' · эфир №'+String(op.event||'—')),
+            h('div',{class:'meta'},'Бронь '+String(op.booking)+' · № '+String(op.numbers)+
+              ' · '+Math.abs(Number(op.amount))+' ₽ · '+String(op.date||'').slice(0,10)+
+              (refunded?' · ВОЗВРАТ':''))),
+          h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>showDepositReceipt({
+            key:p.key,name:p.name,booking:op.booking,operationId:op.id,players:accounts,
+            photo:(playerDirectory.find(x=>String(x.key)===String(p.key))||{}).photo
+          })},'🧾 Чек PNG'));
+      }));
+      receiptMore.style.display=all.length>receiptLimit?'':'none';
+    }
+    receiptSearch.addEventListener('input',()=>{receiptLimit=25;renderReceipts();});
     const newId=()=>String(Date.now())+'-'+Math.random().toString(36).slice(2);
     const refresh=async()=>{const [r,p]=await Promise.all([act('adminDepositList'),act('adminPlayers')]);if(p)playerDirectory=p.players||[];if(r){accounts=r.players||[];draw();}};
     function draw(){
@@ -1631,7 +1662,15 @@
             booking:r.booking,players:r.players});
         }
       }},'Назначить и списать');
-      const history=current?(current.history||[]).map(op=>h('div',{class:'gift-item-row'},h('b',null,(op.amount>0?'+':'')+op.amount+' ₽ · '+op.type),h('div',{class:'meta'},String(op.date).slice(0,10)+' · № '+op.numbers+' · '+op.note))):[];
+      const history=current?(current.history||[]).map(op=>h('div',{class:'gift-item-row'},
+        h('b',null,(op.amount>0?'+':'')+op.amount+' ₽ · '+op.type),
+        h('div',{class:'meta'},String(op.date).slice(0,10)+' · № '+op.numbers+' · '+op.note),
+        String(op.type)==='СПИСАНИЕ'&&op.booking&&op.numbers
+          ?h('button',{class:'btn btn-soft btn-sm',type:'button',onclick:()=>showDepositReceipt({
+            key:current.key,name:current.name,booking:op.booking,operationId:op.id,players:accounts,
+            photo:(playerDirectory.find(p=>String(p.key)===String(current.key))||{}).photo
+          })},'🧾 Чек PNG'):null)):[];
+      renderReceipts();
       fill(body,h('div',{class:'gift-add-row'},search,h('label',null,positive,'Только с остатком')),
         h('div',null,...cards),
         h('h3',null,current?current.name+' · '+(current.balance||0)+' ₽':'Операции с условным балансом'),
@@ -1663,7 +1702,13 @@
     body.parentNode&&body.parentNode.appendChild(migration);
     search.addEventListener('input',draw);positive.addEventListener('change',draw);
     refresh();
-    return h('section',{class:'card'},h('h2',null,'💳 Тестовые балансы'),h('p',{class:'hint'},'Только условные суммы. Не принимайте реальные платежи через этот модуль.'),body,migration);
+    return h('section',{class:'card'},h('h2',null,'💳 Тестовые балансы'),
+      h('p',{class:'hint'},'Только условные суммы. Не принимайте реальные платежи через этот модуль.'),
+      h('section',{class:'bok-deposit-receipt-browser'},
+        h('h3',null,'🧾 Архив чеков депозитных броней'),
+        h('p',{class:'hint'},'Все списания из журнала, включая старые эфиры и участников с нулевым текущим остатком. Сумма и остаток чека восстанавливаются на дату операции.'),
+        receiptSearch,receiptCount,receiptList,receiptMore),
+      body,migration);
   }
 
   function giftsView() {
