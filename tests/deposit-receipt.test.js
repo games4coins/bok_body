@@ -1,0 +1,32 @@
+const fs=require('node:fs');
+const vm=require('node:vm');
+const assert=require('node:assert/strict');
+const src=fs.readFileSync('assets/deposit-receipt.js','utf8');
+const admin=fs.readFileSync('assets/admin.js','utf8');
+const html=fs.readFileSync('admin.html','utf8');
+const client={};
+vm.runInNewContext(src,{window:client,Date,Number,String,Set,Array,Error});
+const receipt=client.BokDepositReceipt;
+assert(receipt&&typeof receipt.render==='function');
+const data=receipt.validate({name:'Ирина',numbers:'9, 2; 9, 17',amount:750,balance:1250,event:'235',booking:'B-123'});
+assert.deepEqual(Array.from(data.numbers),[2,9,17]);
+assert.equal(data.amount,750);
+assert.equal(data.balance,1250);
+assert.equal(data.event,'235');
+assert.throws(()=>receipt.validate({numbers:[1],amount:0,balance:100}));
+assert.throws(()=>receipt.validate({numbers:[1],amount:250,balance:-1}));
+assert.throws(()=>receipt.validate({numbers:[],amount:250,balance:0}));
+assert(receipt.textForPost(data).includes('№2, №9, №17'));
+assert(receipt.textForPost(data).includes('1 250 ₽')||receipt.textForPost(data).includes('1 250 ₽'));
+assert.equal(receipt.filename({numbers:[1],amount:250,balance:0,booking:'B/123'}),'BOK-chek-B_123.png');
+for(const marker of ['showDepositReceipt({key:b.key','showDepositReceipt({key:picker.value','showDepositReceipt({key:owner']){
+  assert(admin.includes(marker),'Missing deposit receipt integration: '+marker);
+}
+assert(html.includes('assets/deposit-receipt.js?v=6.7.35-deposit-receipts'));
+assert(html.indexOf('assets/deposit-receipt.js')<html.indexOf('assets/admin.js'));
+assert(admin.includes('String(op.booking)===String(opts.booking)'));
+assert(admin.includes("String(op.type)==='СПИСАНИЕ'"));
+assert(admin.includes("receipt.render(data)"));
+assert(admin.includes("canvas.toDataURL('image/png')"));
+assert(admin.includes("r.state)setState(r.state)"));
+console.log('Deposit PNG receipts: validation, ledger linkage, 3 flows, script order PASS');
