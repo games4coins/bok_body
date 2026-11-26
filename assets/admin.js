@@ -799,6 +799,8 @@
 
   // One receipt renderer for all administrator test-deposit booking paths.
   // Use committed ledger data, never the preliminary price displayed before booking.
+  // Historical receipt is rebuilt from the actual debit ledger row.
+  // Never use today's account balance or today's event for an old booking.
   async function showDepositReceipt(opts) {
     try {
       const receipt=window.BokDepositReceipt;
@@ -806,38 +808,32 @@
       let account=Array.isArray(opts.players)&&opts.players.find(p=>String(p.key)===String(opts.key));
       if(!account){
         const res=await api.post('adminDepositList',{password:A.pw});
-        if(!res.ok)throw new Error(res.error&&res.error.message||'Не удалось получить остаток');
+        if(!res.ok)throw new Error(res.error&&res.error.message||'Не удалось получить историю депозита');
         account=(res.players||[]).find(p=>String(p.key)===String(opts.key));
       }
-      if(!account)throw new Error('Не найден баланс участника после операции');
-      const ledger=(account.history||[]).find(op=>String(op.booking)===String(opts.booking)&&
-        String(op.type)==='СПИСАНИЕ'&&Number(op.amount)<0);
-      const amount=opts.amount!=null?Number(opts.amount):ledger?-Number(ledger.amount):NaN;
-      if(!Number.isFinite(amount)||amount<=0)throw new Error('Не найдена сумма списания в журнале');
+      if(!account)throw new Error('История депозита участника не найдена');
+      const ledger=(account.history||[]).find(op=>String(op.type)==='СПИСАНИЕ'&&
+        (opts.operationId?String(op.id)===String(opts.operationId):
+        String(op.booking)===String(opts.booking)));
+      if(!ledger)throw new Error('Нет подтверждённой операции списания по этой брони');
+      const book=(A.st&&A.st.bookings||[]).find(b=>String(b.code)===String(ledger.booking));
+      let photo=opts.photo||(book&&book.photo)||'';
       const known=(A.players||[]).find(p=>String(p.key)===String(opts.key));
-      const book=(A.st&&A.st.bookings||[]).find(b=>String(b.code)===String(opts.booking));
-      let photo=opts.photo||(book&&book.photo)||(known&&known.photo)||'';
+      if(!photo)photo=known&&known.photo||'';
       if(!photo){
-        // Admin directory is only consulted for the avatar, not receipt amounts.
         try {
           const profile=await api.post('adminPlayers',{password:A.pw});
           if(profile.ok){
             const p=(profile.players||[]).find(x=>String(x.key)===String(opts.key));
-            if(p){photo=p.photo||'';}
+            if(p)photo=p.photo||'';
           }
         }catch(_){}
       }
-      const data={
-        name:opts.name||account.name||(book&&book.name)||'Участник BOK',
-        photo:photo,
-        numbers:opts.numbers||(ledger&&ledger.numbers)||[],
-        amount:amount,balance:Number(account.balance),
-        booking:opts.booking,event:opts.event||(A.st&&A.st.event&&A.st.event.number)||'—',
-        date:new Date()
-      };
+      const data=receipt.fromLedger(account,ledger,{name:opts.name||account.name,photo});
+      // The PNG and text are local to this browser; no VK token or money is transmitted.
       const canvas=await receipt.render(data);
       const png=canvas.toDataURL('image/png');
-      const preview=h('img',{src:png,alt:'Премиальный чек подтверждения депозитной брони',
+      const preview=h('img',{src:png,alt:'Исторический премиальный чек депозитной брони',
         class:'bok-deposit-receipt-image'});
       const download=h('a',{class:'btn btn-primary',href:png,download:receipt.filename(data)},'⬇ Скачать PNG');
       const open=h('a',{class:'btn btn-soft',href:png,target:'_blank',rel:'noopener noreferrer'},'↗ Открыть изображение');
@@ -845,13 +841,40 @@
         const ok=await copyText(receipt.textForPost(data));
         toast(ok?'Текст для поста скопирован':'Не получилось скопировать текст',ok?null:'bad');
       }},'📋 Текст для поста');
-      openModal([h('h3',null,'✨ Чек BOK Body · бронь подтверждена'),
-        h('p',{class:'hint'},'Условный тестовый баланс. Чек — изображение для поста, не платёжный документ.'),
-        preview,h('div',{class:'bok-deposit-receipt-actions'},download,open,copy),
-        h('p',{class:'hint'},'На iPhone используйте «Открыть изображение» и сохраните картинку в Фото.')]);
+      const share=h('button',{class:'btn btn-primary',type:'button',onclick:async()=>{
+        const post=receipt.textForPost(data);
+        try{
+          // Native share can hand PNG + text to the installed VK app on mobile.
+          // It is a user-directed share sheet, NOT an automatic wall publication.
+          if(typeof File==='function'&&navigator.share&&navigator.canShare){
+            const bytes=atob(png.split(',')[1]);
+            const array=new Uint8Array(bytes.length);
+            for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);
+            const file=new File([array],receipt.filename(data),{type:'image/png'});
+            if(navigator.canShare({files:[file]})){
+              await navigator.share({files:[file],title:'Подтверждение брони · Мастерская ВОК',text:post});
+              return;
+            }
+          }
+          // Fallback: make both assets available, then open VK. Attaching is manual.
+          const copied=await copyText(post);
+          download.click();
+          window.open('https://vk.com/feed','_blank','noopener,noreferrer');
+          toast(copied?'PNG скачан, текст скопирован. Прикрепите чек в посте ВК.':
+            'PNG скачан. Скопируйте текст и прикрепите чек в ВК.',null,9500);
+        }catch(e){
+          if(e&&e.name==='AbortError')return;
+          toast('Отправка не удалась — используйте «Скачать PNG» и «Текст для поста».','bad');
+        }
+      }},'📤 Отправить в ВК');
+      openModal([h('h3',null,'✨ Премиум-чек · Мастерская ВОК'),
+        h('p',{class:'hint'},'Суммы и остаток — на дату исходной операции из журнала. Это подтверждение списания условного тестового баланса, не банковский чек.'),
+        data.refunded?h('p',{class:'msg'},'↩ Эта бронь позднее была отменена, средства возвращены. Чек помечен как отменённый.'):null,
+        preview,h('div',{class:'bok-deposit-receipt-actions'},download,open,copy,share),
+        h('p',{class:'hint'},'«Отправить в ВК» откроет системное меню публикации с PNG и текстом, если устройство поддерживает передачу файлов. Иначе сохранит PNG и откроет ВК для ручного прикрепления.')]);
     }catch(e){
       console.error('BOK deposit receipt:',e);
-      toast('Бронь проведена, но чек не создан: '+(e&&e.message||'ошибка изображения'),'bad',10000);
+      toast('Чек не создан: '+(e&&e.message||'ошибка изображения'),'bad',10000);
     }
   }
 
@@ -893,6 +916,11 @@
       }else{
         buttons.push(h('button', { class: 'btn btn-danger btn-sm', onclick: () => confirmThen('Отменить подтверждённую бронь ' + b.code + '?', () => act('adminCancel', { code: b.code }, 'Отменена')) }, 'Отменить бронь'));
       }
+    }
+    if(b.key&&(/ОПЛАЧЕНО ИЗ ДЕПОЗИТА|Тестовый баланс:/i.test(String(b.note||'')))){
+      buttons.push(h('button',{class:'btn btn-soft btn-sm',onclick:()=>showDepositReceipt({
+        key:b.key,booking:b.code,name:b.name,photo:b.photo
+      })},'🧾 Чек PNG'));
     }
     buttons.push(h('button', { class: 'btn btn-ghost btn-sm', onclick: async (e) => { const ok = await copyText(b.code); e.target.textContent = ok ? 'Скопировано ✓' : 'Ошибка'; } }, '📋 Код'));
     const whoName = b.vkUrl ? h('a', { href: b.vkUrl, target: '_blank', rel: 'noopener noreferrer' }, b.name) : h('span', null, b.name);
