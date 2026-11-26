@@ -16,7 +16,8 @@
       throw new Error('Некорректные данные для чека депозитной брони');
     return {name:short(d.name||'Участник BOK',90),photo:String(d.photo||''),
       numbers:nums,amount,balance,event:short(d.event||'—',32),
-      booking:short(d.booking||'—',48),date:d.date instanceof Date?d.date:new Date(),
+      booking:short(d.booking||'—',48),date:d.date instanceof Date?d.date:new Date(d.date||Date.now()),
+      refunded:!!d.refunded,
       operation:short(d.operation||'',100)};
   };
   function rounded(ctx,x,y,w,h,r) {
@@ -72,12 +73,11 @@
     rounded(ctx,25,25,850,H-50,32);ctx.fillStyle=paper;ctx.fill();
     ctx.lineWidth=2;ctx.strokeStyle='#d6bea0';ctx.stroke();
     rounded(ctx,43,43,814,118,24);ctx.fillStyle=dark;ctx.fill();
-    text(ctx,'BOK',80,119,63,'#f2dbb4','800');
-    text(ctx,'BODY  /  МАСТЕРСКАЯ ВОК',277,111,24,'#f9ecdc','600');
+    text(ctx,'МАСТЕРСКАЯ ВОК',80,116,44,'#f2dbb4','800');
     text(ctx,'ПОДТВЕРЖДЕНИЕ БРОНИ',80,229,38,dark,'800');
     text(ctx,'ДОНАТ С ТЕСТОВОГО БАЛАНСА ВОК',80,273,23,muted,'700');
     rounded(ctx,80,301,250,46,23);ctx.fillStyle='#e8f0e9';ctx.fill();
-    text(ctx,'✓  БРОНЬ ПОДТВЕРЖДЕНА',205,331,18,'#34724b','800','center');
+    text(ctx,d.refunded?'↩  БРОНЬ ОТМЕНЕНА':'✓  БРОНЬ ПОДТВЕРЖДЕНА',205,331,18,d.refunded?'#875b3d':'#34724b','800','center');
     // Avatar must fail gracefully if the VK CDN does not grant canvas CORS.
     const avatar=await loadAvatar(d.photo);
     ctx.save();rounded(ctx,80,378,144,144,72);ctx.clip();
@@ -115,7 +115,7 @@
     text(ctx,'СФОРМИРОВАНО: '+formatted,80,infoY+32,18,muted,'500');
     ctx.beginPath();ctx.moveTo(80,H-114);ctx.lineTo(820,H-114);ctx.strokeStyle='#d6bea0';ctx.stroke();
     text(ctx,'УДАЧИ НА ЭФИРЕ! 🍀',450,H-74,30,gold,'800','center');
-    text(ctx,'Спасибо за поддержку мастерской BOK Body',450,H-47,17,muted,'500','center');
+    text(ctx,'Спасибо за поддержку мастерской ВОК',450,H-47,17,muted,'500','center');
     return canvas;
   }
   function filename(raw) {
@@ -124,10 +124,31 @@
   }
   function textForPost(raw) {
     const d=validate(raw);
-    return '✅ Бронь подтверждена!\n'+d.name+'\nЭфир №'+d.event+
+    return (d.refunded?'↩ Историческая бронь отменена':'✅ Бронь подтверждена!')+'\n'+d.name+'\nЭфир №'+d.event+
       '\nНомерки: '+d.numbers.map(n=>'№'+n).join(', ')+
       '\nДонат с тестового баланса ВОК: '+money(d.amount)+
       '\nОстаток: '+money(d.balance)+'\n🍀 Удачи на эфире!';
   }
-  global.BokDepositReceipt=Object.freeze({render,validate,filename,textForPost});
+  /* The ledger history is reverse chronological, latest first. Reconstruct
+   * balance immediately AFTER the original debit, not the current balance.
+   * Reject operations that have no stable ledger ID.
+   */
+  function fromLedger(account, op, profile) {
+    if(!account||!op||!op.id||String(op.type)!=='СПИСАНИЕ'||Number(op.amount)>=0||
+       !String(op.booking||'').trim()||!String(op.numbers||'').trim())
+      throw new Error('Операция не является подтверждённой депозитной бронью');
+    const history=Array.isArray(account.history)?account.history:[];
+    const index=history.findIndex(x=>String(x.id)===String(op.id));
+    if(index<0)throw new Error('Операция не найдена в истории депозита');
+    const newer=history.slice(0,index).reduce((sum,x)=>sum+Number(x.amount||0),0);
+    const balance=Number(account.balance)-newer;
+    if(!Number.isFinite(balance)||balance<0)throw new Error('Невозможно восстановить исторический остаток');
+    const refunded=history.some(x=>String(x.type)==='ВОЗВРАТ'&&String(x.booking)===String(op.booking));
+    return validate({
+      name:(profile&&profile.name)||account.name,photo:(profile&&profile.photo)||'',
+      numbers:op.numbers,amount:-Number(op.amount),balance,
+      event:op.event,booking:op.booking,date:op.date,operation:op.id,refunded
+    });
+  }
+  global.BokDepositReceipt=Object.freeze({render,validate,filename,textForPost,fromLedger});
 })(window);
