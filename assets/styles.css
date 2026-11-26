@@ -1701,3 +1701,14 @@ button.pill { border: 0; font: inherit; cursor: pointer; }
   .bok-admin-grid.bok-boutique-grid .bok-admin-ticket{border-radius:8px}
 }
 /* Fewer tickets do not stretch to fill a wide laptop content column. */
+
+
+/* BOK 6.7.34 — historical achievement preflight in archive confirmation. */
+.bok-ach-close-preflight{margin:10px 0 8px;padding:12px 14px;border:1px solid #e6cbb3;
+  border-radius:14px;background:linear-gradient(140deg,#fff9ee,#fff3e9);color:#644536}
+.bok-ach-close-preflight:empty{display:none}
+.bok-ach-close-preflight>b{display:block;font-size:14px}
+.bok-ach-close-preflight p{margin:8px 0 0;line-height:1.45}
+.bok-ach-close-items{margin-top:10px;max-height:155px;overflow:auto;border-top:1px solid #ead6c6}
+.bok-ach-close-item{font-size:12px;overflow-wrap:anywhere;color:#82604a;
+  padding:6px 2px;border-bottom:1px solid #f1e3d9}
