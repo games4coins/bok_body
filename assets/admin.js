@@ -796,6 +796,65 @@
     return h('div', { class: 'meta' }, timerNodes(b, A.st.quiet, off()));
   }
 
+
+  // One receipt renderer for all administrator test-deposit booking paths.
+  // Use committed ledger data, never the preliminary price displayed before booking.
+  async function showDepositReceipt(opts) {
+    try {
+      const receipt=window.BokDepositReceipt;
+      if(!receipt)throw new Error('Модуль чеков не загрузился. Обновите админку.');
+      let account=Array.isArray(opts.players)&&opts.players.find(p=>String(p.key)===String(opts.key));
+      if(!account){
+        const res=await api.post('adminDepositList',{password:A.pw});
+        if(!res.ok)throw new Error(res.error&&res.error.message||'Не удалось получить остаток');
+        account=(res.players||[]).find(p=>String(p.key)===String(opts.key));
+      }
+      if(!account)throw new Error('Не найден баланс участника после операции');
+      const ledger=(account.history||[]).find(op=>String(op.booking)===String(opts.booking)&&
+        String(op.type)==='СПИСАНИЕ'&&Number(op.amount)<0);
+      const amount=opts.amount!=null?Number(opts.amount):ledger?-Number(ledger.amount):NaN;
+      if(!Number.isFinite(amount)||amount<=0)throw new Error('Не найдена сумма списания в журнале');
+      const known=(A.players||[]).find(p=>String(p.key)===String(opts.key));
+      const book=(A.st&&A.st.bookings||[]).find(b=>String(b.code)===String(opts.booking));
+      let photo=opts.photo||(book&&book.photo)||(known&&known.photo)||'';
+      if(!photo){
+        // Admin directory is only consulted for the avatar, not receipt amounts.
+        try {
+          const profile=await api.post('adminPlayers',{password:A.pw});
+          if(profile.ok){
+            const p=(profile.players||[]).find(x=>String(x.key)===String(opts.key));
+            if(p){photo=p.photo||'';}
+          }
+        }catch(_){}
+      }
+      const data={
+        name:opts.name||account.name||(book&&book.name)||'Участник BOK',
+        photo:photo,
+        numbers:opts.numbers||(ledger&&ledger.numbers)||[],
+        amount:amount,balance:Number(account.balance),
+        booking:opts.booking,event:opts.event||(A.st&&A.st.event&&A.st.event.number)||'—',
+        date:new Date()
+      };
+      const canvas=await receipt.render(data);
+      const png=canvas.toDataURL('image/png');
+      const preview=h('img',{src:png,alt:'Премиальный чек подтверждения депозитной брони',
+        class:'bok-deposit-receipt-image'});
+      const download=h('a',{class:'btn btn-primary',href:png,download:receipt.filename(data)},'⬇ Скачать PNG');
+      const open=h('a',{class:'btn btn-soft',href:png,target:'_blank',rel:'noopener noreferrer'},'↗ Открыть изображение');
+      const copy=h('button',{class:'btn btn-soft',type:'button',onclick:async()=>{
+        const ok=await copyText(receipt.textForPost(data));
+        toast(ok?'Текст для поста скопирован':'Не получилось скопировать текст',ok?null:'bad');
+      }},'📋 Текст для поста');
+      openModal([h('h3',null,'✨ Чек BOK Body · бронь подтверждена'),
+        h('p',{class:'hint'},'Условный тестовый баланс. Чек — изображение для поста, не платёжный документ.'),
+        preview,h('div',{class:'bok-deposit-receipt-actions'},download,open,copy),
+        h('p',{class:'hint'},'На iPhone используйте «Открыть изображение» и сохраните картинку в Фото.')]);
+    }catch(e){
+      console.error('BOK deposit receipt:',e);
+      toast('Бронь проведена, но чек не создан: '+(e&&e.message||'ошибка изображения'),'bad',10000);
+    }
+  }
+
   function bookingCard(b) {
     const [cls, label] = STATUS[b.status] || ['s-off', b.status];
     const buttons = [];
@@ -812,6 +871,9 @@
             if(r){A.depositFetchedAt=0;A.depositBalances=null;
               toast('Бронь оплачена из депозита: '+r.amount+' ₽');
               if(r.state)setState(r.state);else pollOnce();
+              await showDepositReceipt({key:b.key,name:b.name,photo:b.photo,
+                numbers:b.numbers,booking:b.code,amount:r.amount,
+                event:b.event||A.st&&A.st.event&&A.st.event.number});
             }
           }},'💳 Подтвердить за счёт депозита'));
       }
@@ -1008,8 +1070,11 @@
       submit.disabled=true;
       const requestId='grid-'+Date.now()+'-'+Math.random().toString(36).slice(2);
       const r=await act('adminDepositBook',{key:picker.value,numbers:nums,requestId:requestId,note:'Назначено из сетки админки'});
-      if(r){A.sel.clear();closeModal();toast('Тестовая бронь назначена');}
-      else submit.disabled=false;
+      if(r){
+        A.sel.clear();closeModal();toast('Тестовая бронь назначена');pollOnce();
+        await showDepositReceipt({key:picker.value,name:account.name,photo:account.photo,
+          numbers:nums,booking:r.booking,players:r.players});
+      }else submit.disabled=false;
     }},'Назначить и списать с баланса');
     picker.addEventListener('change',update);
     openModal([h('h3',null,'💳 Бронирование из сетки'),
@@ -1528,7 +1593,15 @@
         if(!key.value.trim()||!nums.value.trim())return toast('Укажите игрока и номерки','bad');
         if(!confirm('Назначить номерки '+nums.value+' и списать условный баланс?'))return;
         const r=await act('adminDepositBook',{key:key.value.trim(),numbers:nums.value.split(/[,;\\s]+/).map(Number),requestId:newId(),note:note.value});
-        if(r){accounts=r.players||[];selected=accounts.find(p=>p.key===key.value.trim());draw();toast('Номерки назначены');}
+        if(r){
+          const owner=key.value.trim(),profile=playerDirectory.find(p=>String(p.key)===owner);
+          accounts=r.players||[];selected=accounts.find(p=>String(p.key)===owner);
+          const ledger=selected&&(selected.history||[]).find(op=>String(op.booking)===String(r.booking)&&String(op.type)==='СПИСАНИЕ');
+          draw();toast('Номерки назначены');pollOnce();
+          await showDepositReceipt({key:owner,name:profile&&profile.name||selected&&selected.name,
+            photo:profile&&profile.photo,numbers:ledger&&ledger.numbers||nums.value,
+            booking:r.booking,players:r.players});
+        }
       }},'Назначить и списать');
       const history=current?(current.history||[]).map(op=>h('div',{class:'gift-item-row'},h('b',null,(op.amount>0?'+':'')+op.amount+' ₽ · '+op.type),h('div',{class:'meta'},String(op.date).slice(0,10)+' · № '+op.numbers+' · '+op.note))):[];
       fill(body,h('div',{class:'gift-add-row'},search,h('label',null,positive,'Только с остатком')),
