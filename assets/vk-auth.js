@@ -23,7 +23,7 @@ function loadSdk(url){
   const script=document.createElement('script');let settled=false;
   const finish=(error)=>{if(settled)return;settled=true;clearTimeout(timer);script.onload=script.onerror=null;
    if(error){script.remove();reject(error);}else resolve(sdkReady());};
-  const timer=setTimeout(()=>finish(Error('Тайм-аут VK ID')),7000);
+  const timer=setTimeout(()=>finish(Error('Тайм-аут VK ID')),5000);
   script.async=true;script.src=url;
   script.onload=()=>finish(sdkReady()?null:Error('SDK недоступен'));
   script.onerror=()=>finish(Error('Ошибка загрузки SDK'));
@@ -38,6 +38,14 @@ function sdk(){
   throw Error('VK ID недоступен (VK-SDK-01). Проверьте подключение или откройте сайт в обычном браузере и повторите вход.');
  })().finally(()=>{sdkFlight=null;});
  return sdkFlight;
+}
+// SDK calls may remain pending on some mobile/in-app browsers; surface a retry.
+function bounded(promise,ms,label){
+ let timer;
+ return Promise.race([
+  Promise.resolve(promise),
+  new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(label+' (VK-TIMEOUT)')),ms);})
+ ]).finally(()=>clearTimeout(timer));
 }
 function configure(VKID){VKID.Config.init({app:APP_ID,redirectUrl:REDIRECT,responseMode:VKID.ConfigResponseMode.Callback,source:VKID.ConfigSource.LOWCODE,scope:''});}
 function profile(){return current;}
@@ -59,7 +67,7 @@ async function ensureToken(){
   try{
    const VKID=await sdk();configure(VKID);
    if(epoch!==authEpoch)return '';
-   const result=await VKID.Auth.refreshToken(previous.refreshToken,previous.deviceId);
+   const result=await bounded(VKID.Auth.refreshToken(previous.refreshToken,previous.deviceId),10000,'Обновление VK ID не ответило');
    if(!result||!result.access_token)throw Error('Не удалось обновить сессию VK ID');
    if(epoch!==authEpoch||session!==previous)return '';
    storeSession(result,previous.deviceId,current.id);
@@ -89,9 +97,9 @@ async function mount(container,onSuccess,onError){
     if(!active()||exchanging)return;
     exchanging=true;
     try{
-     const result=await VKID.Auth.exchangeCode(payload.code,payload.device_id);
+     const result=await bounded(VKID.Auth.exchangeCode(payload.code,payload.device_id),12000,'VK ID не завершил обмен кода');
      if(!result||!result.access_token)throw Error('Не получен токен');
-     const data=await VKID.Auth.userInfo(result.access_token);
+     const data=await bounded(VKID.Auth.userInfo(result.access_token),12000,'VK ID не загрузил профиль');
      const u=data.user||data;
      if(!active())return;
      if(!u||!/^\d+$/.test(String(u.user_id||'')))throw Error('Не получен числовой VK ID');

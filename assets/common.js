@@ -217,9 +217,13 @@
   async function call(method, action, payload) {
     const started=BOK_API_PERF?performance.now():0;
     if (DEMO) { await new Promise((r) => setTimeout(r, 120)); return Demo.handle(action, payload || {}); }
+    // Network requests must not leave a mobile browser on "Загрузка…" indefinitely.
+    // A timed-out mutation may still finish on GAS: never retry writes automatically.
+    const controller=typeof AbortController==='function'?new AbortController():null;
+    const deadline=setTimeout(()=>{if(controller)controller.abort();},method==='GET'?18000:35000);
     try {
       let r;
-      if (method === 'GET') r = await fetch(CFG.API_URL + '?' + new URLSearchParams(payload || {}));
+      if (method === 'GET') r = await fetch(CFG.API_URL + '?' + new URLSearchParams(payload || {}),controller?{signal:controller.signal}:{});
       else {
         // Refresh expiring VK credentials for private operations, but NEVER use
         // a saved display name as proof of authentication.
@@ -231,15 +235,22 @@
         r=await fetch(CFG.API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // без preflight
-          body: JSON.stringify(Object.assign({},safePayload,{action}))
+          body: JSON.stringify(Object.assign({},safePayload,{action})),
+          ...(controller?{signal:controller.signal}:{})
         });
       }
+      if(!r.ok)throw Error('HTTP '+r.status);
       const data = await r.json();
       if (data && data.now) skew = data.now - Date.now();
       return data;
     } catch (e) {
-      return { ok: false, error: { code: 'NETWORK', message: 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' } };
+      const timedOut=e&&e.name==='AbortError';
+      return { ok: false, error: { code: timedOut?'TIMEOUT':'NETWORK',
+        message: timedOut
+          ? (method==='GET'?'Сервер отвечает слишком долго. Повторите загрузку.':'Ответ сервера задержался. Операция могла выполниться — проверьте состояние перед повтором.')
+          : 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.' } };
     } finally {
+      clearTimeout(deadline);
       if(BOK_API_PERF)console.info('[BOK API] '+String(action)+' · '+Math.round(performance.now()-started)+' мс');
     }
   }

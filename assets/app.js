@@ -359,10 +359,23 @@
   // Нельзя выдавать его за подтверждение владения аккаунтом или давать операции с балансом.
   async function openCabinet(target, publicMode=false) {
     const identity=window.BokVK&&window.BokVK.profile();
-    // A cached public profile is not a login: ensure the VK access token is
-    // valid or refreshable before presenting owner-only controls.
-    const verifiedToken=identity&&window.BokVK&&window.BokVK.ensureToken
-      ?await window.BokVK.ensureToken():'';
+    // Show an actionable screen immediately even when VK CDN/refresh is slow.
+    // A saved display profile never grants access to private controls.
+    const recovering=!!(identity&&!publicMode&&window.BokVK&&!window.BokVK.token());
+    const recoverySheet=recovering?openModal([
+      h('h3',null,'🔐 Проверяем сессию VK ID'),
+      h('p',{class:'lead'},'Восстанавливаем вход…'),
+      h('button',{class:'btn btn-soft btn-block',type:'button',onclick:()=>{closeModal();openCabinet(target,true);}},'👤 Открыть публичный кабинет')
+    ]):null;
+    let verifiedToken='';
+    if(identity&&!publicMode&&window.BokVK&&window.BokVK.ensureToken){
+      verifiedToken=await Promise.race([
+        Promise.resolve().then(()=>window.BokVK.ensureToken()).catch(()=>''),
+        new Promise(resolve=>setTimeout(()=>resolve(''),9000))
+      ]);
+    }
+    // Do not reopen a modal that the visitor explicitly dismissed.
+    if(recoverySheet&&!recoverySheet.isConnected)return;
     if((!identity||!verifiedToken) && !publicMode) {
       const content=h('div',null,
         h('p',{class:'lead'},'Выберите способ входа в кабинет.'),
