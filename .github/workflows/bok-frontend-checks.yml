@@ -24,6 +24,7 @@ jobs:
           node tests/grid-quality.test.js
           node tests/responsive-booking-grid.test.js
           node tests/archive-achievements-backlog.test.js
+          node tests/loading-resilience.test.js
           node tests/deposit-receipt.test.js
       - name: Check release and routing invariants
         run: |
@@ -44,6 +45,8 @@ jobs:
           grep -Fq '6.7.29' admin.html
           grep -Fq '6.7.33' index.html
           grep -Fq '6.7.34' admin.html
+          grep -Fq '6.7.37' index.html
+          grep -Fq '6.7.37' admin.html
           grep -Fq '6.7.35' admin.html
           grep -Fq 'achApply' assets/admin.js
           grep -Fq 'bookingGridStyle' assets/app.js
