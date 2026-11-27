@@ -22,7 +22,7 @@ assert.equal(receipt.filename({numbers:[1],amount:250,balance:0,booking:'B/123'}
 for(const marker of ['showDepositReceipt({key:b.key','showDepositReceipt({key:picker.value','showDepositReceipt({key:owner']){
   assert(admin.includes(marker),'Missing deposit receipt integration: '+marker);
 }
-assert(html.includes('assets/deposit-receipt.js?v=6.7.36-receipt-history'));
+assert(/assets\/deposit-receipt\.js\?v=6\.7\.\d+[\w-]*/.test(html),'Receipt module missing or cache version invalid');
 assert(html.indexOf('assets/deposit-receipt.js')<html.indexOf('assets/admin.js'));
 assert(admin.includes('String(op.booking)===String(opts.booking)'));
 assert(admin.includes("String(op.type)==='СПИСАНИЕ'"));
