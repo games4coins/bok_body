@@ -112,7 +112,7 @@
     text(ctx,'КОД БРОНИ: '+d.booking,80,infoY,19,muted,'600');
     const when=Number.isNaN(d.date.getTime())?new Date():d.date;
     const formatted=when.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    text(ctx,'СФОРМИРОВАНО: '+formatted,80,infoY+32,18,muted,'500');
+    text(ctx,'ДАТА СПИСАНИЯ: '+formatted,80,infoY+32,18,muted,'500');
     ctx.beginPath();ctx.moveTo(80,H-114);ctx.lineTo(820,H-114);ctx.strokeStyle='#d6bea0';ctx.stroke();
     text(ctx,'УДАЧИ НА ЭФИРЕ! 🍀',450,H-74,30,gold,'800','center');
     text(ctx,'Спасибо за поддержку мастерской ВОК',450,H-47,17,muted,'500','center');
