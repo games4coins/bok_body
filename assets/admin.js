@@ -686,6 +686,69 @@
           delta,reason:friendReason.value.trim(),confirmed:true});
         if(r){toast('Корректировка учтена. Счётчик: '+r.friendCount);friendCode.value='';friendReason.value='';friendConfirmed.checked=false;}
       }},'Записать подтверждённую бронь'));
+    // Correct earned-achievement progress without editing booking balances.
+    const counterLookup=adminPlayerLookup('Участник · имя, VK ID или ссылка');
+    const counterTypes=[
+      ['friend','💌 Брони за подругу'],['miss','😴 Текущая серия пропусков'],
+      ['maxMiss','😴 Максимум пропусков подряд'],
+      ['visits','🧸 Посещено эфиров'],['streak','🧵 Текущая серия посещений'],
+      ['maxStreak','👑 Максимальная серия посещений'],
+      ['tickets','🎟 Максимум номерков за эфир']
+    ];
+    const counterType=h('select',{class:'input'},...counterTypes.map(x=>h('option',{value:x[0]},x[1])));
+    const counterValue=h('input',{class:'input',type:'number',min:'0',max:'100000',step:'1',placeholder:'Новое итоговое значение'});
+    const counterReason=h('input',{class:'input',maxlength:'200',placeholder:'Обязательная причина изменения (не менее 5 символов)'});
+    const counterPreview=h('div',{class:'hint'},'Сначала выберите участника и нажмите «Показать счётчики».');
+    const counterHistory=h('div',{class:'bok-counter-history'});
+    let counterState=null,counterBusy=false;
+    const counterRender=()=>{
+      if(!counterState)return;
+      const k=counterType.value,old=Number(counterState.values[k])||0;
+      counterPreview.textContent='Сейчас: '+old+' · Успешно подтверждённых броней за подругу в текущем эфире (пока не учтены): '+counterState.currentConfirmedFriends+
+        '. После сохранения ачивки будут пересчитаны; выданные награды не отзываются.';
+      counterValue.value=String(old);
+      fill(counterHistory,...(counterState.history||[]).slice(0,12).map(x=>h('p',{class:'hint'},
+        new Date(x.date).toLocaleString('ru-RU')+' · '+(counterTypes.find(t=>t[0]===x.metric)||[x.metric,x.metric])[1]+
+        ': '+x.before+' → '+x.after+' ('+(x.delta>0?'+':'')+x.delta+') · '+x.reason)));
+    };
+    counterType.addEventListener('change',counterRender);
+    const loadCounter=h('button',{class:'btn btn-soft btn-block',onclick:async()=>{
+      if(counterBusy)return;
+      const player=await counterLookup.get();if(!player)return;
+      const r=await act('adminAchCounterState',{key:player.key});
+      if(!r)return;
+      counterState=r;counterRender();
+    }},'🔎 Показать счётчики участника');
+    const counterSave=h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
+      if(counterBusy)return;
+      const player=await counterLookup.get();if(!player)return;
+      if(!counterState||String(counterState.key)!==String(player.key))
+        return toast('Сначала загрузите счётчики выбранного участника','bad');
+      const next=Number(counterValue.value),previous=Number(counterState.values[counterType.value])||0;
+      const reason=counterReason.value.trim();
+      if(!Number.isInteger(next)||next<0||next>100000)return toast('Введите целое значение от 0 до 100000','bad');
+      if(reason.length<5)return toast('Укажите причину длиной не менее 5 символов','bad');
+      if(next===previous)return toast('Значение не изменилось','bad');
+      const label=(counterTypes.find(t=>t[0]===counterType.value)||[])[1]||counterType.value;
+      if(!confirm('Корректировка ачивки для '+player.name+'\\n'+label+': '+previous+' → '+next+
+        '\\nПричина: '+reason+'\\n\\nПродолжить?'))return;
+      counterBusy=true;counterSave.disabled=true;
+      try{
+        const id='ach'+Date.now()+'_'+Math.random().toString(36).slice(2,14);
+        const result=await act('adminAchCounterAdjust',{key:player.key,metric:counterType.value,
+          value:next,expected:previous,reason,requestId:id});
+        if(!result)return;
+        counterReason.value='';
+        toast('Счётчик изменён: '+previous+' → '+next+'. Начисление награды требует синхронизации ачивок.');
+        const fresh=await act('adminAchCounterState',{key:player.key});
+        if(fresh){counterState=fresh;counterRender();}
+      }finally{counterBusy=false;counterSave.disabled=false;}
+    }},'💾 Сохранить корректировку');
+    const counterPanel=h('details',{class:'bok-friend-admin bok-ach-counter-panel'},
+      h('summary',null,'🛠 Ручная корректировка счётчиков ачивок'),
+      h('p',{class:'hint'},'Сохраняются отдельные корректировки прогресса. Баланс номерков, текущие штрафы за пропуски и вращения не изменяются. Ранее выданные ачивки автоматически не отзываются.'),
+      counterLookup.container,loadCounter,counterType,counterPreview,counterValue,counterReason,counterSave,
+      h('h4',null,'История корректировок'),counterHistory);
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
@@ -717,7 +780,7 @@
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
       rewardReady?earlyControls:null,
       rewardReady?unlockBackfillButton:null,
-      friendAudit,
+      friendAudit,counterPanel,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
