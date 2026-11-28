@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#c4501c">
   <title>Бронирование номерков</title>
-  <link rel="stylesheet" href="assets/styles.css?v=6.7.37-load-stability">
+  <link rel="stylesheet" href="assets/styles.css?v=6.7.38-friends">
 </head>
 <body>
   <div id="demo"></div>
@@ -13,17 +13,18 @@
     <div class="card" style="margin-top:40px;text-align:center">Загрузка…</div>
   </main>
   <script defer src="config.js"></script>
-  <script defer src="assets/qrcode.js?v=6.7.37-load-stability"></script>
-  <script defer src="assets/common.js?v=6.7.37-load-stability"></script>
-  <script defer src="assets/vk-auth.js?v=6.7.37-load-stability"></script>
-  <script defer src="assets/app.js?v=6.7.37-load-stability"></script>
+  <script defer src="assets/qrcode.js?v=6.7.38-friends"></script>
+  <script defer src="assets/common.js?v=6.7.38-friends"></script>
+  <script defer src="assets/vk-auth.js?v=6.7.38-friends"></script>
+  <script defer src="assets/app.js?v=6.7.38-friends"></script>
   <footer id="bok-version-footer" style="position:relative;z-index:1;margin:18px auto;max-width:880px;text-align:center;padding:18px 16px 28px;font:13px/1.55 system-ui,sans-serif;color:#746356">
-    <div style="font-weight:700">BOK Body · сайт 6.7.37 · Бронирование</div>
-    <div style="font-size:12px">Релиз 27.11.2026 · Надёжная загрузка и VK ID</div>
+    <div style="font-weight:700">BOK Body · сайт 6.7.38 · Бронирование</div>
+    <div style="font-size:12px">Релиз 28.11.2026 · Бронирование за подругу</div>
     <details style="margin:10px auto 0;max-width:650px;text-align:left;border:1px solid #e6d9ce;border-radius:12px;padding:10px 14px;background:#fffaf6">
       <summary style="cursor:pointer;font-weight:650">История версий и изменений</summary>
       <div style="padding-top:8px;font-size:12px">
         <p style="margin:6px 0"><strong>6.7.37 · 27.11.2026</strong> — Исправлены зависания загрузки при медленном GAS и VK ID: тайм-ауты запросов и SDK, явный экран восстановления входа, возможность открыть публичный кабинет без VK, быстрый переход на резервный CDN и параллельная загрузка скриптов с сохранением порядка выполнения. При задержке записи требуется проверить результат перед повтором. GAS и правила бронирования не изменялись.</p>
+        <p style="margin:6px 0"><strong>6.7.38 · 28.11.2026</strong> — В кабинете подготовлено бронирование за подругу: выбор участницы и номерков без выхода из кабинета, проверка поддержки GAS перед отправкой. Учёт происходит после подтверждения оплаты, при этом номерки принадлежат подруге. Требуется отдельное развёртывание GAS.</p>
         <p style="margin:6px 0"><strong>6.7.33 · 26.11.2026</strong> — Адаптивная компактная раскладка номерков на странице бронирования и в админке. Для 63 номерков — ровно 7 столбцов × 9 рядов; для другого количества — автоматический выбор оптимальной сетки. Уменьшены размеры ячеек на ноутбуках и при небольшой высоте экрана; мобильная адаптация сохранена. GAS и правила бронирования не изменялись.</p>
         <p style="margin:6px 0"><strong>6.7.32 · 26.11.2026</strong> — VK ID: резервный CDN, ограничение времени загрузки, защита от повторных callback и восстановления сессии после выхода, сохранение сессии при сетевых сбоях, исправление выхода. GAS не изменялся.</p>
         <p style="margin:6px 0"><strong>6.7.31 · 26.11.2026</strong> — Участникам: легенда статусов уменьшена до пяти узких кнопок в одну строку. Сокращённые подписи, мини-маркеры и счётчики; полные названия сохранены для экранных дикторов. Интерактивная подсветка работает как прежде.</p>
