@@ -659,13 +659,40 @@
       const result=await act('adminUnlockBackfill',{apply:true,confirm:'ACTIVATE_UNLOCK_BACKFILL'});
       if(result){api.invalidateBalances();toast('Обработано выигрышей: '+result.count);achievementsView();}
     }},'🏅 Проверить и перенести старые разблокировки ачивок');
+    const friendActorLookup=adminPlayerLookup('Кто оформлял бронь · имя или VK');
+    const friendRecipientLookup=adminPlayerLookup('За кого оформлял · имя или VK');
+    const friendEvent=h('input',{class:'input',placeholder:'Номер старого эфира',value:String(A.st.event.number||'')});
+    const friendCode=h('input',{class:'input',placeholder:'Код подтверждённой брони (например Б-1234)'});
+    const friendDelta=h('input',{class:'input',type:'number',min:'-10',max:'10',value:'1'});
+    const friendReason=h('input',{class:'input',placeholder:'Причина и подтверждение оплаты'});
+    const friendConfirmed=h('input',{type:'checkbox'});
+    const friendAudit=h('details',{class:'bok-friend-admin'},
+      h('summary',null,'💌 Учёт старых броней за подруг'),
+      h('p',{class:'hint'},'Только подтверждённые и оплаченные брони. Корректировка учитывается отдельно в листе «BOK Брони за подруг», исходные брони и балансы не изменяются.'),
+      h('label',null,'Кто бронировал'),friendActorLookup.container,
+      h('label',null,'Кому достались номерки'),friendRecipientLookup.container,
+      h('div',{class:'bok-friend-audit-fields'},friendEvent,friendCode,friendDelta,friendReason),
+      h('label',{class:'sw'},friendConfirmed,' Подтверждаю, что бронь была оплачена и подтверждена'),
+      h('button',{class:'btn btn-primary btn-block',onclick:async()=>{
+        const actor=await friendActorLookup.get();if(!actor)return;
+        const recipient=await friendRecipientLookup.get();if(!recipient)return;
+        if(String(actor.key)===String(recipient.key))return toast('Выберите двух разных участников','bad');
+        if(!friendConfirmed.checked)return toast('Подтвердите факт оплаты','bad');
+        const delta=Number(friendDelta.value);
+        if(!Number.isInteger(delta)||delta===0||Math.abs(delta)>10)return toast('Допустима корректировка от -10 до 10, кроме нуля','bad');
+        if(!confirm('Учесть '+delta+' подтверждённых броней за подругу для '+actor.name+'? Подруга: '+recipient.name+'. Операция попадёт в журнал.'))return;
+        const r=await act('adminFriendAdjust',{actorKey:actor.key,recipientKey:recipient.key,
+          event:friendEvent.value.trim(),booking:friendCode.value.trim(),
+          delta,reason:friendReason.value.trim(),confirmed:true});
+        if(r){toast('Корректировка учтена. Счётчик: '+r.friendCount);friendCode.value='';friendReason.value='';friendConfirmed.checked=false;}
+      }},'Записать подтверждённую бронь'));
     const spinLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardLookup=adminPlayerLookup('Имя, @ник, VK ссылка или ID');
     const awardType=h('select',{class:'input'},...[
       ['streak5','🧵 5 подряд'],['streak10','🪡 10 подряд'],['streak15','👑 15 подряд'],
       ['visits10','🧸 10 посещений'],['visits20','🎀 20 посещений'],['visits30','🏰 30 посещений'],
       ['tickets5','🛍️ 5 номерков'],['tickets10','🧳 10 номерков'],['tickets15','🚂 15 номерков'],
-      ['friends10','💌 10 броней друзьям'],['miss3','😴 3 пропуска']
+      ['friend10','💌 10 подтверждённых броней за подруг'],['miss3','😴 3 пропуска']
     ].map(([id,title])=>h('option',{value:id},title)));
     const amount=h('input',{class:'input',type:'number',value:'1',min:'-100',max:'100'});
     const reason=h('input',{class:'input',placeholder:'Причина начисления или списания'});
@@ -690,6 +717,7 @@
       h('p',{class:'hint'},'Исторические начисления выполняются отдельно после проверки. Кнопка ниже ничего не начисляет.'),h('button',{class:'btn btn-soft',onclick:achievementsView},'↻ Обновить каталог и выигрыши'),h('button',{class:'btn btn-primary',onclick:openSpinBatchManager},'👥 Участники и вращения'),syncBtn,
       rewardReady?earlyControls:null,
       rewardReady?unlockBackfillButton:null,
+      friendAudit,
       h('h3',null,'🏅 Выдать достижение вручную'),awardLookup.container,awardType,
       h('button',{class:'btn btn-soft',onclick:async()=>{
         const participant=await awardLookup.get();
