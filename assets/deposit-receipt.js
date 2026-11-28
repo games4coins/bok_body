@@ -5,7 +5,7 @@
   'use strict';
   const W=900, BASE_H=1160;
   const money = n => (Number(n)||0).toLocaleString('ru-RU')+' ₽';
-  const cleanNums = values => [...new Set((Array.isArray(values)?values:String(values||'').split(/[,;\s]+/)).map(Number).filter(n=>Number.isInteger(n)&&n>0))].sort((a,b)=>a-b);
+  const cleanNums = values => [...new Set((Array.isArray(values)?values:String(values||'').split(/[,;.\s№#]+/)).map(Number).filter(n=>Number.isInteger(n)&&n>0))].sort((a,b)=>a-b);
   const short = (value, max) => {
     const s=String(value==null?'':value).replace(/[\x00-\x1f]/g,' ').trim();
     return s.length>max?s.slice(0,max-1)+'…':s;
