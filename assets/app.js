@@ -355,6 +355,96 @@
       rules.url ? h('a', { class: 'btn btn-primary btn-block', href: safeUrl(rules.url), target: '_blank', rel: 'noopener', style: { marginTop: '12px' } }, rules.button || 'ОБМЕНЯТЬ НА СКИДКУ') : null);
   }
 
+  // Friend booking stays inside the authenticated cabinet. The backend
+  // authoritatively verifies the VK token and credits tickets to the recipient.
+  function friendBookingPanel(players,actor){
+    const root=h('section',{class:'bok-cab-panel bok-friend-panel'});
+    const toggle=h('button',{type:'button',class:'btn btn-soft btn-block'},'💌 Забронировать за подругу');
+    const body=h('div',{class:'bok-friend-form hidden'});
+    let checked=false,recipient=null,busy=false;
+    const search=h('input',{class:'input',type:'search',placeholder:'Имя подруги или ссылка vk.com/id…',autocomplete:'off'});
+    const results=h('div',{class:'bok-friend-results'});
+    const selection=h('p',{class:'hint'},'Выберите участницу из базы либо вставьте ссылку на её профиль ВК.');
+    const slots=h('div',{class:'bok-friend-slots'});
+    const count=h('p',{class:'hint'},'Выберите свободные номерки.');
+    const error=h('p',{class:'msg err',role:'alert'});
+    const send=h('button',{type:'button',class:'btn btn-primary btn-block',disabled:true},'Забронировать за подругу');
+    const chosen=new Set();
+    const free=()=>S.st&&Array.isArray(S.st.tickets)?S.st.tickets:[];
+    const actorKey=String(actor.key||'');
+    function redraw(){
+      fill(slots,...free().map((state,i)=>{
+        const n=i+1,ok=state==='f',sel=chosen.has(n);
+        return h('button',{type:'button',class:'bok-friend-number'+(sel?' selected':''),
+          disabled:!ok||busy,'aria-pressed':String(sel),title:'Номерок №'+n,
+          onclick:()=>{if(sel)chosen.delete(n);else chosen.add(n);redraw();}},String(n));
+      }));
+      count.textContent='Выбрано: '+chosen.size+' · свободные номерки показаны светлым цветом';
+      send.disabled=busy||!chosen.size||!recipient;
+    }
+    function choose(p){
+      if(String(p.key)===actorKey){error.textContent='Для себя используйте обычное бронирование.';return;}
+      recipient={playerKey:p.key,name:p.name,url:p.url||''};
+      search.value=p.name;error.textContent='';
+      fill(results);selection.textContent='Номерки будут записаны на '+p.name+'.';
+      redraw();
+    }
+    search.addEventListener('input',()=>{
+      recipient=null;send.disabled=true;
+      const value=search.value.trim();
+      selection.textContent='Выберите участницу из результатов или укажите ссылку VK.';
+      const matched=value.length>=2&&window.BokPlayerSearch
+        ?window.BokPlayerSearch.filter(players,value,12).filter(p=>String(p.key)!==actorKey):[];
+      fill(results,...matched.map(p=>h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>choose(p)},p.name+' · '+(p.url||''))));
+      if(/^https?:\\/\\/(?:www\\.)?vk\\.(?:com|ru)\\//i.test(value)||/^vk\\.(?:com|ru)\\//i.test(value)){
+        recipient={vkUrl:value,name:'По ссылке ВК'};
+        selection.textContent='Получатель по ссылке '+value+'. Сервер проверит профиль ВК.';
+        redraw();
+      }
+    });
+    send.addEventListener('click',async()=>{
+      if(busy||!recipient||!chosen.size)return;
+      const nums=Array.from(chosen).sort((a,b)=>a-b);
+      if(!window.confirm('Оформить '+nums.length+' номерков за подругу? Накопления и участие получит подруга, а вам засчитается подтверждённая бронь для ачивки.'))return;
+      busy=true;send.disabled=true;error.textContent='';
+      try{
+        const token=await window.BokVK.ensureToken();
+        if(!token){error.textContent='Нужно обновить вход через VK ID.';return;}
+        const request={clientId:CLIENT,vkAccessToken:token,friendBooking:true,numbers:nums};
+        if(recipient.playerKey)request.playerKey=recipient.playerKey;
+        else request.vkUrl=recipient.vkUrl;
+        const r=await api.post('book',request);
+        if(!r||!r.ok){error.textContent=(r&&r.error&&r.error.message)||'Бронь не создана';return;}
+        chosen.clear();
+        const b=r.booking;
+        fill(body,h('h4',null,'✅ Бронь за подругу создана'),
+          h('p',{class:'lead'},'Бронь '+b.code+' · номерки '+b.numbers.join(', ')),
+          h('p',{class:'hint'},'Эта бронь принадлежит подруге. Для учёта ачивки организатор должен подтвердить оплату.'),
+          payBlock(b.numbers),commentBlock(b.numbers),
+          h('button',{type:'button',class:'btn btn-primary btn-block',onclick:async()=>{
+            const x=await api.post('markPaid',{clientId:CLIENT,code:b.code});
+            if(x&&x.ok){toast('Заявка об оплате отправлена администратору');refresh(false);}
+            else toast(x&&x.error&&x.error.message||'Не удалось отправить подтверждение','bad');
+          }},'Я оставил(а) комментарий со скриншотом'),
+          h('button',{type:'button',class:'btn btn-soft btn-block',onclick:()=>{body.classList.add('hidden');}},'Вернуться в кабинет'));
+        refresh(false);
+      }finally{busy=false;send.disabled=false;}
+    });
+    toggle.addEventListener('click',async()=>{
+      if(!body.classList.contains('hidden')){body.classList.add('hidden');return;}
+      body.classList.remove('hidden');
+      if(!checked){
+        selection.textContent='Проверяем поддержку бронирования за подругу…';
+        const x=await api.post('friendBookingCapability',{});
+        checked=!!(x&&x.ok&&x.enabled===true);
+        if(!checked){fill(body,h('p',{class:'msg err'},'Сервер ещё не обновлён для безопасной брони за подругу. Дождитесь обновления GAS.'));return;}
+        fill(body,search,results,selection,h('h4',null,'Выберите номерки'),slots,count,error,send);
+        redraw();
+      }
+    });
+    return h('section',{class:'bok-cab-panel bok-friend-panel'},toggle,body);
+  }
+
   // Публичный кабинет БЕЗ авторизации: только те сведения, которые уже видны всем в списке балансов.
   // Нельзя выдавать его за подтверждение владения аккаунтом или давать операции с балансом.
   async function openCabinet(target, publicMode=false) {
@@ -1223,6 +1313,7 @@
               (identity.restored?'VK ID · вход сохранён на устройстве':'VK ID · вход выполнен'):
               'Публичная карточка · без авторизации'))),
         stats,
+        authenticated&&S.st&&S.st.open&&!S.st.paused?friendBookingPanel(players,privatePlayer):null,
         p.frozen?h('p',{class:'msg bok-cab-freeze-note'},left===null?
           '❄ Бессрочная заморозка по старым правилам':
           '❄ До бесплатной разморозки осталось '+left+' дн.'):null,
