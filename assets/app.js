@@ -396,7 +396,8 @@
       const matched=value.length>=2&&window.BokPlayerSearch
         ?window.BokPlayerSearch.filter(players,value,12).filter(p=>String(p.key)!==actorKey):[];
       fill(results,...matched.map(p=>h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>choose(p)},p.name+' · '+(p.url||''))));
-      if(/^https?:\\/\\/(?:www\\.)?vk\\.(?:com|ru)\\//i.test(value)||/^vk\\.(?:com|ru)\\//i.test(value)){
+      const urlHost=value.toLowerCase().replace(/^https?:\/\//i,'').replace(/^www\./i,'');
+      if(urlHost.startsWith('vk.com/')||urlHost.startsWith('vk.ru/')){
         recipient={vkUrl:value,name:'По ссылке ВК'};
         selection.textContent='Получатель по ссылке '+value+'. Сервер проверит профиль ВК.';
         redraw();
