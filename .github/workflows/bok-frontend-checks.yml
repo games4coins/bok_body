@@ -25,6 +25,7 @@ jobs:
           node tests/responsive-booking-grid.test.js
           node tests/archive-achievements-backlog.test.js
           node tests/loading-resilience.test.js
+          node tests/friend-booking.test.js
           node tests/deposit-receipt.test.js
       - name: Check release and routing invariants
         run: |
