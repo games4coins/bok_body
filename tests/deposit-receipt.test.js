@@ -10,6 +10,8 @@ const receipt=client.BokDepositReceipt;
 assert(receipt&&typeof receipt.render==='function');
 const data=receipt.validate({name:'Ирина',numbers:'9, 2; 9, 17',amount:750,balance:1250,event:'235',booking:'B-123'});
 assert.deepEqual(Array.from(data.numbers),[2,9,17]);
+assert.deepEqual(Array.from(receipt.validate({name:'Оксана',numbers:'33.44',amount:500,balance:0}).numbers),[33,44]);
+assert.deepEqual(Array.from(receipt.validate({numbers:'№33. №44; 52, 52',amount:500,balance:100}).numbers),[33,44,52]);
 assert.equal(data.amount,750);
 assert.equal(data.balance,1250);
 assert.equal(data.event,'235');
