@@ -383,8 +383,9 @@
       send.disabled=busy||!chosen.size||!recipient;
     }
     function choose(p){
-      if(String(p.key)===actorKey){error.textContent='Для себя используйте обычное бронирование.';return;}
-      recipient={playerKey:p.key,name:p.name,url:p.url||''};
+      if(!p.url){error.textContent='У участницы нет ссылки ВК. Выберите другую карточку или вставьте ссылку.';return;}
+      if(String(p.url)===String(actor.url)){error.textContent='Для себя используйте обычное бронирование.';return;}
+      recipient={vkUrl:p.url,name:p.name};
       search.value=p.name;error.textContent='';
       fill(results);selection.textContent='Номерки будут записаны на '+p.name+'.';
       redraw();
@@ -394,7 +395,7 @@
       const value=search.value.trim();
       selection.textContent='Выберите участницу из результатов или укажите ссылку VK.';
       const matched=value.length>=2&&window.BokPlayerSearch
-        ?window.BokPlayerSearch.filter(players,value,12).filter(p=>String(p.key)!==actorKey):[];
+        ?window.BokPlayerSearch.filter(players,value,12).filter(p=>p.url&&String(p.url)!==String(actor.url)):[];
       fill(results,...matched.map(p=>h('button',{type:'button',class:'btn btn-soft btn-sm',onclick:()=>choose(p)},p.name+' · '+(p.url||''))));
       const urlHost=value.toLowerCase().replace(/^https?:\/\//i,'').replace(/^www\./i,'');
       if(urlHost.startsWith('vk.com/')||urlHost.startsWith('vk.ru/')){
